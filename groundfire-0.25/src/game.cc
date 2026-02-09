@@ -73,7 +73,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 cGame::cGame
 (
-    bool headless
 ) 
         : _settings ("conf/options.ini"),
           // Create the interface object
@@ -81,17 +80,8 @@ cGame::cGame
                       _settings.getInt ("Graphics", "ScreenHeight", 480),
                       _settings.getInt ("Graphics", "Fullscreen",   0))
 {
-    _headless = headless;
-
     // load the textures and sounds
-    if (!_headless) {
-        loadResources ();
-    } else {
-        _font = NULL;
-#ifndef NOSOUND
-        _sound = NULL;
-#endif
-    }
+    loadResources ();
 
     // These variables are used to determine the time elapsed between frames 
     // and thus, the framerate.
@@ -108,7 +98,6 @@ cGame::cGame
     cMissile::readSettings (_settings);
     cQuake::readSettings (_settings);
     cMissileWeapon::readSettings (_settings);
-    // _headless = false; // REMOVED: Overwriting parameter
     cTrail::readSettings (_settings);
     cBlast::readSettings (_settings);
     cMirv::readSettings (_settings);
@@ -190,7 +179,6 @@ cGame::cGame
     // Finally, reset the timer.
     glfwSetTime (0.0);
     _lastTick = 0.0;
-    _stateCountdown = 0.0f;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -311,19 +299,14 @@ cGame::loopOnce
 {
     // Calculate the time that has passed since the last iteration
     double currentTick = glfwGetTime ();
-    double elapsedTime = currentTick - _lastTick;
-    if (elapsedTime > 0.1) elapsedTime = 0.1; // Cap to prevent logic explosion
-    printf("Loop dt: %f, Total: %f\n", elapsedTime, currentTick);
+    double elapsedTime = currentTick - _lastTick;    
     _lastTick = currentTick;
 
     _time = currentTick;
     
     // Start the frame
-    if (!_headless) _interface.startDraw ();
+    _interface.startDraw ();
     
-    // printf("Game Loop State: %d\n", _gameState);
-    if (_controls == NULL) printf("CONTROLS IS NULL!\n");
-
     switch (_gameState)
     {       
     case MAIN_MENU:
@@ -340,20 +323,16 @@ cGame::loopOnce
         break;
         
     case ROUND_STARTING:
-        printf("ROUND_STARTING: countdown %f\n", _stateCountdown);
         gameLoop (elapsedTime);
         
         // While the round is starting, draw the round number in the centre of 
         // the screen.
-        if (!_headless)
-        {
-            _font->setShadow (true);
-            _font->setSize   (0.6f, 0.6f, 0.5f);
-            _font->setColour (1.0f, 1.0f, 1.0f);
-            _font->printCentredAt (0.0f,  0.5f, "Round %d", _currentRound);
-            _font->printCentredAt (0.0f, -0.5f, "Get Ready");
-            _font->setShadow (false);
-        }
+        _font->setShadow (true);
+        _font->setSize   (0.6f, 0.6f, 0.5f);
+        _font->setColour (1.0f, 1.0f, 1.0f);
+        _font->printCentredAt (0.0f,  0.5f, "Round %d", _currentRound);
+        _font->printCentredAt (0.0f, -0.5f, "Get Ready");
+        _font->setShadow (false);
         
         // Countdown until the round begins
         _stateCountdown -= elapsedTime;
@@ -396,9 +375,7 @@ cGame::loopOnce
     
     // If we have been told to display the Frames per second, we should draw it
     // now in the bottom left corner.
-    // If we have been told to display the Frames per second, we should draw it
-    // now in the bottom left corner.
-    if (_showFPS && !_headless)
+    if (_showFPS)
     {
         // To get a better estimate of the average FPS, only update the FPS
         // every 20 frames.
@@ -448,13 +425,11 @@ cGame::gameLoop
 
     // First we update everything. Landscape first and then the entities.
     
-    // printf("Updating Landscape\n");
     _landscape->update ((float)elapsedTime);
 
     for (iterator  = _entityList.begin ();
          iterator != _entityList.end ();)
     {
-        // printf("Updating Entity %p\n", *iterator);
         // If an entities update function returns 'false', that entity has died
         // and should be removed from the list of entities. 
         if (!(*iterator)->update ((float)elapsedTime))
@@ -467,18 +442,15 @@ cGame::gameLoop
         }
     }
 
-    // Now we draw everything. First the landscape and then the entities.
+    // Now we draw everything. First the landscape and then all the entities.
 
-    if (!_headless)
-    {
-        _landscape->draw ();
+    _landscape->draw ();
     
-        for (iterator  = _entityList.begin ();
-             iterator != _entityList.end ();
-             iterator++)
-        {
-            (*iterator)->draw ();
-        }
+    for (iterator  = _entityList.begin ();
+         iterator != _entityList.end ();
+         iterator++)
+    {
+        (*iterator)->draw ();
     }
 }
 
@@ -868,5 +840,3 @@ cGame::explosion
         }
     }
 }
-
-void cGame::initLandscape() { printf("Init Landscape\n"); _landscape = new cLandscape(&_settings, _lastTick); printf("Landscape Done\n"); }

@@ -93,7 +93,7 @@ enum enumGameState
 class cGame
 {
 public:
-    cGame (bool headless = false);
+    cGame ();
     ~cGame ();
 
     bool loopOnce (void);
@@ -138,11 +138,6 @@ public:
                     int soundToPlay, bool whiteOut,
                     cPlayer * owner);
 
-    void setGameState(enumGameState s) { _gameState = s; if (s == 7) _stateCountdown = 3.0f; }
-    void initLandscape();
-    void setHeadless(bool h) { _headless = h; }
-    bool isHeadless() const { return _headless; }
-
 private:
 
     void loadResources ();
@@ -184,7 +179,6 @@ private:
 
     // should we display the Frames per second during the game?
     bool            _showFPS;
-    bool            _headless;
 
     // Variables for measuring time
     double          _lastTick;

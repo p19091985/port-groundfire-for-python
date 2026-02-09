@@ -274,7 +274,7 @@ cMachineGunWeapon::unselect
 (
 )
 {
-#ifndef NOSOUND
+#ifndef NO_SOUND
     if (_gunSound)
     {
         delete _gunSound;

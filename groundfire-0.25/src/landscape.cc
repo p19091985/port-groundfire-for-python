@@ -229,7 +229,6 @@ cLandscape::update
     float time
 )
 {
-    printf("Landscape::update start. Slices: %d, Chunks: %p\n", _numOfSlices, _landChunks);
  
     bool leftAtRest;
     bool rightAtRest;
@@ -969,7 +968,6 @@ cLandscape::moveToGround
 )
 {
     int   slice = getSliceFromWorldX (x);
-    // printf("moveToGround(%f, %f) Slice: %d\n", x, y, slice);
     float xOffset = getSliceOffsetFromWorldX (x);
 
     float height = 0.0f;

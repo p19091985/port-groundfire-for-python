@@ -97,7 +97,6 @@ public:
     bool  alive () const { return (_state == TANK_ALIVE); }
 
     void  gunLaunchPosition (float &x, float &y);
-    float getHealth() const { return _health; }
 
     void  gunLaunchVelocity (float &xVel, float &yVel);
 

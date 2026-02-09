@@ -65,11 +65,6 @@ OBJECTS = $(SOURCES:.cc=.o)
 $(TARGET):: $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) $(LIBS) -o ../$(TARGET)
 
-TEST_BG_OBJECTS := $(filter-out interface.o main.o, $(OBJECTS))
-
-test_full_suite: headless_interface.o test_full_suite.o $(TEST_BG_OBJECTS)
-	$(CC) $(CFLAGS) $^ $(LIBS) -o ../test_full_suite
-
 # Clean uses the unix 'rm' command so might not work on windows unless you have
 # a version of this.
 clean:

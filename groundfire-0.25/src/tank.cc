@@ -368,19 +368,13 @@ cTank::update
     float time
 )
 {
-    // printf("Tank::update(%f) Player: %p\n", time, _player);
+    bool  boost = false;
     float tiltAngleRadians = (_tankAngle / 180.0f) * PI;
     float cosAngle         = cos (tiltAngleRadians);
     float sinAngle         = sin (tiltAngleRadians);
     
-    // Get keyboard commands from the player
-    // This is the part of the update that depends on the players input.
+    // Update the owner player (used to make the AIs think)
     _player->update ();
-    
-    // From here on is the part of the update that depends on the laws of physics
-    // or the state of the tank.
-    
-    bool boost = false;
 
     if (_game->getGameState () != ROUND_STARTING)
     {
@@ -480,9 +474,7 @@ cTank::update
     }
 
     // Calculate the angle of the tank by looking at the terrain underneath
-    // it (Skip in ROUND_STARTING to avoid headless crashes in moveToGround?)
-    // Actually, only do it if not ROUND_STARTING if that fixes crash.
-    if (_game->getGameState() != ROUND_STARTING) {
+    // it
     
     // Get a coordinates of the far left and far right sides of the tank.
     float leftX  = _x - (_tankSize / 2.0f) * cosAngle;
@@ -574,11 +566,9 @@ cTank::update
         
         _y += maxDisplacement;
     }
-    } // End if != ROUND_STARTING
 
     // update the current weapon
-    if (_game->getGameState() != ROUND_STARTING) 
-        _weapon[_selectedWeapon]->update (time);
+    _weapon[_selectedWeapon]->update (time);
 
     return (true);
 }
