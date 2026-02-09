@@ -1,0 +1,152 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//               Groundfire
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2004, Tom Russell (tom@groundfire.net)
+//
+// This file is part of the Groundfire project, distributed under the MIT 
+// license. See the file 'COPYING', included with this distribution, for a copy
+// of the full MIT licence.
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+//   File name : player.cc
+//
+//          By : Tom Russell
+//
+//        Date : 24-Mar-04
+//
+// Description : Interface class for a player
+//
+//
+//
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+// Includes
+////////////////////////////////////////////////////////////////////////////////
+#include "player.hh"
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Member Functions
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Function    : cPlayer
+//
+// Description : Constructor
+//
+////////////////////////////////////////////////////////////////////////////////
+cPlayer::cPlayer
+(
+    cGame * game,
+    int     number // The player's designated number
+)
+        : _tank (game, this, number)
+{
+    _score  = 0;
+    _money  = 0;
+    _leader = false;
+
+    _number = number;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Function    : ~cPlayer
+//
+// Description : Destructor
+//
+////////////////////////////////////////////////////////////////////////////////
+cPlayer::~cPlayer
+(
+)
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Function    : newRound
+//
+// Description : Reset scoring ready for a new round
+//
+////////////////////////////////////////////////////////////////////////////////
+void
+cPlayer::newRound
+(
+)
+{
+    for (int i = 0; i < 8; i++)
+    {
+        _defeatedPlayers[i] = NULL;
+    }
+
+    _defeatedPlayersCount = 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Function    : endRound
+//
+// Description : Add up the score for the player at the end of a round
+//
+////////////////////////////////////////////////////////////////////////////////
+void
+cPlayer::endRound
+(
+)
+{
+    for (int i = 0; i < _defeatedPlayersCount; i++)
+    {
+        if (_defeatedPlayers[i] == this)
+        {
+            // Oh dear; we killed ourself. Minus 50 points and no money :-(
+            _score -= 50;
+        }
+        else if (_defeatedPlayers[i]->_leader)
+        {
+            // Double points for killing the leader!
+            _score += 200;
+            _money += 50;
+        }
+        else
+        {
+            // Otherwise, just normal points for killing an opponent
+            _score += 100;
+            _money += 50;
+        }
+    }
+    
+    // Award points for surviving the round
+    if (_tank.alive ())
+    {
+        _score += 100;
+        _money += 25;
+    }
+
+    // Everybody gets a little bit of money every round.
+    _money += 10;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// Function    : defeat
+//
+// Description : Add a player to the list of players we have defeated this
+//               round.
+//
+////////////////////////////////////////////////////////////////////////////////
+void
+cPlayer::defeat
+(
+    cPlayer * deadPlayer
+) 
+{
+    // Add this player to the list of our victories for the round!
+
+    _defeatedPlayers[_defeatedPlayersCount] = deadPlayer;
+    _defeatedPlayersCount++;
+}

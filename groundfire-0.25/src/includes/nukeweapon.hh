@@ -1,0 +1,59 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//               Groundfire
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2004, Tom Russell (tom@groundfire.net)
+//
+// This file is part of the Groundfire project, distributed under the MIT 
+// license. See the file 'COPYING', included with this distribution, for a copy
+// of the full MIT licence.
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+//   File name : nukeweapon.hh
+//
+//          By : Tom Russell
+//
+//        Date : 28-Apr-03
+//
+// Description : Handles the nuclear weapons of a tank
+//
+//
+//
+////////////////////////////////////////////////////////////////////////////////
+#ifndef __NUKEWEAPON_HH__
+#define __NUKEWEAPON_HH__
+
+////////////////////////////////////////////////////////////////////////////////
+// Includes
+////////////////////////////////////////////////////////////////////////////////
+#include "weapon.hh"
+
+////////////////////////////////////////////////////////////////////////////////
+// Exception Classes
+////////////////////////////////////////////////////////////////////////////////
+
+class cNukeWeapon : public cWeapon
+{
+public:
+    cNukeWeapon (cGame * game, cTank * ownerTank);
+    ~cNukeWeapon ();
+
+    static void readSettings (cReadIniFile const & settings);
+
+    bool fire (bool starting, float time);
+    void update (float time);
+    bool select (void);
+    void drawGraphic (float x);
+
+private:
+    // Settings Variables
+    static float OPTION_BlastSize;
+    static float OPTION_CooldownTime;
+    static float OPTION_Damage; 
+    static int   OPTION_Cost;
+};
+
+#endif // __NUKEWEAPON_HH__

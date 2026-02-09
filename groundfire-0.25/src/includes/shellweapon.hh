@@ -1,0 +1,62 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//               Groundfire
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2004, Tom Russell (tom@groundfire.net)
+//
+// This file is part of the Groundfire project, distributed under the MIT 
+// license. See the file 'COPYING', included with this distribution, for a copy
+// of the full MIT licence.
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+//   File name : shellweapon.hh
+//
+//          By : Tom Russell
+//
+//        Date : 28-Apr-03
+//
+// Description : Handles the standard weapon
+//
+//
+//
+////////////////////////////////////////////////////////////////////////////////
+#ifndef __SHELLWEAPON_HH__
+#define __SHELLWEAPON_HH__
+
+////////////////////////////////////////////////////////////////////////////////
+// Includes
+////////////////////////////////////////////////////////////////////////////////
+#include "weapon.hh"
+
+////////////////////////////////////////////////////////////////////////////////
+// Exception Classes
+////////////////////////////////////////////////////////////////////////////////
+
+class cShellWeapon : public cWeapon
+{
+public:
+    cShellWeapon (cGame * game, cTank * ownerTank);
+    ~cShellWeapon ();
+
+    static void readSettings (cReadIniFile const & settings);
+
+    bool fire (bool starting, float time);
+
+    void update (float time);
+
+    bool select (void);
+
+    void drawGraphic (float x);
+
+private:
+    // Settings Variables
+    static float OPTION_BlastSize;
+    static float OPTION_CooldownTime;
+    static float OPTION_Damage;
+    
+};
+
+#endif // __SHELLWEAPON_HH__

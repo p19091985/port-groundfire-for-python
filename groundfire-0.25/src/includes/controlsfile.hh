@@ -1,0 +1,61 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//               Groundfire
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2004, Tom Russell (tom@groundfire.net)
+//
+// This file is part of the Groundfire project, distributed under the MIT 
+// license. See the file 'COPYING', included with this distribution, for a copy
+// of the full MIT licence.
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+//   File name : controlsfile.hh
+//
+//          By : Tom Russell
+//
+//        Date : 21-Jan-04
+//
+// Description : Handles the reading and writing of the file that stores the 
+//               current controller mappings.
+//
+//
+////////////////////////////////////////////////////////////////////////////////
+#ifndef __CONTROLSFILE_HH__
+#define __CONTROLSFILE_HH__
+
+////////////////////////////////////////////////////////////////////////////////
+// Includes
+////////////////////////////////////////////////////////////////////////////////
+#include <stdio.h>
+#include <string.h>
+#include "controls.hh"
+
+////////////////////////////////////////////////////////////////////////////////
+// Exception Classes
+////////////////////////////////////////////////////////////////////////////////
+class eControlsFile {};
+
+class cControlsFile
+{
+public:
+    cControlsFile (cControls * controls, char * fileName);
+    ~cControlsFile ();
+
+    bool readFile ();
+    bool writeFile ();
+
+private:
+    bool readLayout (int layout);
+    void skipWhiteSpace ();
+
+    cControls * _controls;
+
+    char * _fileName;
+    FILE * _file;
+    
+};
+
+#endif // __CONTROLSFILE_HH__

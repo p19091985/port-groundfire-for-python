@@ -1,0 +1,3002 @@
+Init Landscape
+Landscape Done
+Loop 0 Start
+Loop dt: 0.000777, Total: 0.000777
+ROUND_STARTING: countdown 3.000000
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 0 End. Running: 1
+{ "tick": 0, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999997, "hp": 0.000003 }] }
+Loop 1 Start
+Loop dt: 0.000485, Total: 0.001262
+ROUND_STARTING: countdown 2.999223
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 1 End. Running: 1
+{ "tick": 1, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999994, "hp": 0.000003 }] }
+Loop 2 Start
+Loop dt: 0.000122, Total: 0.001384
+ROUND_STARTING: countdown 2.998738
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 2 End. Running: 1
+{ "tick": 2, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999993, "hp": 0.000003 }] }
+Loop 3 Start
+Loop dt: 0.000108, Total: 0.001492
+ROUND_STARTING: countdown 2.998616
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 3 End. Running: 1
+{ "tick": 3, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999992, "hp": 0.000003 }] }
+Loop 4 Start
+Loop dt: 0.000124, Total: 0.001615
+ROUND_STARTING: countdown 2.998508
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 4 End. Running: 1
+{ "tick": 4, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999991, "hp": 0.000003 }] }
+Loop 5 Start
+Loop dt: 0.000112, Total: 0.001727
+ROUND_STARTING: countdown 2.998384
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 5 End. Running: 1
+{ "tick": 5, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999990, "hp": 0.000003 }] }
+Loop 6 Start
+Loop dt: 0.000112, Total: 0.001839
+ROUND_STARTING: countdown 2.998272
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 6 End. Running: 1
+{ "tick": 6, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999990, "hp": 0.000003 }] }
+Loop 7 Start
+Loop dt: 0.000116, Total: 0.001956
+ROUND_STARTING: countdown 2.998160
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 7 End. Running: 1
+{ "tick": 7, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999989, "hp": 0.000003 }] }
+Loop 8 Start
+Loop dt: 0.000109, Total: 0.002064
+ROUND_STARTING: countdown 2.998044
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 8 End. Running: 1
+{ "tick": 8, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999988, "hp": 0.000003 }] }
+Loop 9 Start
+Loop dt: 0.000113, Total: 0.002177
+ROUND_STARTING: countdown 2.997935
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 9 End. Running: 1
+{ "tick": 9, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999986, "hp": 0.000003 }] }
+Loop 10 Start
+Loop dt: 0.000138, Total: 0.002315
+ROUND_STARTING: countdown 2.997823
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 10 End. Running: 1
+{ "tick": 10, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999985, "hp": 0.000003 }] }
+Loop 11 Start
+Loop dt: 0.000109, Total: 0.002424
+ROUND_STARTING: countdown 2.997685
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 11 End. Running: 1
+{ "tick": 11, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999983, "hp": 0.000003 }] }
+Loop 12 Start
+Loop dt: 0.000107, Total: 0.002531
+ROUND_STARTING: countdown 2.997576
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 12 End. Running: 1
+{ "tick": 12, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999982, "hp": 0.000003 }] }
+Loop 13 Start
+Loop dt: 0.000105, Total: 0.002636
+ROUND_STARTING: countdown 2.997469
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 13 End. Running: 1
+{ "tick": 13, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999980, "hp": 0.000003 }] }
+Loop 14 Start
+Loop dt: 0.000100, Total: 0.002736
+ROUND_STARTING: countdown 2.997364
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 14 End. Running: 1
+{ "tick": 14, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999979, "hp": 0.000003 }] }
+Loop 15 Start
+Loop dt: 0.000100, Total: 0.002836
+ROUND_STARTING: countdown 2.997264
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 15 End. Running: 1
+{ "tick": 15, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999978, "hp": 0.000003 }] }
+Loop 16 Start
+Loop dt: 0.000104, Total: 0.002940
+ROUND_STARTING: countdown 2.997164
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 16 End. Running: 1
+{ "tick": 16, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999976, "hp": 0.000003 }] }
+Loop 17 Start
+Loop dt: 0.000126, Total: 0.003066
+ROUND_STARTING: countdown 2.997060
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 17 End. Running: 1
+{ "tick": 17, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999974, "hp": 0.000003 }] }
+Loop 18 Start
+Loop dt: 0.000106, Total: 0.003171
+ROUND_STARTING: countdown 2.996934
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 18 End. Running: 1
+{ "tick": 18, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999972, "hp": 0.000003 }] }
+Loop 19 Start
+Loop dt: 0.000164, Total: 0.003336
+ROUND_STARTING: countdown 2.996829
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 19 End. Running: 1
+{ "tick": 19, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999969, "hp": 0.000003 }] }
+Loop 20 Start
+Loop dt: 0.000109, Total: 0.003445
+ROUND_STARTING: countdown 2.996664
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 20 End. Running: 1
+{ "tick": 20, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999968, "hp": 0.000003 }] }
+Loop 21 Start
+Loop dt: 0.000109, Total: 0.003554
+ROUND_STARTING: countdown 2.996555
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 21 End. Running: 1
+{ "tick": 21, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999966, "hp": 0.000003 }] }
+Loop 22 Start
+Loop dt: 0.000111, Total: 0.003666
+ROUND_STARTING: countdown 2.996446
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 22 End. Running: 1
+{ "tick": 22, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999964, "hp": 0.000003 }] }
+Loop 23 Start
+Loop dt: 0.000105, Total: 0.003770
+ROUND_STARTING: countdown 2.996334
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 23 End. Running: 1
+{ "tick": 23, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999962, "hp": 0.000003 }] }
+Loop 24 Start
+Loop dt: 0.000102, Total: 0.003873
+ROUND_STARTING: countdown 2.996229
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 24 End. Running: 1
+{ "tick": 24, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999960, "hp": 0.000003 }] }
+Loop 25 Start
+Loop dt: 0.000102, Total: 0.003974
+ROUND_STARTING: countdown 2.996127
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 25 End. Running: 1
+{ "tick": 25, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999958, "hp": 0.000003 }] }
+Loop 26 Start
+Loop dt: 0.000110, Total: 0.004085
+ROUND_STARTING: countdown 2.996026
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 26 End. Running: 1
+{ "tick": 26, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999956, "hp": 0.000003 }] }
+Loop 27 Start
+Loop dt: 0.000107, Total: 0.004192
+ROUND_STARTING: countdown 2.995915
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 27 End. Running: 1
+{ "tick": 27, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999953, "hp": 0.000003 }] }
+Loop 28 Start
+Loop dt: 0.000147, Total: 0.004339
+ROUND_STARTING: countdown 2.995808
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 28 End. Running: 1
+{ "tick": 28, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999950, "hp": 0.000003 }] }
+Loop 29 Start
+Loop dt: 0.000116, Total: 0.004455
+ROUND_STARTING: countdown 2.995661
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 29 End. Running: 1
+{ "tick": 29, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999948, "hp": 0.000003 }] }
+Loop 30 Start
+Loop dt: 0.000134, Total: 0.004589
+ROUND_STARTING: countdown 2.995545
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 30 End. Running: 1
+{ "tick": 30, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999945, "hp": 0.000003 }] }
+Loop 31 Start
+Loop dt: 0.000118, Total: 0.004708
+ROUND_STARTING: countdown 2.995411
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 31 End. Running: 1
+{ "tick": 31, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999942, "hp": 0.000003 }] }
+Loop 32 Start
+Loop dt: 0.000116, Total: 0.004823
+ROUND_STARTING: countdown 2.995292
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 32 End. Running: 1
+{ "tick": 32, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999939, "hp": 0.000003 }] }
+Loop 33 Start
+Loop dt: 0.000176, Total: 0.004999
+ROUND_STARTING: countdown 2.995177
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 33 End. Running: 1
+{ "tick": 33, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999935, "hp": 0.000003 }] }
+Loop 34 Start
+Loop dt: 0.000118, Total: 0.005117
+ROUND_STARTING: countdown 2.995001
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 34 End. Running: 1
+{ "tick": 34, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999932, "hp": 0.000003 }] }
+Loop 35 Start
+Loop dt: 0.000140, Total: 0.005258
+ROUND_STARTING: countdown 2.994883
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 35 End. Running: 1
+{ "tick": 35, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999928, "hp": 0.000003 }] }
+Loop 36 Start
+Loop dt: 0.000118, Total: 0.005376
+ROUND_STARTING: countdown 2.994743
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 36 End. Running: 1
+{ "tick": 36, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999925, "hp": 0.000003 }] }
+Loop 37 Start
+Loop dt: 0.000114, Total: 0.005490
+ROUND_STARTING: countdown 2.994625
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 37 End. Running: 1
+{ "tick": 37, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999921, "hp": 0.000003 }] }
+Loop 38 Start
+Loop dt: 0.000501, Total: 0.005990
+ROUND_STARTING: countdown 2.994510
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 38 End. Running: 1
+{ "tick": 38, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999907, "hp": 0.000003 }] }
+Loop 39 Start
+Loop dt: 0.000109, Total: 0.006100
+ROUND_STARTING: countdown 2.994010
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 39 End. Running: 1
+{ "tick": 39, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999903, "hp": 0.000003 }] }
+Loop 40 Start
+Loop dt: 0.000102, Total: 0.006202
+ROUND_STARTING: countdown 2.993901
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 40 End. Running: 1
+{ "tick": 40, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999900, "hp": 0.000003 }] }
+Loop 41 Start
+Loop dt: 0.000134, Total: 0.006336
+ROUND_STARTING: countdown 2.993798
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 41 End. Running: 1
+{ "tick": 41, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999896, "hp": 0.000003 }] }
+Loop 42 Start
+Loop dt: 0.000088, Total: 0.006424
+ROUND_STARTING: countdown 2.993664
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 42 End. Running: 1
+{ "tick": 42, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999893, "hp": 0.000003 }] }
+Loop 43 Start
+Loop dt: 0.000088, Total: 0.006512
+ROUND_STARTING: countdown 2.993576
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 43 End. Running: 1
+{ "tick": 43, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999890, "hp": 0.000003 }] }
+Loop 44 Start
+Loop dt: 0.000086, Total: 0.006598
+ROUND_STARTING: countdown 2.993488
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 44 End. Running: 1
+{ "tick": 44, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999887, "hp": 0.000003 }] }
+Loop 45 Start
+Loop dt: 0.000087, Total: 0.006685
+ROUND_STARTING: countdown 2.993402
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 45 End. Running: 1
+{ "tick": 45, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999884, "hp": 0.000003 }] }
+Loop 46 Start
+Loop dt: 0.000087, Total: 0.006772
+ROUND_STARTING: countdown 2.993315
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 46 End. Running: 1
+{ "tick": 46, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999881, "hp": 0.000003 }] }
+Loop 47 Start
+Loop dt: 0.000088, Total: 0.006860
+ROUND_STARTING: countdown 2.993229
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 47 End. Running: 1
+{ "tick": 47, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999878, "hp": 0.000003 }] }
+Loop 48 Start
+Loop dt: 0.000089, Total: 0.006949
+ROUND_STARTING: countdown 2.993140
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 48 End. Running: 1
+{ "tick": 48, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999875, "hp": 0.000003 }] }
+Loop 49 Start
+Loop dt: 0.000127, Total: 0.007076
+ROUND_STARTING: countdown 2.993051
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 49 End. Running: 1
+{ "tick": 49, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999871, "hp": 0.000003 }] }
+Loop 50 Start
+Loop dt: 0.000090, Total: 0.007166
+ROUND_STARTING: countdown 2.992924
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 50 End. Running: 1
+{ "tick": 50, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999867, "hp": 0.000003 }] }
+Loop 51 Start
+Loop dt: 0.000099, Total: 0.007265
+ROUND_STARTING: countdown 2.992834
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 51 End. Running: 1
+{ "tick": 51, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999864, "hp": 0.000003 }] }
+Loop 52 Start
+Loop dt: 0.000088, Total: 0.007353
+ROUND_STARTING: countdown 2.992735
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 52 End. Running: 1
+{ "tick": 52, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999860, "hp": 0.000003 }] }
+Loop 53 Start
+Loop dt: 0.000089, Total: 0.007442
+ROUND_STARTING: countdown 2.992647
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 53 End. Running: 1
+{ "tick": 53, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999857, "hp": 0.000003 }] }
+Loop 54 Start
+Loop dt: 0.000088, Total: 0.007529
+ROUND_STARTING: countdown 2.992559
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 54 End. Running: 1
+{ "tick": 54, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999854, "hp": 0.000003 }] }
+Loop 55 Start
+Loop dt: 0.000091, Total: 0.007620
+ROUND_STARTING: countdown 2.992471
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 55 End. Running: 1
+{ "tick": 55, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999850, "hp": 0.000003 }] }
+Loop 56 Start
+Loop dt: 0.000088, Total: 0.007708
+ROUND_STARTING: countdown 2.992380
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 56 End. Running: 1
+{ "tick": 56, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999847, "hp": 0.000003 }] }
+Loop 57 Start
+Loop dt: 0.000095, Total: 0.007803
+ROUND_STARTING: countdown 2.992292
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 57 End. Running: 1
+{ "tick": 57, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999843, "hp": 0.000003 }] }
+Loop 58 Start
+Loop dt: 0.000087, Total: 0.007890
+ROUND_STARTING: countdown 2.992198
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 58 End. Running: 1
+{ "tick": 58, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999840, "hp": 0.000003 }] }
+Loop 59 Start
+Loop dt: 0.000088, Total: 0.007977
+ROUND_STARTING: countdown 2.992111
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 59 End. Running: 1
+{ "tick": 59, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999836, "hp": 0.000003 }] }
+Loop 60 Start
+Loop dt: 0.000088, Total: 0.008065
+ROUND_STARTING: countdown 2.992023
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 60 End. Running: 1
+{ "tick": 60, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999833, "hp": 0.000003 }] }
+Loop 61 Start
+Loop dt: 0.000093, Total: 0.008159
+ROUND_STARTING: countdown 2.991935
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 61 End. Running: 1
+{ "tick": 61, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999829, "hp": 0.000003 }] }
+Loop 62 Start
+Loop dt: 0.000125, Total: 0.008284
+ROUND_STARTING: countdown 2.991842
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 62 End. Running: 1
+{ "tick": 62, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999824, "hp": 0.000003 }] }
+Loop 63 Start
+Loop dt: 0.000091, Total: 0.008375
+ROUND_STARTING: countdown 2.991716
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 63 End. Running: 1
+{ "tick": 63, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999820, "hp": 0.000003 }] }
+Loop 64 Start
+Loop dt: 0.000092, Total: 0.008467
+ROUND_STARTING: countdown 2.991625
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 64 End. Running: 1
+{ "tick": 64, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999816, "hp": 0.000003 }] }
+Loop 65 Start
+Loop dt: 0.000098, Total: 0.008565
+ROUND_STARTING: countdown 2.991533
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 65 End. Running: 1
+{ "tick": 65, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999812, "hp": 0.000003 }] }
+Loop 66 Start
+Loop dt: 0.000095, Total: 0.008661
+ROUND_STARTING: countdown 2.991435
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 66 End. Running: 1
+{ "tick": 66, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999808, "hp": 0.000003 }] }
+Loop 67 Start
+Loop dt: 0.000089, Total: 0.008750
+ROUND_STARTING: countdown 2.991340
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 67 End. Running: 1
+{ "tick": 67, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999804, "hp": 0.000003 }] }
+Loop 68 Start
+Loop dt: 0.000101, Total: 0.008851
+ROUND_STARTING: countdown 2.991250
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 68 End. Running: 1
+{ "tick": 68, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999800, "hp": 0.000003 }] }
+Loop 69 Start
+Loop dt: 0.000091, Total: 0.008942
+ROUND_STARTING: countdown 2.991149
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 69 End. Running: 1
+{ "tick": 69, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999795, "hp": 0.000003 }] }
+Loop 70 Start
+Loop dt: 0.000088, Total: 0.009030
+ROUND_STARTING: countdown 2.991058
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 70 End. Running: 1
+{ "tick": 70, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999792, "hp": 0.000003 }] }
+Loop 71 Start
+Loop dt: 0.000089, Total: 0.009119
+ROUND_STARTING: countdown 2.990970
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 71 End. Running: 1
+{ "tick": 71, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999788, "hp": 0.000003 }] }
+Loop 72 Start
+Loop dt: 0.000105, Total: 0.009224
+ROUND_STARTING: countdown 2.990881
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 72 End. Running: 1
+{ "tick": 72, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999783, "hp": 0.000003 }] }
+Loop 73 Start
+Loop dt: 0.000097, Total: 0.009321
+ROUND_STARTING: countdown 2.990777
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 73 End. Running: 1
+{ "tick": 73, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999778, "hp": 0.000003 }] }
+Loop 74 Start
+Loop dt: 0.000091, Total: 0.009412
+ROUND_STARTING: countdown 2.990679
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 74 End. Running: 1
+{ "tick": 74, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999774, "hp": 0.000003 }] }
+Loop 75 Start
+Loop dt: 0.000095, Total: 0.009507
+ROUND_STARTING: countdown 2.990589
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 75 End. Running: 1
+{ "tick": 75, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999770, "hp": 0.000003 }] }
+Loop 76 Start
+Loop dt: 0.000093, Total: 0.009599
+ROUND_STARTING: countdown 2.990494
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 76 End. Running: 1
+{ "tick": 76, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999765, "hp": 0.000003 }] }
+Loop 77 Start
+Loop dt: 0.000091, Total: 0.009690
+ROUND_STARTING: countdown 2.990401
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 77 End. Running: 1
+{ "tick": 77, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999761, "hp": 0.000003 }] }
+Loop 78 Start
+Loop dt: 0.000088, Total: 0.009779
+ROUND_STARTING: countdown 2.990310
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 78 End. Running: 1
+{ "tick": 78, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999757, "hp": 0.000003 }] }
+Loop 79 Start
+Loop dt: 0.000089, Total: 0.009868
+ROUND_STARTING: countdown 2.990222
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 79 End. Running: 1
+{ "tick": 79, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999753, "hp": 0.000003 }] }
+Loop 80 Start
+Loop dt: 0.000098, Total: 0.009965
+ROUND_STARTING: countdown 2.990133
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 80 End. Running: 1
+{ "tick": 80, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999748, "hp": 0.000003 }] }
+Loop 81 Start
+Loop dt: 0.000097, Total: 0.010063
+ROUND_STARTING: countdown 2.990035
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 81 End. Running: 1
+{ "tick": 81, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999743, "hp": 0.000003 }] }
+Loop 82 Start
+Loop dt: 0.000093, Total: 0.010155
+ROUND_STARTING: countdown 2.989938
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 82 End. Running: 1
+{ "tick": 82, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999738, "hp": 0.000003 }] }
+Loop 83 Start
+Loop dt: 0.000108, Total: 0.010264
+ROUND_STARTING: countdown 2.989845
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 83 End. Running: 1
+{ "tick": 83, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999732, "hp": 0.000003 }] }
+Loop 84 Start
+Loop dt: 0.000092, Total: 0.010355
+ROUND_STARTING: countdown 2.989737
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 84 End. Running: 1
+{ "tick": 84, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999728, "hp": 0.000003 }] }
+Loop 85 Start
+Loop dt: 0.000099, Total: 0.010454
+ROUND_STARTING: countdown 2.989645
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 85 End. Running: 1
+{ "tick": 85, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999722, "hp": 0.000003 }] }
+Loop 86 Start
+Loop dt: 0.000096, Total: 0.010550
+ROUND_STARTING: countdown 2.989546
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 86 End. Running: 1
+{ "tick": 86, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999717, "hp": 0.000003 }] }
+Loop 87 Start
+Loop dt: 0.000096, Total: 0.010646
+ROUND_STARTING: countdown 2.989450
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 87 End. Running: 1
+{ "tick": 87, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999712, "hp": 0.000003 }] }
+Loop 88 Start
+Loop dt: 0.000088, Total: 0.010734
+ROUND_STARTING: countdown 2.989354
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 88 End. Running: 1
+{ "tick": 88, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999707, "hp": 0.000003 }] }
+Loop 89 Start
+Loop dt: 0.000087, Total: 0.010821
+ROUND_STARTING: countdown 2.989266
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 89 End. Running: 1
+{ "tick": 89, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999702, "hp": 0.000003 }] }
+Loop 90 Start
+Loop dt: 0.000082, Total: 0.010903
+ROUND_STARTING: countdown 2.989179
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 90 End. Running: 1
+{ "tick": 90, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999698, "hp": 0.000003 }] }
+Loop 91 Start
+Loop dt: 0.000080, Total: 0.010983
+ROUND_STARTING: countdown 2.989098
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 91 End. Running: 1
+{ "tick": 91, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999694, "hp": 0.000003 }] }
+Loop 92 Start
+Loop dt: 0.000078, Total: 0.011061
+ROUND_STARTING: countdown 2.989017
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 92 End. Running: 1
+{ "tick": 92, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999690, "hp": 0.000003 }] }
+Loop 93 Start
+Loop dt: 0.000080, Total: 0.011141
+ROUND_STARTING: countdown 2.988939
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 93 End. Running: 1
+{ "tick": 93, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999685, "hp": 0.000003 }] }
+Loop 94 Start
+Loop dt: 0.000094, Total: 0.011235
+ROUND_STARTING: countdown 2.988859
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 94 End. Running: 1
+{ "tick": 94, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999680, "hp": 0.000003 }] }
+Loop 95 Start
+Loop dt: 0.000083, Total: 0.011318
+ROUND_STARTING: countdown 2.988765
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 95 End. Running: 1
+{ "tick": 95, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999675, "hp": 0.000003 }] }
+Loop 96 Start
+Loop dt: 0.000078, Total: 0.011396
+ROUND_STARTING: countdown 2.988683
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 96 End. Running: 1
+{ "tick": 96, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999671, "hp": 0.000003 }] }
+Loop 97 Start
+Loop dt: 0.000088, Total: 0.011484
+ROUND_STARTING: countdown 2.988604
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 97 End. Running: 1
+{ "tick": 97, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999666, "hp": 0.000003 }] }
+Loop 98 Start
+Loop dt: 0.000083, Total: 0.011567
+ROUND_STARTING: countdown 2.988516
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 98 End. Running: 1
+{ "tick": 98, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999661, "hp": 0.000003 }] }
+Loop 99 Start
+Loop dt: 0.000088, Total: 0.011654
+ROUND_STARTING: countdown 2.988434
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 99 End. Running: 1
+{ "tick": 99, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999656, "hp": 0.000003 }] }
+Loop 100 Start
+Loop dt: 0.000080, Total: 0.011735
+ROUND_STARTING: countdown 2.988346
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 100 End. Running: 1
+{ "tick": 100, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999651, "hp": 0.000003 }] }
+Loop 101 Start
+Loop dt: 0.000082, Total: 0.011817
+ROUND_STARTING: countdown 2.988266
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 101 End. Running: 1
+{ "tick": 101, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999646, "hp": 0.000003 }] }
+Loop 102 Start
+Loop dt: 0.000081, Total: 0.011897
+ROUND_STARTING: countdown 2.988184
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 102 End. Running: 1
+{ "tick": 102, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999641, "hp": 0.000003 }] }
+Loop 103 Start
+Loop dt: 0.000081, Total: 0.011978
+ROUND_STARTING: countdown 2.988103
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 103 End. Running: 1
+{ "tick": 103, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999637, "hp": 0.000003 }] }
+Loop 104 Start
+Loop dt: 0.000081, Total: 0.012059
+ROUND_STARTING: countdown 2.988023
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 104 End. Running: 1
+{ "tick": 104, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999632, "hp": 0.000003 }] }
+Loop 105 Start
+Loop dt: 0.000079, Total: 0.012137
+ROUND_STARTING: countdown 2.987942
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 105 End. Running: 1
+{ "tick": 105, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999627, "hp": 0.000003 }] }
+Loop 106 Start
+Loop dt: 0.000095, Total: 0.012232
+ROUND_STARTING: countdown 2.987863
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 106 End. Running: 1
+{ "tick": 106, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999621, "hp": 0.000003 }] }
+Loop 107 Start
+Loop dt: 0.000083, Total: 0.012315
+ROUND_STARTING: countdown 2.987768
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 107 End. Running: 1
+{ "tick": 107, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999616, "hp": 0.000003 }] }
+Loop 108 Start
+Loop dt: 0.000084, Total: 0.012399
+ROUND_STARTING: countdown 2.987685
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 108 End. Running: 1
+{ "tick": 108, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999611, "hp": 0.000003 }] }
+Loop 109 Start
+Loop dt: 0.000083, Total: 0.012482
+ROUND_STARTING: countdown 2.987602
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 109 End. Running: 1
+{ "tick": 109, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999606, "hp": 0.000003 }] }
+Loop 110 Start
+Loop dt: 0.000083, Total: 0.012564
+ROUND_STARTING: countdown 2.987519
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 110 End. Running: 1
+{ "tick": 110, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999600, "hp": 0.000003 }] }
+Loop 111 Start
+Loop dt: 0.000080, Total: 0.012645
+ROUND_STARTING: countdown 2.987436
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 111 End. Running: 1
+{ "tick": 111, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999595, "hp": 0.000003 }] }
+Loop 112 Start
+Loop dt: 0.000083, Total: 0.012728
+ROUND_STARTING: countdown 2.987356
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 112 End. Running: 1
+{ "tick": 112, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999590, "hp": 0.000003 }] }
+Loop 113 Start
+Loop dt: 0.000082, Total: 0.012810
+ROUND_STARTING: countdown 2.987273
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 113 End. Running: 1
+{ "tick": 113, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999585, "hp": 0.000003 }] }
+Loop 114 Start
+Loop dt: 0.000087, Total: 0.012897
+ROUND_STARTING: countdown 2.987190
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 114 End. Running: 1
+{ "tick": 114, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999579, "hp": 0.000003 }] }
+Loop 115 Start
+Loop dt: 0.000080, Total: 0.012977
+ROUND_STARTING: countdown 2.987103
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 115 End. Running: 1
+{ "tick": 115, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999574, "hp": 0.000003 }] }
+Loop 116 Start
+Loop dt: 0.000078, Total: 0.013055
+ROUND_STARTING: countdown 2.987024
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 116 End. Running: 1
+{ "tick": 116, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999568, "hp": 0.000003 }] }
+Loop 117 Start
+Loop dt: 0.000079, Total: 0.013134
+ROUND_STARTING: countdown 2.986946
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 117 End. Running: 1
+{ "tick": 117, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999563, "hp": 0.000003 }] }
+Loop 118 Start
+Loop dt: 0.000087, Total: 0.013221
+ROUND_STARTING: countdown 2.986867
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 118 End. Running: 1
+{ "tick": 118, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999557, "hp": 0.000003 }] }
+Loop 119 Start
+Loop dt: 0.000078, Total: 0.013299
+ROUND_STARTING: countdown 2.986780
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 119 End. Running: 1
+{ "tick": 119, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999552, "hp": 0.000003 }] }
+Loop 120 Start
+Loop dt: 0.000082, Total: 0.013381
+ROUND_STARTING: countdown 2.986702
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 120 End. Running: 1
+{ "tick": 120, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999547, "hp": 0.000003 }] }
+Loop 121 Start
+Loop dt: 0.000084, Total: 0.013465
+ROUND_STARTING: countdown 2.986619
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 121 End. Running: 1
+{ "tick": 121, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999541, "hp": 0.000003 }] }
+Loop 122 Start
+Loop dt: 0.000084, Total: 0.013549
+ROUND_STARTING: countdown 2.986535
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 122 End. Running: 1
+{ "tick": 122, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999535, "hp": 0.000003 }] }
+Loop 123 Start
+Loop dt: 0.000082, Total: 0.013631
+ROUND_STARTING: countdown 2.986451
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 123 End. Running: 1
+{ "tick": 123, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999529, "hp": 0.000003 }] }
+Loop 124 Start
+Loop dt: 0.000087, Total: 0.013718
+ROUND_STARTING: countdown 2.986369
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 124 End. Running: 1
+{ "tick": 124, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999524, "hp": 0.000003 }] }
+Loop 125 Start
+Loop dt: 0.000080, Total: 0.013798
+ROUND_STARTING: countdown 2.986282
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 125 End. Running: 1
+{ "tick": 125, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999518, "hp": 0.000003 }] }
+Loop 126 Start
+Loop dt: 0.000085, Total: 0.013884
+ROUND_STARTING: countdown 2.986202
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 126 End. Running: 1
+{ "tick": 126, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999512, "hp": 0.000003 }] }
+Loop 127 Start
+Loop dt: 0.000085, Total: 0.013969
+ROUND_STARTING: countdown 2.986117
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 127 End. Running: 1
+{ "tick": 127, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999506, "hp": 0.000003 }] }
+Loop 128 Start
+Loop dt: 0.000084, Total: 0.014052
+ROUND_STARTING: countdown 2.986032
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 128 End. Running: 1
+{ "tick": 128, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999501, "hp": 0.000003 }] }
+Loop 129 Start
+Loop dt: 0.000091, Total: 0.014143
+ROUND_STARTING: countdown 2.985948
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 129 End. Running: 1
+{ "tick": 129, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999495, "hp": 0.000003 }] }
+Loop 130 Start
+Loop dt: 0.000083, Total: 0.014226
+ROUND_STARTING: countdown 2.985857
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 130 End. Running: 1
+{ "tick": 130, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999489, "hp": 0.000003 }] }
+Loop 131 Start
+Loop dt: 0.000081, Total: 0.014307
+ROUND_STARTING: countdown 2.985774
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 131 End. Running: 1
+{ "tick": 131, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999483, "hp": 0.000003 }] }
+Loop 132 Start
+Loop dt: 0.000109, Total: 0.014416
+ROUND_STARTING: countdown 2.985693
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 132 End. Running: 1
+{ "tick": 132, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999475, "hp": 0.000003 }] }
+Loop 133 Start
+Loop dt: 0.000278, Total: 0.014694
+ROUND_STARTING: countdown 2.985584
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 133 End. Running: 1
+{ "tick": 133, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999455, "hp": 0.000003 }] }
+Loop 134 Start
+Loop dt: 0.000110, Total: 0.014804
+ROUND_STARTING: countdown 2.985307
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 134 End. Running: 1
+{ "tick": 134, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999447, "hp": 0.000003 }] }
+Loop 135 Start
+Loop dt: 0.000094, Total: 0.014897
+ROUND_STARTING: countdown 2.985196
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 135 End. Running: 1
+{ "tick": 135, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999440, "hp": 0.000003 }] }
+Loop 136 Start
+Loop dt: 0.000095, Total: 0.014993
+ROUND_STARTING: countdown 2.985103
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 136 End. Running: 1
+{ "tick": 136, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999433, "hp": 0.000003 }] }
+Loop 137 Start
+Loop dt: 0.000097, Total: 0.015089
+ROUND_STARTING: countdown 2.985008
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 137 End. Running: 1
+{ "tick": 137, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999425, "hp": 0.000003 }] }
+Loop 138 Start
+Loop dt: 0.000100, Total: 0.015189
+ROUND_STARTING: countdown 2.984911
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 138 End. Running: 1
+{ "tick": 138, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999418, "hp": 0.000003 }] }
+Loop 139 Start
+Loop dt: 0.000255, Total: 0.015445
+ROUND_STARTING: countdown 2.984811
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 139 End. Running: 1
+{ "tick": 139, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999398, "hp": 0.000003 }] }
+Loop 140 Start
+Loop dt: 0.000106, Total: 0.015551
+ROUND_STARTING: countdown 2.984555
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 140 End. Running: 1
+{ "tick": 140, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999390, "hp": 0.000003 }] }
+Loop 141 Start
+Loop dt: 0.000098, Total: 0.015648
+ROUND_STARTING: countdown 2.984449
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 141 End. Running: 1
+{ "tick": 141, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999382, "hp": 0.000003 }] }
+Loop 142 Start
+Loop dt: 0.000102, Total: 0.015750
+ROUND_STARTING: countdown 2.984351
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 142 End. Running: 1
+{ "tick": 142, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999374, "hp": 0.000003 }] }
+Loop 143 Start
+Loop dt: 0.000098, Total: 0.015848
+ROUND_STARTING: countdown 2.984250
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 143 End. Running: 1
+{ "tick": 143, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999367, "hp": 0.000003 }] }
+Loop 144 Start
+Loop dt: 0.000104, Total: 0.015952
+ROUND_STARTING: countdown 2.984151
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 144 End. Running: 1
+{ "tick": 144, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999359, "hp": 0.000003 }] }
+Loop 145 Start
+Loop dt: 0.000178, Total: 0.016131
+ROUND_STARTING: countdown 2.984048
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 145 End. Running: 1
+{ "tick": 145, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999344, "hp": 0.000003 }] }
+Loop 146 Start
+Loop dt: 0.000222, Total: 0.016352
+ROUND_STARTING: countdown 2.983869
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 146 End. Running: 1
+{ "tick": 146, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999326, "hp": 0.000003 }] }
+Loop 147 Start
+Loop dt: 0.000175, Total: 0.016527
+ROUND_STARTING: countdown 2.983647
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 147 End. Running: 1
+{ "tick": 147, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999312, "hp": 0.000003 }] }
+Loop 148 Start
+Loop dt: 0.000144, Total: 0.016672
+ROUND_STARTING: countdown 2.983472
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 148 End. Running: 1
+{ "tick": 148, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999300, "hp": 0.000003 }] }
+Loop 149 Start
+Loop dt: 0.000114, Total: 0.016785
+ROUND_STARTING: countdown 2.983328
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 149 End. Running: 1
+{ "tick": 149, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999290, "hp": 0.000003 }] }
+Loop 150 Start
+Loop dt: 0.000108, Total: 0.016893
+ROUND_STARTING: countdown 2.983215
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 150 End. Running: 1
+{ "tick": 150, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999281, "hp": 0.000003 }] }
+Loop 151 Start
+Loop dt: 0.000116, Total: 0.017009
+ROUND_STARTING: countdown 2.983107
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 151 End. Running: 1
+{ "tick": 151, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999271, "hp": 0.000003 }] }
+Loop 152 Start
+Loop dt: 0.000102, Total: 0.017111
+ROUND_STARTING: countdown 2.982991
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 152 End. Running: 1
+{ "tick": 152, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999263, "hp": 0.000003 }] }
+Loop 153 Start
+Loop dt: 0.000131, Total: 0.017241
+ROUND_STARTING: countdown 2.982889
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 153 End. Running: 1
+{ "tick": 153, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999251, "hp": 0.000003 }] }
+Loop 154 Start
+Loop dt: 0.000114, Total: 0.017355
+ROUND_STARTING: countdown 2.982759
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 154 End. Running: 1
+{ "tick": 154, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999241, "hp": 0.000003 }] }
+Loop 155 Start
+Loop dt: 0.000108, Total: 0.017463
+ROUND_STARTING: countdown 2.982645
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 155 End. Running: 1
+{ "tick": 155, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999232, "hp": 0.000003 }] }
+Loop 156 Start
+Loop dt: 0.000109, Total: 0.017573
+ROUND_STARTING: countdown 2.982537
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 156 End. Running: 1
+{ "tick": 156, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999222, "hp": 0.000003 }] }
+Loop 157 Start
+Loop dt: 0.000112, Total: 0.017685
+ROUND_STARTING: countdown 2.982427
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 157 End. Running: 1
+{ "tick": 157, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999212, "hp": 0.000003 }] }
+Loop 158 Start
+Loop dt: 0.000119, Total: 0.017803
+ROUND_STARTING: countdown 2.982315
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 158 End. Running: 1
+{ "tick": 158, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999202, "hp": 0.000003 }] }
+Loop 159 Start
+Loop dt: 0.000121, Total: 0.017924
+ROUND_STARTING: countdown 2.982197
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 159 End. Running: 1
+{ "tick": 159, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999191, "hp": 0.000003 }] }
+Loop 160 Start
+Loop dt: 0.000128, Total: 0.018052
+ROUND_STARTING: countdown 2.982076
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 160 End. Running: 1
+{ "tick": 160, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999179, "hp": 0.000003 }] }
+Loop 161 Start
+Loop dt: 0.000142, Total: 0.018194
+ROUND_STARTING: countdown 2.981948
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 161 End. Running: 1
+{ "tick": 161, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999166, "hp": 0.000003 }] }
+Loop 162 Start
+Loop dt: 0.000134, Total: 0.018329
+ROUND_STARTING: countdown 2.981806
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 162 End. Running: 1
+{ "tick": 162, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999154, "hp": 0.000003 }] }
+Loop 163 Start
+Loop dt: 0.000122, Total: 0.018451
+ROUND_STARTING: countdown 2.981671
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 163 End. Running: 1
+{ "tick": 163, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999143, "hp": 0.000003 }] }
+Loop 164 Start
+Loop dt: 0.000120, Total: 0.018570
+ROUND_STARTING: countdown 2.981549
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 164 End. Running: 1
+{ "tick": 164, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999132, "hp": 0.000003 }] }
+Loop 165 Start
+Loop dt: 0.000143, Total: 0.018713
+ROUND_STARTING: countdown 2.981430
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 165 End. Running: 1
+{ "tick": 165, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999118, "hp": 0.000003 }] }
+Loop 166 Start
+Loop dt: 0.000161, Total: 0.018873
+ROUND_STARTING: countdown 2.981287
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 166 End. Running: 1
+{ "tick": 166, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999103, "hp": 0.000003 }] }
+Loop 167 Start
+Loop dt: 0.000145, Total: 0.019018
+ROUND_STARTING: countdown 2.981127
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 167 End. Running: 1
+{ "tick": 167, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999089, "hp": 0.000003 }] }
+Loop 168 Start
+Loop dt: 0.000115, Total: 0.019133
+ROUND_STARTING: countdown 2.980982
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 168 End. Running: 1
+{ "tick": 168, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999078, "hp": 0.000003 }] }
+Loop 169 Start
+Loop dt: 0.000131, Total: 0.019263
+ROUND_STARTING: countdown 2.980867
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 169 End. Running: 1
+{ "tick": 169, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999066, "hp": 0.000003 }] }
+Loop 170 Start
+Loop dt: 0.000116, Total: 0.019380
+ROUND_STARTING: countdown 2.980737
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 170 End. Running: 1
+{ "tick": 170, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999054, "hp": 0.000003 }] }
+Loop 171 Start
+Loop dt: 0.000108, Total: 0.019488
+ROUND_STARTING: countdown 2.980620
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 171 End. Running: 1
+{ "tick": 171, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999044, "hp": 0.000003 }] }
+Loop 172 Start
+Loop dt: 0.000108, Total: 0.019596
+ROUND_STARTING: countdown 2.980512
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 172 End. Running: 1
+{ "tick": 172, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999033, "hp": 0.000003 }] }
+Loop 173 Start
+Loop dt: 0.000105, Total: 0.019701
+ROUND_STARTING: countdown 2.980405
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 173 End. Running: 1
+{ "tick": 173, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999023, "hp": 0.000003 }] }
+Loop 174 Start
+Loop dt: 0.000101, Total: 0.019802
+ROUND_STARTING: countdown 2.980299
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 174 End. Running: 1
+{ "tick": 174, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999013, "hp": 0.000003 }] }
+Loop 175 Start
+Loop dt: 0.000101, Total: 0.019903
+ROUND_STARTING: countdown 2.980198
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 175 End. Running: 1
+{ "tick": 175, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.999003, "hp": 0.000003 }] }
+Loop 176 Start
+Loop dt: 0.000272, Total: 0.020175
+ROUND_STARTING: countdown 2.980097
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 176 End. Running: 1
+{ "tick": 176, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998975, "hp": 0.000003 }] }
+Loop 177 Start
+Loop dt: 0.000171, Total: 0.020347
+ROUND_STARTING: countdown 2.979825
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 177 End. Running: 1
+{ "tick": 177, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998958, "hp": 0.000003 }] }
+Loop 178 Start
+Loop dt: 0.000097, Total: 0.020444
+ROUND_STARTING: countdown 2.979654
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 178 End. Running: 1
+{ "tick": 178, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998948, "hp": 0.000003 }] }
+Loop 179 Start
+Loop dt: 0.000093, Total: 0.020537
+ROUND_STARTING: countdown 2.979556
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 179 End. Running: 1
+{ "tick": 179, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998938, "hp": 0.000003 }] }
+Loop 180 Start
+Loop dt: 0.000091, Total: 0.020628
+ROUND_STARTING: countdown 2.979463
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 180 End. Running: 1
+{ "tick": 180, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998929, "hp": 0.000003 }] }
+Loop 181 Start
+Loop dt: 0.000090, Total: 0.020718
+ROUND_STARTING: countdown 2.979372
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 181 End. Running: 1
+{ "tick": 181, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998919, "hp": 0.000003 }] }
+Loop 182 Start
+Loop dt: 0.000109, Total: 0.020826
+ROUND_STARTING: countdown 2.979282
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 182 End. Running: 1
+{ "tick": 182, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998908, "hp": 0.000003 }] }
+Loop 183 Start
+Loop dt: 0.000109, Total: 0.020935
+ROUND_STARTING: countdown 2.979174
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 183 End. Running: 1
+{ "tick": 183, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998897, "hp": 0.000003 }] }
+Loop 184 Start
+Loop dt: 0.000099, Total: 0.021034
+ROUND_STARTING: countdown 2.979065
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 184 End. Running: 1
+{ "tick": 184, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998886, "hp": 0.000003 }] }
+Loop 185 Start
+Loop dt: 0.000125, Total: 0.021158
+ROUND_STARTING: countdown 2.978966
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 185 End. Running: 1
+{ "tick": 185, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998873, "hp": 0.000003 }] }
+Loop 186 Start
+Loop dt: 0.000119, Total: 0.021277
+ROUND_STARTING: countdown 2.978842
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 186 End. Running: 1
+{ "tick": 186, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998860, "hp": 0.000003 }] }
+Loop 187 Start
+Loop dt: 0.000126, Total: 0.021403
+ROUND_STARTING: countdown 2.978723
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 187 End. Running: 1
+{ "tick": 187, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998847, "hp": 0.000003 }] }
+Loop 188 Start
+Loop dt: 0.000090, Total: 0.021493
+ROUND_STARTING: countdown 2.978597
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 188 End. Running: 1
+{ "tick": 188, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998837, "hp": 0.000003 }] }
+Loop 189 Start
+Loop dt: 0.000086, Total: 0.021579
+ROUND_STARTING: countdown 2.978508
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 189 End. Running: 1
+{ "tick": 189, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998828, "hp": 0.000003 }] }
+Loop 190 Start
+Loop dt: 0.000087, Total: 0.021666
+ROUND_STARTING: countdown 2.978421
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 190 End. Running: 1
+{ "tick": 190, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998818, "hp": 0.000003 }] }
+Loop 191 Start
+Loop dt: 0.000086, Total: 0.021753
+ROUND_STARTING: countdown 2.978334
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 191 End. Running: 1
+{ "tick": 191, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998809, "hp": 0.000003 }] }
+Loop 192 Start
+Loop dt: 0.000090, Total: 0.021843
+ROUND_STARTING: countdown 2.978248
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 192 End. Running: 1
+{ "tick": 192, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998799, "hp": 0.000003 }] }
+Loop 193 Start
+Loop dt: 0.000094, Total: 0.021937
+ROUND_STARTING: countdown 2.978157
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 193 End. Running: 1
+{ "tick": 193, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998788, "hp": 0.000003 }] }
+Loop 194 Start
+Loop dt: 0.000089, Total: 0.022026
+ROUND_STARTING: countdown 2.978063
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 194 End. Running: 1
+{ "tick": 194, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998778, "hp": 0.000003 }] }
+Loop 195 Start
+Loop dt: 0.000093, Total: 0.022119
+ROUND_STARTING: countdown 2.977974
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 195 End. Running: 1
+{ "tick": 195, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998768, "hp": 0.000003 }] }
+Loop 196 Start
+Loop dt: 0.000106, Total: 0.022225
+ROUND_STARTING: countdown 2.977881
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 196 End. Running: 1
+{ "tick": 196, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998756, "hp": 0.000003 }] }
+Loop 197 Start
+Loop dt: 0.000089, Total: 0.022314
+ROUND_STARTING: countdown 2.977775
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 197 End. Running: 1
+{ "tick": 197, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998746, "hp": 0.000003 }] }
+Loop 198 Start
+Loop dt: 0.000108, Total: 0.022422
+ROUND_STARTING: countdown 2.977686
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 198 End. Running: 1
+{ "tick": 198, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998734, "hp": 0.000003 }] }
+Loop 199 Start
+Loop dt: 0.000107, Total: 0.022529
+ROUND_STARTING: countdown 2.977578
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 199 End. Running: 1
+{ "tick": 199, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998722, "hp": 0.000003 }] }
+Loop 200 Start
+Loop dt: 0.000110, Total: 0.022640
+ROUND_STARTING: countdown 2.977471
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 200 End. Running: 1
+{ "tick": 200, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998710, "hp": 0.000003 }] }
+Loop 201 Start
+Loop dt: 0.000091, Total: 0.022730
+ROUND_STARTING: countdown 2.977360
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 201 End. Running: 1
+{ "tick": 201, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998699, "hp": 0.000003 }] }
+Loop 202 Start
+Loop dt: 0.000090, Total: 0.022820
+ROUND_STARTING: countdown 2.977270
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 202 End. Running: 1
+{ "tick": 202, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998689, "hp": 0.000003 }] }
+Loop 203 Start
+Loop dt: 0.000087, Total: 0.022907
+ROUND_STARTING: countdown 2.977180
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 203 End. Running: 1
+{ "tick": 203, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998679, "hp": 0.000003 }] }
+Loop 204 Start
+Loop dt: 0.000089, Total: 0.022996
+ROUND_STARTING: countdown 2.977093
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 204 End. Running: 1
+{ "tick": 204, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998669, "hp": 0.000003 }] }
+Loop 205 Start
+Loop dt: 0.000089, Total: 0.023086
+ROUND_STARTING: countdown 2.977004
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 205 End. Running: 1
+{ "tick": 205, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998659, "hp": 0.000003 }] }
+Loop 206 Start
+Loop dt: 0.000089, Total: 0.023174
+ROUND_STARTING: countdown 2.976914
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 206 End. Running: 1
+{ "tick": 206, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998648, "hp": 0.000003 }] }
+Loop 207 Start
+Loop dt: 0.000105, Total: 0.023280
+ROUND_STARTING: countdown 2.976826
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 207 End. Running: 1
+{ "tick": 207, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998636, "hp": 0.000003 }] }
+Loop 208 Start
+Loop dt: 0.000092, Total: 0.023372
+ROUND_STARTING: countdown 2.976720
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 208 End. Running: 1
+{ "tick": 208, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998625, "hp": 0.000003 }] }
+Loop 209 Start
+Loop dt: 0.000096, Total: 0.023468
+ROUND_STARTING: countdown 2.976629
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 209 End. Running: 1
+{ "tick": 209, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998613, "hp": 0.000003 }] }
+Loop 210 Start
+Loop dt: 0.000091, Total: 0.023559
+ROUND_STARTING: countdown 2.976532
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 210 End. Running: 1
+{ "tick": 210, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998603, "hp": 0.000003 }] }
+Loop 211 Start
+Loop dt: 0.000096, Total: 0.023655
+ROUND_STARTING: countdown 2.976442
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 211 End. Running: 1
+{ "tick": 211, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998591, "hp": 0.000003 }] }
+Loop 212 Start
+Loop dt: 0.000097, Total: 0.023752
+ROUND_STARTING: countdown 2.976345
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 212 End. Running: 1
+{ "tick": 212, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998580, "hp": 0.000003 }] }
+Loop 213 Start
+Loop dt: 0.000086, Total: 0.023839
+ROUND_STARTING: countdown 2.976248
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 213 End. Running: 1
+{ "tick": 213, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998569, "hp": 0.000003 }] }
+Loop 214 Start
+Loop dt: 0.000092, Total: 0.023931
+ROUND_STARTING: countdown 2.976162
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 214 End. Running: 1
+{ "tick": 214, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998559, "hp": 0.000003 }] }
+Loop 215 Start
+Loop dt: 0.000102, Total: 0.024033
+ROUND_STARTING: countdown 2.976069
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 215 End. Running: 1
+{ "tick": 215, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998546, "hp": 0.000003 }] }
+Loop 216 Start
+Loop dt: 0.000101, Total: 0.024134
+ROUND_STARTING: countdown 2.975967
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 216 End. Running: 1
+{ "tick": 216, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998534, "hp": 0.000003 }] }
+Loop 217 Start
+Loop dt: 0.000106, Total: 0.024240
+ROUND_STARTING: countdown 2.975866
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 217 End. Running: 1
+{ "tick": 217, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998521, "hp": 0.000003 }] }
+Loop 218 Start
+Loop dt: 0.000095, Total: 0.024335
+ROUND_STARTING: countdown 2.975760
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 218 End. Running: 1
+{ "tick": 218, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998509, "hp": 0.000003 }] }
+Loop 219 Start
+Loop dt: 0.000087, Total: 0.024422
+ROUND_STARTING: countdown 2.975666
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 219 End. Running: 1
+{ "tick": 219, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998499, "hp": 0.000003 }] }
+Loop 220 Start
+Loop dt: 0.000086, Total: 0.024509
+ROUND_STARTING: countdown 2.975578
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 220 End. Running: 1
+{ "tick": 220, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998488, "hp": 0.000003 }] }
+Loop 221 Start
+Loop dt: 0.000099, Total: 0.024607
+ROUND_STARTING: countdown 2.975492
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 221 End. Running: 1
+{ "tick": 221, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998477, "hp": 0.000003 }] }
+Loop 222 Start
+Loop dt: 0.000086, Total: 0.024694
+ROUND_STARTING: countdown 2.975393
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 222 End. Running: 1
+{ "tick": 222, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998466, "hp": 0.000003 }] }
+Loop 223 Start
+Loop dt: 0.000095, Total: 0.024788
+ROUND_STARTING: countdown 2.975307
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 223 End. Running: 1
+{ "tick": 223, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998454, "hp": 0.000003 }] }
+Loop 224 Start
+Loop dt: 0.000092, Total: 0.024880
+ROUND_STARTING: countdown 2.975212
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 224 End. Running: 1
+{ "tick": 224, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998443, "hp": 0.000003 }] }
+Loop 225 Start
+Loop dt: 0.000096, Total: 0.024976
+ROUND_STARTING: countdown 2.975120
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 225 End. Running: 1
+{ "tick": 225, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998431, "hp": 0.000003 }] }
+Loop 226 Start
+Loop dt: 0.000089, Total: 0.025065
+ROUND_STARTING: countdown 2.975024
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 226 End. Running: 1
+{ "tick": 226, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998420, "hp": 0.000003 }] }
+Loop 227 Start
+Loop dt: 0.000099, Total: 0.025164
+ROUND_STARTING: countdown 2.974935
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 227 End. Running: 1
+{ "tick": 227, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998407, "hp": 0.000003 }] }
+Loop 228 Start
+Loop dt: 0.000108, Total: 0.025273
+ROUND_STARTING: countdown 2.974836
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 228 End. Running: 1
+{ "tick": 228, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998394, "hp": 0.000003 }] }
+Loop 229 Start
+Loop dt: 0.000090, Total: 0.025362
+ROUND_STARTING: countdown 2.974728
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 229 End. Running: 1
+{ "tick": 229, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998382, "hp": 0.000003 }] }
+Loop 230 Start
+Loop dt: 0.000095, Total: 0.025457
+ROUND_STARTING: countdown 2.974638
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 230 End. Running: 1
+{ "tick": 230, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998370, "hp": 0.000003 }] }
+Loop 231 Start
+Loop dt: 0.000091, Total: 0.025548
+ROUND_STARTING: countdown 2.974543
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 231 End. Running: 1
+{ "tick": 231, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998359, "hp": 0.000003 }] }
+Loop 232 Start
+Loop dt: 0.000095, Total: 0.025643
+ROUND_STARTING: countdown 2.974452
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 232 End. Running: 1
+{ "tick": 232, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998347, "hp": 0.000003 }] }
+Loop 233 Start
+Loop dt: 0.000093, Total: 0.025736
+ROUND_STARTING: countdown 2.974358
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 233 End. Running: 1
+{ "tick": 233, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998335, "hp": 0.000003 }] }
+Loop 234 Start
+Loop dt: 0.000091, Total: 0.025827
+ROUND_STARTING: countdown 2.974264
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 234 End. Running: 1
+{ "tick": 234, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998323, "hp": 0.000003 }] }
+Loop 235 Start
+Loop dt: 0.000095, Total: 0.025921
+ROUND_STARTING: countdown 2.974174
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 235 End. Running: 1
+{ "tick": 235, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998311, "hp": 0.000003 }] }
+Loop 236 Start
+Loop dt: 0.000095, Total: 0.026016
+ROUND_STARTING: countdown 2.974079
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 236 End. Running: 1
+{ "tick": 236, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998298, "hp": 0.000003 }] }
+Loop 237 Start
+Loop dt: 0.000095, Total: 0.026112
+ROUND_STARTING: countdown 2.973984
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 237 End. Running: 1
+{ "tick": 237, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998286, "hp": 0.000003 }] }
+Loop 238 Start
+Loop dt: 0.000090, Total: 0.026201
+ROUND_STARTING: countdown 2.973889
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 238 End. Running: 1
+{ "tick": 238, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998274, "hp": 0.000003 }] }
+Loop 239 Start
+Loop dt: 0.000104, Total: 0.026306
+ROUND_STARTING: countdown 2.973799
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 239 End. Running: 1
+{ "tick": 239, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998260, "hp": 0.000003 }] }
+Loop 240 Start
+Loop dt: 0.000089, Total: 0.026395
+ROUND_STARTING: countdown 2.973695
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 240 End. Running: 1
+{ "tick": 240, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998248, "hp": 0.000003 }] }
+Loop 241 Start
+Loop dt: 0.000094, Total: 0.026488
+ROUND_STARTING: countdown 2.973606
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 241 End. Running: 1
+{ "tick": 241, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998236, "hp": 0.000003 }] }
+Loop 242 Start
+Loop dt: 0.000093, Total: 0.026581
+ROUND_STARTING: countdown 2.973512
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 242 End. Running: 1
+{ "tick": 242, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998223, "hp": 0.000003 }] }
+Loop 243 Start
+Loop dt: 0.000107, Total: 0.026688
+ROUND_STARTING: countdown 2.973419
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 243 End. Running: 1
+{ "tick": 243, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998209, "hp": 0.000003 }] }
+Loop 244 Start
+Loop dt: 0.000108, Total: 0.026796
+ROUND_STARTING: countdown 2.973312
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 244 End. Running: 1
+{ "tick": 244, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998195, "hp": 0.000003 }] }
+Loop 245 Start
+Loop dt: 0.000086, Total: 0.026882
+ROUND_STARTING: countdown 2.973204
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 245 End. Running: 1
+{ "tick": 245, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998183, "hp": 0.000003 }] }
+Loop 246 Start
+Loop dt: 0.000082, Total: 0.026964
+ROUND_STARTING: countdown 2.973118
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 246 End. Running: 1
+{ "tick": 246, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998172, "hp": 0.000003 }] }
+Loop 247 Start
+Loop dt: 0.000081, Total: 0.027045
+ROUND_STARTING: countdown 2.973037
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 247 End. Running: 1
+{ "tick": 247, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998161, "hp": 0.000003 }] }
+Loop 248 Start
+Loop dt: 0.000082, Total: 0.027128
+ROUND_STARTING: countdown 2.972955
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 248 End. Running: 1
+{ "tick": 248, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998150, "hp": 0.000003 }] }
+Loop 249 Start
+Loop dt: 0.000088, Total: 0.027215
+ROUND_STARTING: countdown 2.972873
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 249 End. Running: 1
+{ "tick": 249, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998138, "hp": 0.000003 }] }
+Loop 250 Start
+Loop dt: 0.000090, Total: 0.027305
+ROUND_STARTING: countdown 2.972785
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 250 End. Running: 1
+{ "tick": 250, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998126, "hp": 0.000003 }] }
+Loop 251 Start
+Loop dt: 0.000078, Total: 0.027383
+ROUND_STARTING: countdown 2.972695
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 251 End. Running: 1
+{ "tick": 251, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998116, "hp": 0.000003 }] }
+Loop 252 Start
+Loop dt: 0.000081, Total: 0.027465
+ROUND_STARTING: countdown 2.972617
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 252 End. Running: 1
+{ "tick": 252, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998105, "hp": 0.000003 }] }
+Loop 253 Start
+Loop dt: 0.000077, Total: 0.027541
+ROUND_STARTING: countdown 2.972536
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 253 End. Running: 1
+{ "tick": 253, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998094, "hp": 0.000003 }] }
+Loop 254 Start
+Loop dt: 0.000076, Total: 0.027618
+ROUND_STARTING: countdown 2.972459
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 254 End. Running: 1
+{ "tick": 254, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998084, "hp": 0.000003 }] }
+Loop 255 Start
+Loop dt: 0.000081, Total: 0.027699
+ROUND_STARTING: countdown 2.972382
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 255 End. Running: 1
+{ "tick": 255, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998073, "hp": 0.000003 }] }
+Loop 256 Start
+Loop dt: 0.000078, Total: 0.027777
+ROUND_STARTING: countdown 2.972301
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 256 End. Running: 1
+{ "tick": 256, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998062, "hp": 0.000003 }] }
+Loop 257 Start
+Loop dt: 0.000083, Total: 0.027860
+ROUND_STARTING: countdown 2.972224
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 257 End. Running: 1
+{ "tick": 257, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998050, "hp": 0.000003 }] }
+Loop 258 Start
+Loop dt: 0.000086, Total: 0.027946
+ROUND_STARTING: countdown 2.972140
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 258 End. Running: 1
+{ "tick": 258, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998038, "hp": 0.000003 }] }
+Loop 259 Start
+Loop dt: 0.000082, Total: 0.028027
+ROUND_STARTING: countdown 2.972055
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 259 End. Running: 1
+{ "tick": 259, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998027, "hp": 0.000003 }] }
+Loop 260 Start
+Loop dt: 0.000086, Total: 0.028114
+ROUND_STARTING: countdown 2.971973
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 260 End. Running: 1
+{ "tick": 260, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998015, "hp": 0.000003 }] }
+Loop 261 Start
+Loop dt: 0.000080, Total: 0.028194
+ROUND_STARTING: countdown 2.971887
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 261 End. Running: 1
+{ "tick": 261, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.998003, "hp": 0.000003 }] }
+Loop 262 Start
+Loop dt: 0.000081, Total: 0.028275
+ROUND_STARTING: countdown 2.971807
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 262 End. Running: 1
+{ "tick": 262, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997992, "hp": 0.000003 }] }
+Loop 263 Start
+Loop dt: 0.000082, Total: 0.028357
+ROUND_STARTING: countdown 2.971725
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 263 End. Running: 1
+{ "tick": 263, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997981, "hp": 0.000003 }] }
+Loop 264 Start
+Loop dt: 0.000082, Total: 0.028438
+ROUND_STARTING: countdown 2.971644
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 264 End. Running: 1
+{ "tick": 264, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997969, "hp": 0.000003 }] }
+Loop 265 Start
+Loop dt: 0.000084, Total: 0.028522
+ROUND_STARTING: countdown 2.971562
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 265 End. Running: 1
+{ "tick": 265, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997957, "hp": 0.000003 }] }
+Loop 266 Start
+Loop dt: 0.000084, Total: 0.028607
+ROUND_STARTING: countdown 2.971478
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 266 End. Running: 1
+{ "tick": 266, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997945, "hp": 0.000003 }] }
+Loop 267 Start
+Loop dt: 0.000083, Total: 0.028689
+ROUND_STARTING: countdown 2.971394
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 267 End. Running: 1
+{ "tick": 267, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997933, "hp": 0.000003 }] }
+Loop 268 Start
+Loop dt: 0.000078, Total: 0.028767
+ROUND_STARTING: countdown 2.971311
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 268 End. Running: 1
+{ "tick": 268, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997922, "hp": 0.000003 }] }
+Loop 269 Start
+Loop dt: 0.000084, Total: 0.028851
+ROUND_STARTING: countdown 2.971234
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 269 End. Running: 1
+{ "tick": 269, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997910, "hp": 0.000003 }] }
+Loop 270 Start
+Loop dt: 0.000079, Total: 0.028931
+ROUND_STARTING: countdown 2.971150
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 270 End. Running: 1
+{ "tick": 270, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997899, "hp": 0.000003 }] }
+Loop 271 Start
+Loop dt: 0.000078, Total: 0.029009
+ROUND_STARTING: countdown 2.971070
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 271 End. Running: 1
+{ "tick": 271, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997888, "hp": 0.000003 }] }
+Loop 272 Start
+Loop dt: 0.000082, Total: 0.029090
+ROUND_STARTING: countdown 2.970992
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 272 End. Running: 1
+{ "tick": 272, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997876, "hp": 0.000003 }] }
+Loop 273 Start
+Loop dt: 0.000088, Total: 0.029178
+ROUND_STARTING: countdown 2.970910
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 273 End. Running: 1
+{ "tick": 273, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997863, "hp": 0.000003 }] }
+Loop 274 Start
+Loop dt: 0.000082, Total: 0.029260
+ROUND_STARTING: countdown 2.970823
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 274 End. Running: 1
+{ "tick": 274, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997851, "hp": 0.000003 }] }
+Loop 275 Start
+Loop dt: 0.000083, Total: 0.029343
+ROUND_STARTING: countdown 2.970741
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 275 End. Running: 1
+{ "tick": 275, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997839, "hp": 0.000003 }] }
+Loop 276 Start
+Loop dt: 0.000075, Total: 0.029418
+ROUND_STARTING: countdown 2.970658
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 276 End. Running: 1
+{ "tick": 276, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997828, "hp": 0.000003 }] }
+Loop 277 Start
+Loop dt: 0.000078, Total: 0.029496
+ROUND_STARTING: countdown 2.970583
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 277 End. Running: 1
+{ "tick": 277, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997817, "hp": 0.000003 }] }
+Loop 278 Start
+Loop dt: 0.000075, Total: 0.029571
+ROUND_STARTING: countdown 2.970505
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 278 End. Running: 1
+{ "tick": 278, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997806, "hp": 0.000003 }] }
+Loop 279 Start
+Loop dt: 0.000074, Total: 0.029645
+ROUND_STARTING: countdown 2.970429
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 279 End. Running: 1
+{ "tick": 279, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997795, "hp": 0.000003 }] }
+Loop 280 Start
+Loop dt: 0.000077, Total: 0.029722
+ROUND_STARTING: countdown 2.970356
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 280 End. Running: 1
+{ "tick": 280, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997783, "hp": 0.000003 }] }
+Loop 281 Start
+Loop dt: 0.000074, Total: 0.029796
+ROUND_STARTING: countdown 2.970279
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 281 End. Running: 1
+{ "tick": 281, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997772, "hp": 0.000003 }] }
+Loop 282 Start
+Loop dt: 0.000076, Total: 0.029872
+ROUND_STARTING: countdown 2.970205
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 282 End. Running: 1
+{ "tick": 282, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997761, "hp": 0.000003 }] }
+Loop 283 Start
+Loop dt: 0.000079, Total: 0.029951
+ROUND_STARTING: countdown 2.970129
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 283 End. Running: 1
+{ "tick": 283, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997749, "hp": 0.000003 }] }
+Loop 284 Start
+Loop dt: 0.000081, Total: 0.030032
+ROUND_STARTING: countdown 2.970050
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 284 End. Running: 1
+{ "tick": 284, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997736, "hp": 0.000003 }] }
+Loop 285 Start
+Loop dt: 0.000081, Total: 0.030113
+ROUND_STARTING: countdown 2.969969
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 285 End. Running: 1
+{ "tick": 285, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997724, "hp": 0.000003 }] }
+Loop 286 Start
+Loop dt: 0.000110, Total: 0.030223
+ROUND_STARTING: countdown 2.969888
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 286 End. Running: 1
+{ "tick": 286, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997707, "hp": 0.000003 }] }
+Loop 287 Start
+Loop dt: 0.000104, Total: 0.030327
+ROUND_STARTING: countdown 2.969778
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 287 End. Running: 1
+{ "tick": 287, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997692, "hp": 0.000003 }] }
+Loop 288 Start
+Loop dt: 0.000102, Total: 0.030429
+ROUND_STARTING: countdown 2.969674
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 288 End. Running: 1
+{ "tick": 288, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997676, "hp": 0.000003 }] }
+Loop 289 Start
+Loop dt: 0.000117, Total: 0.030545
+ROUND_STARTING: countdown 2.969572
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 289 End. Running: 1
+{ "tick": 289, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997659, "hp": 0.000003 }] }
+Loop 290 Start
+Loop dt: 0.000101, Total: 0.030647
+ROUND_STARTING: countdown 2.969456
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 290 End. Running: 1
+{ "tick": 290, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997643, "hp": 0.000003 }] }
+Loop 291 Start
+Loop dt: 0.000119, Total: 0.030765
+ROUND_STARTING: countdown 2.969354
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 291 End. Running: 1
+{ "tick": 291, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997625, "hp": 0.000003 }] }
+Loop 292 Start
+Loop dt: 0.000114, Total: 0.030879
+ROUND_STARTING: countdown 2.969236
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 292 End. Running: 1
+{ "tick": 292, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997607, "hp": 0.000003 }] }
+Loop 293 Start
+Loop dt: 0.000121, Total: 0.031000
+ROUND_STARTING: countdown 2.969122
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 293 End. Running: 1
+{ "tick": 293, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997589, "hp": 0.000003 }] }
+Loop 294 Start
+Loop dt: 0.000089, Total: 0.031088
+ROUND_STARTING: countdown 2.969001
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 294 End. Running: 1
+{ "tick": 294, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997575, "hp": 0.000003 }] }
+Loop 295 Start
+Loop dt: 0.000090, Total: 0.031179
+ROUND_STARTING: countdown 2.968913
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 295 End. Running: 1
+{ "tick": 295, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997561, "hp": 0.000003 }] }
+Loop 296 Start
+Loop dt: 0.000110, Total: 0.031289
+ROUND_STARTING: countdown 2.968822
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 296 End. Running: 1
+{ "tick": 296, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997543, "hp": 0.000003 }] }
+Loop 297 Start
+Loop dt: 0.000091, Total: 0.031380
+ROUND_STARTING: countdown 2.968712
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 297 End. Running: 1
+{ "tick": 297, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997529, "hp": 0.000003 }] }
+Loop 298 Start
+Loop dt: 0.000094, Total: 0.031474
+ROUND_STARTING: countdown 2.968621
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 298 End. Running: 1
+{ "tick": 298, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997514, "hp": 0.000003 }] }
+Loop 299 Start
+Loop dt: 0.000120, Total: 0.031594
+ROUND_STARTING: countdown 2.968527
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 299 End. Running: 1
+{ "tick": 299, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997495, "hp": 0.000003 }] }
+Loop 300 Start
+Loop dt: 0.000108, Total: 0.031702
+ROUND_STARTING: countdown 2.968407
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 300 End. Running: 1
+{ "tick": 300, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997478, "hp": 0.000003 }] }
+Loop 301 Start
+Loop dt: 0.000094, Total: 0.031796
+ROUND_STARTING: countdown 2.968299
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 301 End. Running: 1
+{ "tick": 301, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997463, "hp": 0.000003 }] }
+Loop 302 Start
+Loop dt: 0.000106, Total: 0.031902
+ROUND_STARTING: countdown 2.968205
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 302 End. Running: 1
+{ "tick": 302, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997446, "hp": 0.000003 }] }
+Loop 303 Start
+Loop dt: 0.000100, Total: 0.032002
+ROUND_STARTING: countdown 2.968099
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 303 End. Running: 1
+{ "tick": 303, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997430, "hp": 0.000003 }] }
+Loop 304 Start
+Loop dt: 0.000129, Total: 0.032131
+ROUND_STARTING: countdown 2.967999
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 304 End. Running: 1
+{ "tick": 304, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997409, "hp": 0.000003 }] }
+Loop 305 Start
+Loop dt: 0.000117, Total: 0.032249
+ROUND_STARTING: countdown 2.967870
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 305 End. Running: 1
+{ "tick": 305, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997390, "hp": 0.000003 }] }
+Loop 306 Start
+Loop dt: 0.000119, Total: 0.032368
+ROUND_STARTING: countdown 2.967752
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 306 End. Running: 1
+{ "tick": 306, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997370, "hp": 0.000003 }] }
+Loop 307 Start
+Loop dt: 0.000106, Total: 0.032475
+ROUND_STARTING: countdown 2.967633
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 307 End. Running: 1
+{ "tick": 307, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997353, "hp": 0.000003 }] }
+Loop 308 Start
+Loop dt: 0.000100, Total: 0.032575
+ROUND_STARTING: countdown 2.967526
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 308 End. Running: 1
+{ "tick": 308, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997337, "hp": 0.000003 }] }
+Loop 309 Start
+Loop dt: 0.000102, Total: 0.032676
+ROUND_STARTING: countdown 2.967426
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 309 End. Running: 1
+{ "tick": 309, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997320, "hp": 0.000003 }] }
+Loop 310 Start
+Loop dt: 0.000119, Total: 0.032795
+ROUND_STARTING: countdown 2.967324
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 310 End. Running: 1
+{ "tick": 310, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997301, "hp": 0.000003 }] }
+Loop 311 Start
+Loop dt: 0.000103, Total: 0.032898
+ROUND_STARTING: countdown 2.967206
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 311 End. Running: 1
+{ "tick": 311, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997284, "hp": 0.000003 }] }
+Loop 312 Start
+Loop dt: 0.000100, Total: 0.032998
+ROUND_STARTING: countdown 2.967103
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 312 End. Running: 1
+{ "tick": 312, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997268, "hp": 0.000003 }] }
+Loop 313 Start
+Loop dt: 0.000118, Total: 0.033115
+ROUND_STARTING: countdown 2.967003
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 313 End. Running: 1
+{ "tick": 313, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997248, "hp": 0.000003 }] }
+Loop 314 Start
+Loop dt: 0.000268, Total: 0.033383
+ROUND_STARTING: countdown 2.966886
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 314 End. Running: 1
+{ "tick": 314, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997203, "hp": 0.000003 }] }
+Loop 315 Start
+Loop dt: 0.000128, Total: 0.033511
+ROUND_STARTING: countdown 2.966618
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 315 End. Running: 1
+{ "tick": 315, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997182, "hp": 0.000003 }] }
+Loop 316 Start
+Loop dt: 0.000110, Total: 0.033621
+ROUND_STARTING: countdown 2.966490
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 316 End. Running: 1
+{ "tick": 316, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997163, "hp": 0.000003 }] }
+Loop 317 Start
+Loop dt: 0.000106, Total: 0.033727
+ROUND_STARTING: countdown 2.966380
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 317 End. Running: 1
+{ "tick": 317, "tanks": [{ "id": 0, "x": 0.000000, "y": 4.997146, "hp": 0.000003 }] }
+Loop 318 Start
+Loop dt: 0.000110, Total: 0.033837
+ROUND_STARTING: countdown 2.966274
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 318 End. Running: 1
+{ "tick": 318, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.997127, "hp": 0.000003 }] }
+Loop 319 Start
+Loop dt: 0.000099, Total: 0.033936
+ROUND_STARTING: countdown 2.966163
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 319 End. Running: 1
+{ "tick": 319, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.997110, "hp": 0.000003 }] }
+Loop 320 Start
+Loop dt: 0.000142, Total: 0.034079
+ROUND_STARTING: countdown 2.966064
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 320 End. Running: 1
+{ "tick": 320, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.997086, "hp": 0.000003 }] }
+Loop 321 Start
+Loop dt: 0.000112, Total: 0.034190
+ROUND_STARTING: countdown 2.965922
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 321 End. Running: 1
+{ "tick": 321, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.997067, "hp": 0.000003 }] }
+Loop 322 Start
+Loop dt: 0.000129, Total: 0.034320
+ROUND_STARTING: countdown 2.965810
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 322 End. Running: 1
+{ "tick": 322, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.997045, "hp": 0.000003 }] }
+Loop 323 Start
+Loop dt: 0.000106, Total: 0.034426
+ROUND_STARTING: countdown 2.965681
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 323 End. Running: 1
+{ "tick": 323, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.997026, "hp": 0.000003 }] }
+Loop 324 Start
+Loop dt: 0.000111, Total: 0.034537
+ROUND_STARTING: countdown 2.965575
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 324 End. Running: 1
+{ "tick": 324, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.997007, "hp": 0.000003 }] }
+Loop 325 Start
+Loop dt: 0.000105, Total: 0.034642
+ROUND_STARTING: countdown 2.965463
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 325 End. Running: 1
+{ "tick": 325, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996989, "hp": 0.000003 }] }
+Loop 326 Start
+Loop dt: 0.000104, Total: 0.034747
+ROUND_STARTING: countdown 2.965358
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 326 End. Running: 1
+{ "tick": 326, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996971, "hp": 0.000003 }] }
+Loop 327 Start
+Loop dt: 0.000104, Total: 0.034851
+ROUND_STARTING: countdown 2.965254
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 327 End. Running: 1
+{ "tick": 327, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996953, "hp": 0.000003 }] }
+Loop 328 Start
+Loop dt: 0.000101, Total: 0.034952
+ROUND_STARTING: countdown 2.965150
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 328 End. Running: 1
+{ "tick": 328, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996935, "hp": 0.000003 }] }
+Loop 329 Start
+Loop dt: 0.000100, Total: 0.035052
+ROUND_STARTING: countdown 2.965049
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 329 End. Running: 1
+{ "tick": 329, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996918, "hp": 0.000003 }] }
+Loop 330 Start
+Loop dt: 0.000107, Total: 0.035159
+ROUND_STARTING: countdown 2.964949
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 330 End. Running: 1
+{ "tick": 330, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996899, "hp": 0.000003 }] }
+Loop 331 Start
+Loop dt: 0.000211, Total: 0.035370
+ROUND_STARTING: countdown 2.964842
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 331 End. Running: 1
+{ "tick": 331, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996862, "hp": 0.000003 }] }
+Loop 332 Start
+Loop dt: 0.000085, Total: 0.035455
+ROUND_STARTING: countdown 2.964631
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 332 End. Running: 1
+{ "tick": 332, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996847, "hp": 0.000003 }] }
+Loop 333 Start
+Loop dt: 0.000096, Total: 0.035551
+ROUND_STARTING: countdown 2.964545
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 333 End. Running: 1
+{ "tick": 333, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996830, "hp": 0.000003 }] }
+Loop 334 Start
+Loop dt: 0.000097, Total: 0.035648
+ROUND_STARTING: countdown 2.964450
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 334 End. Running: 1
+{ "tick": 334, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996812, "hp": 0.000003 }] }
+Loop 335 Start
+Loop dt: 0.000091, Total: 0.035739
+ROUND_STARTING: countdown 2.964353
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 335 End. Running: 1
+{ "tick": 335, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996796, "hp": 0.000003 }] }
+Loop 336 Start
+Loop dt: 0.000112, Total: 0.035851
+ROUND_STARTING: countdown 2.964262
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 336 End. Running: 1
+{ "tick": 336, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996776, "hp": 0.000003 }] }
+Loop 337 Start
+Loop dt: 0.000091, Total: 0.035942
+ROUND_STARTING: countdown 2.964149
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 337 End. Running: 1
+{ "tick": 337, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996760, "hp": 0.000003 }] }
+Loop 338 Start
+Loop dt: 0.000094, Total: 0.036037
+ROUND_STARTING: countdown 2.964058
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 338 End. Running: 1
+{ "tick": 338, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996743, "hp": 0.000003 }] }
+Loop 339 Start
+Loop dt: 0.000092, Total: 0.036129
+ROUND_STARTING: countdown 2.963964
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 339 End. Running: 1
+{ "tick": 339, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996726, "hp": 0.000003 }] }
+Loop 340 Start
+Loop dt: 0.000105, Total: 0.036234
+ROUND_STARTING: countdown 2.963871
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 340 End. Running: 1
+{ "tick": 340, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996707, "hp": 0.000003 }] }
+Loop 341 Start
+Loop dt: 0.000092, Total: 0.036326
+ROUND_STARTING: countdown 2.963766
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 341 End. Running: 1
+{ "tick": 341, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996690, "hp": 0.000003 }] }
+Loop 342 Start
+Loop dt: 0.000095, Total: 0.036421
+ROUND_STARTING: countdown 2.963675
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 342 End. Running: 1
+{ "tick": 342, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996673, "hp": 0.000003 }] }
+Loop 343 Start
+Loop dt: 0.000093, Total: 0.036514
+ROUND_STARTING: countdown 2.963580
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 343 End. Running: 1
+{ "tick": 343, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996656, "hp": 0.000003 }] }
+Loop 344 Start
+Loop dt: 0.000094, Total: 0.036608
+ROUND_STARTING: countdown 2.963487
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 344 End. Running: 1
+{ "tick": 344, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996639, "hp": 0.000003 }] }
+Loop 345 Start
+Loop dt: 0.000100, Total: 0.036708
+ROUND_STARTING: countdown 2.963392
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 345 End. Running: 1
+{ "tick": 345, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996621, "hp": 0.000003 }] }
+Loop 346 Start
+Loop dt: 0.000093, Total: 0.036801
+ROUND_STARTING: countdown 2.963293
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 346 End. Running: 1
+{ "tick": 346, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996603, "hp": 0.000003 }] }
+Loop 347 Start
+Loop dt: 0.000079, Total: 0.036880
+ROUND_STARTING: countdown 2.963200
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 347 End. Running: 1
+{ "tick": 347, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996589, "hp": 0.000003 }] }
+Loop 348 Start
+Loop dt: 0.000107, Total: 0.036986
+ROUND_STARTING: countdown 2.963121
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 348 End. Running: 1
+{ "tick": 348, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996570, "hp": 0.000003 }] }
+Loop 349 Start
+Loop dt: 0.000082, Total: 0.037069
+ROUND_STARTING: countdown 2.963014
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 349 End. Running: 1
+{ "tick": 349, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996554, "hp": 0.000003 }] }
+Loop 350 Start
+Loop dt: 0.000088, Total: 0.037157
+ROUND_STARTING: countdown 2.962932
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 350 End. Running: 1
+{ "tick": 350, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996538, "hp": 0.000003 }] }
+Loop 351 Start
+Loop dt: 0.000097, Total: 0.037254
+ROUND_STARTING: countdown 2.962844
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 351 End. Running: 1
+{ "tick": 351, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996520, "hp": 0.000003 }] }
+Loop 352 Start
+Loop dt: 0.000100, Total: 0.037354
+ROUND_STARTING: countdown 2.962747
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 352 End. Running: 1
+{ "tick": 352, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996501, "hp": 0.000003 }] }
+Loop 353 Start
+Loop dt: 0.000093, Total: 0.037447
+ROUND_STARTING: countdown 2.962647
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 353 End. Running: 1
+{ "tick": 353, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996484, "hp": 0.000003 }] }
+Loop 354 Start
+Loop dt: 0.000094, Total: 0.037541
+ROUND_STARTING: countdown 2.962554
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 354 End. Running: 1
+{ "tick": 354, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996466, "hp": 0.000003 }] }
+Loop 355 Start
+Loop dt: 0.000096, Total: 0.037637
+ROUND_STARTING: countdown 2.962460
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 355 End. Running: 1
+{ "tick": 355, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996448, "hp": 0.000003 }] }
+Loop 356 Start
+Loop dt: 0.000094, Total: 0.037732
+ROUND_STARTING: countdown 2.962364
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 356 End. Running: 1
+{ "tick": 356, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996430, "hp": 0.000003 }] }
+Loop 357 Start
+Loop dt: 0.000099, Total: 0.037830
+ROUND_STARTING: countdown 2.962269
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 357 End. Running: 1
+{ "tick": 357, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996412, "hp": 0.000003 }] }
+Loop 358 Start
+Loop dt: 0.000097, Total: 0.037927
+ROUND_STARTING: countdown 2.962171
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 358 End. Running: 1
+{ "tick": 358, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996393, "hp": 0.000003 }] }
+Loop 359 Start
+Loop dt: 0.000097, Total: 0.038024
+ROUND_STARTING: countdown 2.962074
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 359 End. Running: 1
+{ "tick": 359, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996375, "hp": 0.000003 }] }
+Loop 360 Start
+Loop dt: 0.000096, Total: 0.038120
+ROUND_STARTING: countdown 2.961976
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 360 End. Running: 1
+{ "tick": 360, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996356, "hp": 0.000003 }] }
+Loop 361 Start
+Loop dt: 0.000103, Total: 0.038223
+ROUND_STARTING: countdown 2.961880
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 361 End. Running: 1
+{ "tick": 361, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996337, "hp": 0.000003 }] }
+Loop 362 Start
+Loop dt: 0.000082, Total: 0.038305
+ROUND_STARTING: countdown 2.961778
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 362 End. Running: 1
+{ "tick": 362, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996321, "hp": 0.000003 }] }
+Loop 363 Start
+Loop dt: 0.000092, Total: 0.038396
+ROUND_STARTING: countdown 2.961696
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 363 End. Running: 1
+{ "tick": 363, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996304, "hp": 0.000003 }] }
+Loop 364 Start
+Loop dt: 0.000095, Total: 0.038491
+ROUND_STARTING: countdown 2.961604
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 364 End. Running: 1
+{ "tick": 364, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996285, "hp": 0.000003 }] }
+Loop 365 Start
+Loop dt: 0.000095, Total: 0.038585
+ROUND_STARTING: countdown 2.961510
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 365 End. Running: 1
+{ "tick": 365, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996267, "hp": 0.000003 }] }
+Loop 366 Start
+Loop dt: 0.000098, Total: 0.038683
+ROUND_STARTING: countdown 2.961415
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 366 End. Running: 1
+{ "tick": 366, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996248, "hp": 0.000003 }] }
+Loop 367 Start
+Loop dt: 0.000094, Total: 0.038777
+ROUND_STARTING: countdown 2.961317
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 367 End. Running: 1
+{ "tick": 367, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996230, "hp": 0.000003 }] }
+Loop 368 Start
+Loop dt: 0.000102, Total: 0.038879
+ROUND_STARTING: countdown 2.961224
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 368 End. Running: 1
+{ "tick": 368, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996210, "hp": 0.000003 }] }
+Loop 369 Start
+Loop dt: 0.000099, Total: 0.038978
+ROUND_STARTING: countdown 2.961122
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 369 End. Running: 1
+{ "tick": 369, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996191, "hp": 0.000003 }] }
+Loop 370 Start
+Loop dt: 0.000101, Total: 0.039079
+ROUND_STARTING: countdown 2.961022
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 370 End. Running: 1
+{ "tick": 370, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996171, "hp": 0.000003 }] }
+Loop 371 Start
+Loop dt: 0.000092, Total: 0.039171
+ROUND_STARTING: countdown 2.960922
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 371 End. Running: 1
+{ "tick": 371, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996153, "hp": 0.000003 }] }
+Loop 372 Start
+Loop dt: 0.000109, Total: 0.039280
+ROUND_STARTING: countdown 2.960829
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 372 End. Running: 1
+{ "tick": 372, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996131, "hp": 0.000003 }] }
+Loop 373 Start
+Loop dt: 0.000110, Total: 0.039390
+ROUND_STARTING: countdown 2.960721
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 373 End. Running: 1
+{ "tick": 373, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996109, "hp": 0.000003 }] }
+Loop 374 Start
+Loop dt: 0.000106, Total: 0.039496
+ROUND_STARTING: countdown 2.960610
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 374 End. Running: 1
+{ "tick": 374, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996089, "hp": 0.000003 }] }
+Loop 375 Start
+Loop dt: 0.000108, Total: 0.039605
+ROUND_STARTING: countdown 2.960504
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 375 End. Running: 1
+{ "tick": 375, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996067, "hp": 0.000003 }] }
+Loop 376 Start
+Loop dt: 0.000122, Total: 0.039727
+ROUND_STARTING: countdown 2.960396
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 376 End. Running: 1
+{ "tick": 376, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996043, "hp": 0.000003 }] }
+Loop 377 Start
+Loop dt: 0.000106, Total: 0.039832
+ROUND_STARTING: countdown 2.960274
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 377 End. Running: 1
+{ "tick": 377, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996022, "hp": 0.000003 }] }
+Loop 378 Start
+Loop dt: 0.000106, Total: 0.039938
+ROUND_STARTING: countdown 2.960168
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 378 End. Running: 1
+{ "tick": 378, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.996001, "hp": 0.000003 }] }
+Loop 379 Start
+Loop dt: 0.000105, Total: 0.040043
+ROUND_STARTING: countdown 2.960062
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 379 End. Running: 1
+{ "tick": 379, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995980, "hp": 0.000003 }] }
+Loop 380 Start
+Loop dt: 0.000103, Total: 0.040146
+ROUND_STARTING: countdown 2.959957
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 380 End. Running: 1
+{ "tick": 380, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995959, "hp": 0.000003 }] }
+Loop 381 Start
+Loop dt: 0.000117, Total: 0.040263
+ROUND_STARTING: countdown 2.959855
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 381 End. Running: 1
+{ "tick": 381, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995936, "hp": 0.000003 }] }
+Loop 382 Start
+Loop dt: 0.000109, Total: 0.040372
+ROUND_STARTING: countdown 2.959737
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 382 End. Running: 1
+{ "tick": 382, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995914, "hp": 0.000003 }] }
+Loop 383 Start
+Loop dt: 0.000105, Total: 0.040477
+ROUND_STARTING: countdown 2.959628
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 383 End. Running: 1
+{ "tick": 383, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995893, "hp": 0.000003 }] }
+Loop 384 Start
+Loop dt: 0.000117, Total: 0.040594
+ROUND_STARTING: countdown 2.959523
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 384 End. Running: 1
+{ "tick": 384, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995869, "hp": 0.000003 }] }
+Loop 385 Start
+Loop dt: 0.000110, Total: 0.040703
+ROUND_STARTING: countdown 2.959407
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 385 End. Running: 1
+{ "tick": 385, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995847, "hp": 0.000003 }] }
+Loop 386 Start
+Loop dt: 0.000101, Total: 0.040804
+ROUND_STARTING: countdown 2.959297
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 386 End. Running: 1
+{ "tick": 386, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995826, "hp": 0.000003 }] }
+Loop 387 Start
+Loop dt: 0.000109, Total: 0.040913
+ROUND_STARTING: countdown 2.959196
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 387 End. Running: 1
+{ "tick": 387, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995804, "hp": 0.000003 }] }
+Loop 388 Start
+Loop dt: 0.000104, Total: 0.041017
+ROUND_STARTING: countdown 2.959088
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 388 End. Running: 1
+{ "tick": 388, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995782, "hp": 0.000003 }] }
+Loop 389 Start
+Loop dt: 0.000115, Total: 0.041132
+ROUND_STARTING: countdown 2.958984
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 389 End. Running: 1
+{ "tick": 389, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995759, "hp": 0.000003 }] }
+Loop 390 Start
+Loop dt: 0.000109, Total: 0.041241
+ROUND_STARTING: countdown 2.958869
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 390 End. Running: 1
+{ "tick": 390, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995736, "hp": 0.000003 }] }
+Loop 391 Start
+Loop dt: 0.000097, Total: 0.041338
+ROUND_STARTING: countdown 2.958759
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 391 End. Running: 1
+{ "tick": 391, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995716, "hp": 0.000003 }] }
+Loop 392 Start
+Loop dt: 0.000105, Total: 0.041443
+ROUND_STARTING: countdown 2.958662
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 392 End. Running: 1
+{ "tick": 392, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995694, "hp": 0.000003 }] }
+Loop 393 Start
+Loop dt: 0.000098, Total: 0.041542
+ROUND_STARTING: countdown 2.958557
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 393 End. Running: 1
+{ "tick": 393, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995674, "hp": 0.000003 }] }
+Loop 394 Start
+Loop dt: 0.000107, Total: 0.041648
+ROUND_STARTING: countdown 2.958459
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 394 End. Running: 1
+{ "tick": 394, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995651, "hp": 0.000003 }] }
+Loop 395 Start
+Loop dt: 0.000106, Total: 0.041754
+ROUND_STARTING: countdown 2.958352
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 395 End. Running: 1
+{ "tick": 395, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995629, "hp": 0.000003 }] }
+Loop 396 Start
+Loop dt: 0.000111, Total: 0.041865
+ROUND_STARTING: countdown 2.958246
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 396 End. Running: 1
+{ "tick": 396, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995605, "hp": 0.000003 }] }
+Loop 397 Start
+Loop dt: 0.000106, Total: 0.041971
+ROUND_STARTING: countdown 2.958135
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 397 End. Running: 1
+{ "tick": 397, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995583, "hp": 0.000003 }] }
+Loop 398 Start
+Loop dt: 0.000109, Total: 0.042080
+ROUND_STARTING: countdown 2.958029
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 398 End. Running: 1
+{ "tick": 398, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995560, "hp": 0.000003 }] }
+Loop 399 Start
+Loop dt: 0.000101, Total: 0.042181
+ROUND_STARTING: countdown 2.957921
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 399 End. Running: 1
+{ "tick": 399, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995539, "hp": 0.000003 }] }
+Loop 400 Start
+Loop dt: 0.000118, Total: 0.042299
+ROUND_STARTING: countdown 2.957819
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 400 End. Running: 1
+{ "tick": 400, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995514, "hp": 0.000003 }] }
+Loop 401 Start
+Loop dt: 0.000107, Total: 0.042406
+ROUND_STARTING: countdown 2.957701
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 401 End. Running: 1
+{ "tick": 401, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995491, "hp": 0.000003 }] }
+Loop 402 Start
+Loop dt: 0.000113, Total: 0.042519
+ROUND_STARTING: countdown 2.957594
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 402 End. Running: 1
+{ "tick": 402, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995467, "hp": 0.000003 }] }
+Loop 403 Start
+Loop dt: 0.000107, Total: 0.042626
+ROUND_STARTING: countdown 2.957481
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 403 End. Running: 1
+{ "tick": 403, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995444, "hp": 0.000003 }] }
+Loop 404 Start
+Loop dt: 0.000111, Total: 0.042737
+ROUND_STARTING: countdown 2.957374
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 404 End. Running: 1
+{ "tick": 404, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995420, "hp": 0.000003 }] }
+Loop 405 Start
+Loop dt: 0.000094, Total: 0.042831
+ROUND_STARTING: countdown 2.957263
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 405 End. Running: 1
+{ "tick": 405, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995400, "hp": 0.000003 }] }
+Loop 406 Start
+Loop dt: 0.000091, Total: 0.042922
+ROUND_STARTING: countdown 2.957169
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 406 End. Running: 1
+{ "tick": 406, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995381, "hp": 0.000003 }] }
+Loop 407 Start
+Loop dt: 0.000100, Total: 0.043022
+ROUND_STARTING: countdown 2.957078
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 407 End. Running: 1
+{ "tick": 407, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995359, "hp": 0.000003 }] }
+Loop 408 Start
+Loop dt: 0.000089, Total: 0.043111
+ROUND_STARTING: countdown 2.956978
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 408 End. Running: 1
+{ "tick": 408, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995340, "hp": 0.000003 }] }
+Loop 409 Start
+Loop dt: 0.000106, Total: 0.043217
+ROUND_STARTING: countdown 2.956890
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 409 End. Running: 1
+{ "tick": 409, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995317, "hp": 0.000003 }] }
+Loop 410 Start
+Loop dt: 0.000088, Total: 0.043305
+ROUND_STARTING: countdown 2.956783
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 410 End. Running: 1
+{ "tick": 410, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995298, "hp": 0.000003 }] }
+Loop 411 Start
+Loop dt: 0.000092, Total: 0.043398
+ROUND_STARTING: countdown 2.956695
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 411 End. Running: 1
+{ "tick": 411, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995278, "hp": 0.000003 }] }
+Loop 412 Start
+Loop dt: 0.000086, Total: 0.043484
+ROUND_STARTING: countdown 2.956603
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 412 End. Running: 1
+{ "tick": 412, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995260, "hp": 0.000003 }] }
+Loop 413 Start
+Loop dt: 0.000086, Total: 0.043570
+ROUND_STARTING: countdown 2.956517
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 413 End. Running: 1
+{ "tick": 413, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995241, "hp": 0.000003 }] }
+Loop 414 Start
+Loop dt: 0.000086, Total: 0.043656
+ROUND_STARTING: countdown 2.956430
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 414 End. Running: 1
+{ "tick": 414, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995223, "hp": 0.000003 }] }
+Loop 415 Start
+Loop dt: 0.000092, Total: 0.043748
+ROUND_STARTING: countdown 2.956345
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 415 End. Running: 1
+{ "tick": 415, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995203, "hp": 0.000003 }] }
+Loop 416 Start
+Loop dt: 0.000084, Total: 0.043832
+ROUND_STARTING: countdown 2.956252
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 416 End. Running: 1
+{ "tick": 416, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995184, "hp": 0.000003 }] }
+Loop 417 Start
+Loop dt: 0.000081, Total: 0.043913
+ROUND_STARTING: countdown 2.956168
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 417 End. Running: 1
+{ "tick": 417, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995166, "hp": 0.000003 }] }
+Loop 418 Start
+Loop dt: 0.000078, Total: 0.043991
+ROUND_STARTING: countdown 2.956087
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 418 End. Running: 1
+{ "tick": 418, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995149, "hp": 0.000003 }] }
+Loop 419 Start
+Loop dt: 0.000097, Total: 0.044088
+ROUND_STARTING: countdown 2.956009
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 419 End. Running: 1
+{ "tick": 419, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995128, "hp": 0.000003 }] }
+Loop 420 Start
+Loop dt: 0.000084, Total: 0.044172
+ROUND_STARTING: countdown 2.955912
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 420 End. Running: 1
+{ "tick": 420, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995109, "hp": 0.000003 }] }
+Loop 421 Start
+Loop dt: 0.000103, Total: 0.044276
+ROUND_STARTING: countdown 2.955828
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 421 End. Running: 1
+{ "tick": 421, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995086, "hp": 0.000003 }] }
+Loop 422 Start
+Loop dt: 0.000082, Total: 0.044358
+ROUND_STARTING: countdown 2.955725
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 422 End. Running: 1
+{ "tick": 422, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995068, "hp": 0.000003 }] }
+Loop 423 Start
+Loop dt: 0.000084, Total: 0.044441
+ROUND_STARTING: countdown 2.955643
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 423 End. Running: 1
+{ "tick": 423, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995049, "hp": 0.000003 }] }
+Loop 424 Start
+Loop dt: 0.000078, Total: 0.044519
+ROUND_STARTING: countdown 2.955559
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 424 End. Running: 1
+{ "tick": 424, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995032, "hp": 0.000003 }] }
+Loop 425 Start
+Loop dt: 0.000094, Total: 0.044612
+ROUND_STARTING: countdown 2.955482
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 425 End. Running: 1
+{ "tick": 425, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.995011, "hp": 0.000003 }] }
+Loop 426 Start
+Loop dt: 0.000095, Total: 0.044707
+ROUND_STARTING: countdown 2.955388
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 426 End. Running: 1
+{ "tick": 426, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994990, "hp": 0.000003 }] }
+Loop 427 Start
+Loop dt: 0.000091, Total: 0.044798
+ROUND_STARTING: countdown 2.955293
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 427 End. Running: 1
+{ "tick": 427, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994970, "hp": 0.000003 }] }
+Loop 428 Start
+Loop dt: 0.000095, Total: 0.044893
+ROUND_STARTING: countdown 2.955202
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 428 End. Running: 1
+{ "tick": 428, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994948, "hp": 0.000003 }] }
+Loop 429 Start
+Loop dt: 0.000094, Total: 0.044987
+ROUND_STARTING: countdown 2.955107
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 429 End. Running: 1
+{ "tick": 429, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994927, "hp": 0.000003 }] }
+Loop 430 Start
+Loop dt: 0.000092, Total: 0.045080
+ROUND_STARTING: countdown 2.955013
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 430 End. Running: 1
+{ "tick": 430, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994906, "hp": 0.000003 }] }
+Loop 431 Start
+Loop dt: 0.000093, Total: 0.045172
+ROUND_STARTING: countdown 2.954921
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 431 End. Running: 1
+{ "tick": 431, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994885, "hp": 0.000003 }] }
+Loop 432 Start
+Loop dt: 0.000105, Total: 0.045277
+ROUND_STARTING: countdown 2.954828
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 432 End. Running: 1
+{ "tick": 432, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994862, "hp": 0.000003 }] }
+Loop 433 Start
+Loop dt: 0.000090, Total: 0.045368
+ROUND_STARTING: countdown 2.954723
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 433 End. Running: 1
+{ "tick": 433, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994841, "hp": 0.000003 }] }
+Loop 434 Start
+Loop dt: 0.000093, Total: 0.045460
+ROUND_STARTING: countdown 2.954633
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 434 End. Running: 1
+{ "tick": 434, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994820, "hp": 0.000003 }] }
+Loop 435 Start
+Loop dt: 0.000094, Total: 0.045554
+ROUND_STARTING: countdown 2.954540
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 435 End. Running: 1
+{ "tick": 435, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994799, "hp": 0.000003 }] }
+Loop 436 Start
+Loop dt: 0.000094, Total: 0.045648
+ROUND_STARTING: countdown 2.954447
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 436 End. Running: 1
+{ "tick": 436, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994777, "hp": 0.000003 }] }
+Loop 437 Start
+Loop dt: 0.000095, Total: 0.045743
+ROUND_STARTING: countdown 2.954352
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 437 End. Running: 1
+{ "tick": 437, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994755, "hp": 0.000003 }] }
+Loop 438 Start
+Loop dt: 0.000090, Total: 0.045834
+ROUND_STARTING: countdown 2.954257
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 438 End. Running: 1
+{ "tick": 438, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994735, "hp": 0.000003 }] }
+Loop 439 Start
+Loop dt: 0.000093, Total: 0.045926
+ROUND_STARTING: countdown 2.954167
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 439 End. Running: 1
+{ "tick": 439, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994713, "hp": 0.000003 }] }
+Loop 440 Start
+Loop dt: 0.000098, Total: 0.046025
+ROUND_STARTING: countdown 2.954074
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 440 End. Running: 1
+{ "tick": 440, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994691, "hp": 0.000003 }] }
+Loop 441 Start
+Loop dt: 0.000092, Total: 0.046116
+ROUND_STARTING: countdown 2.953976
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 441 End. Running: 1
+{ "tick": 441, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994670, "hp": 0.000003 }] }
+Loop 442 Start
+Loop dt: 0.000103, Total: 0.046219
+ROUND_STARTING: countdown 2.953884
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 442 End. Running: 1
+{ "tick": 442, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994646, "hp": 0.000003 }] }
+Loop 443 Start
+Loop dt: 0.000087, Total: 0.046306
+ROUND_STARTING: countdown 2.953781
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 443 End. Running: 1
+{ "tick": 443, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994626, "hp": 0.000003 }] }
+Loop 444 Start
+Loop dt: 0.000096, Total: 0.046401
+ROUND_STARTING: countdown 2.953694
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 444 End. Running: 1
+{ "tick": 444, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994604, "hp": 0.000003 }] }
+Loop 445 Start
+Loop dt: 0.000076, Total: 0.046477
+ROUND_STARTING: countdown 2.953599
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 445 End. Running: 1
+{ "tick": 445, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994586, "hp": 0.000003 }] }
+Loop 446 Start
+Loop dt: 0.000092, Total: 0.046569
+ROUND_STARTING: countdown 2.953523
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 446 End. Running: 1
+{ "tick": 446, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994565, "hp": 0.000003 }] }
+Loop 447 Start
+Loop dt: 0.000091, Total: 0.046660
+ROUND_STARTING: countdown 2.953431
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 447 End. Running: 1
+{ "tick": 447, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994544, "hp": 0.000003 }] }
+Loop 448 Start
+Loop dt: 0.000101, Total: 0.046761
+ROUND_STARTING: countdown 2.953340
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 448 End. Running: 1
+{ "tick": 448, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994520, "hp": 0.000003 }] }
+Loop 449 Start
+Loop dt: 0.000094, Total: 0.046854
+ROUND_STARTING: countdown 2.953239
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 449 End. Running: 1
+{ "tick": 449, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994498, "hp": 0.000003 }] }
+Loop 450 Start
+Loop dt: 0.000095, Total: 0.046950
+ROUND_STARTING: countdown 2.953146
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 450 End. Running: 1
+{ "tick": 450, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994475, "hp": 0.000003 }] }
+Loop 451 Start
+Loop dt: 0.000091, Total: 0.047041
+ROUND_STARTING: countdown 2.953050
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 451 End. Running: 1
+{ "tick": 451, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994454, "hp": 0.000003 }] }
+Loop 452 Start
+Loop dt: 0.000086, Total: 0.047127
+ROUND_STARTING: countdown 2.952960
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 452 End. Running: 1
+{ "tick": 452, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994433, "hp": 0.000003 }] }
+Loop 453 Start
+Loop dt: 0.000095, Total: 0.047222
+ROUND_STARTING: countdown 2.952873
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 453 End. Running: 1
+{ "tick": 453, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994411, "hp": 0.000003 }] }
+Loop 454 Start
+Loop dt: 0.000071, Total: 0.047293
+ROUND_STARTING: countdown 2.952778
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 454 End. Running: 1
+{ "tick": 454, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994394, "hp": 0.000003 }] }
+Loop 455 Start
+Loop dt: 0.000101, Total: 0.047393
+ROUND_STARTING: countdown 2.952708
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 455 End. Running: 1
+{ "tick": 455, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994370, "hp": 0.000003 }] }
+Loop 456 Start
+Loop dt: 0.000081, Total: 0.047474
+ROUND_STARTING: countdown 2.952607
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 456 End. Running: 1
+{ "tick": 456, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994351, "hp": 0.000003 }] }
+Loop 457 Start
+Loop dt: 0.000080, Total: 0.047554
+ROUND_STARTING: countdown 2.952526
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 457 End. Running: 1
+{ "tick": 457, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994332, "hp": 0.000003 }] }
+Loop 458 Start
+Loop dt: 0.000085, Total: 0.047639
+ROUND_STARTING: countdown 2.952446
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 458 End. Running: 1
+{ "tick": 458, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994312, "hp": 0.000003 }] }
+Loop 459 Start
+Loop dt: 0.000073, Total: 0.047712
+ROUND_STARTING: countdown 2.952361
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 459 End. Running: 1
+{ "tick": 459, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994295, "hp": 0.000003 }] }
+Loop 460 Start
+Loop dt: 0.000070, Total: 0.047782
+ROUND_STARTING: countdown 2.952288
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 460 End. Running: 1
+{ "tick": 460, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994278, "hp": 0.000003 }] }
+Loop 461 Start
+Loop dt: 0.000251, Total: 0.048033
+ROUND_STARTING: countdown 2.952218
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 461 End. Running: 1
+{ "tick": 461, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994218, "hp": 0.000003 }] }
+Loop 462 Start
+Loop dt: 0.000095, Total: 0.048128
+ROUND_STARTING: countdown 2.951966
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 462 End. Running: 1
+{ "tick": 462, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994195, "hp": 0.000003 }] }
+Loop 463 Start
+Loop dt: 0.000099, Total: 0.048227
+ROUND_STARTING: countdown 2.951872
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 463 End. Running: 1
+{ "tick": 463, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994171, "hp": 0.000003 }] }
+Loop 464 Start
+Loop dt: 0.000115, Total: 0.048342
+ROUND_STARTING: countdown 2.951773
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 464 End. Running: 1
+{ "tick": 464, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994143, "hp": 0.000003 }] }
+Loop 465 Start
+Loop dt: 0.000155, Total: 0.048498
+ROUND_STARTING: countdown 2.951657
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 465 End. Running: 1
+{ "tick": 465, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994106, "hp": 0.000003 }] }
+Loop 466 Start
+Loop dt: 0.000110, Total: 0.048607
+ROUND_STARTING: countdown 2.951502
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 466 End. Running: 1
+{ "tick": 466, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994079, "hp": 0.000003 }] }
+Loop 467 Start
+Loop dt: 0.000112, Total: 0.048720
+ROUND_STARTING: countdown 2.951392
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 467 End. Running: 1
+{ "tick": 467, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994052, "hp": 0.000003 }] }
+Loop 468 Start
+Loop dt: 0.000112, Total: 0.048831
+ROUND_STARTING: countdown 2.951280
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 468 End. Running: 1
+{ "tick": 468, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.994025, "hp": 0.000003 }] }
+Loop 469 Start
+Loop dt: 0.000279, Total: 0.049110
+ROUND_STARTING: countdown 2.951168
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 469 End. Running: 1
+{ "tick": 469, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993957, "hp": 0.000003 }] }
+Loop 470 Start
+Loop dt: 0.000170, Total: 0.049280
+ROUND_STARTING: countdown 2.950890
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 470 End. Running: 1
+{ "tick": 470, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993915, "hp": 0.000003 }] }
+Loop 471 Start
+Loop dt: 0.000119, Total: 0.049398
+ROUND_STARTING: countdown 2.950720
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 471 End. Running: 1
+{ "tick": 471, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993886, "hp": 0.000003 }] }
+Loop 472 Start
+Loop dt: 0.000122, Total: 0.049521
+ROUND_STARTING: countdown 2.950602
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 472 End. Running: 1
+{ "tick": 472, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993855, "hp": 0.000003 }] }
+Loop 473 Start
+Loop dt: 0.000125, Total: 0.049646
+ROUND_STARTING: countdown 2.950479
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 473 End. Running: 1
+{ "tick": 473, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993824, "hp": 0.000003 }] }
+Loop 474 Start
+Loop dt: 0.000123, Total: 0.049769
+ROUND_STARTING: countdown 2.950354
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 474 End. Running: 1
+{ "tick": 474, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993793, "hp": 0.000003 }] }
+Loop 475 Start
+Loop dt: 0.000102, Total: 0.049871
+ROUND_STARTING: countdown 2.950231
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 475 End. Running: 1
+{ "tick": 475, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993768, "hp": 0.000003 }] }
+Loop 476 Start
+Loop dt: 0.000104, Total: 0.049974
+ROUND_STARTING: countdown 2.950129
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 476 End. Running: 1
+{ "tick": 476, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993742, "hp": 0.000003 }] }
+Loop 477 Start
+Loop dt: 0.000103, Total: 0.050077
+ROUND_STARTING: countdown 2.950026
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 477 End. Running: 1
+{ "tick": 477, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993717, "hp": 0.000003 }] }
+Loop 478 Start
+Loop dt: 0.000106, Total: 0.050183
+ROUND_STARTING: countdown 2.949923
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 478 End. Running: 1
+{ "tick": 478, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993690, "hp": 0.000003 }] }
+Loop 479 Start
+Loop dt: 0.000145, Total: 0.050328
+ROUND_STARTING: countdown 2.949817
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 479 End. Running: 1
+{ "tick": 479, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993654, "hp": 0.000003 }] }
+Loop 480 Start
+Loop dt: 0.000138, Total: 0.050465
+ROUND_STARTING: countdown 2.949672
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 480 End. Running: 1
+{ "tick": 480, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993619, "hp": 0.000003 }] }
+Loop 481 Start
+Loop dt: 0.000110, Total: 0.050575
+ROUND_STARTING: countdown 2.949535
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 481 End. Running: 1
+{ "tick": 481, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993591, "hp": 0.000003 }] }
+Loop 482 Start
+Loop dt: 0.000110, Total: 0.050685
+ROUND_STARTING: countdown 2.949425
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 482 End. Running: 1
+{ "tick": 482, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993564, "hp": 0.000003 }] }
+Loop 483 Start
+Loop dt: 0.000111, Total: 0.050796
+ROUND_STARTING: countdown 2.949315
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 483 End. Running: 1
+{ "tick": 483, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993536, "hp": 0.000003 }] }
+Loop 484 Start
+Loop dt: 0.000110, Total: 0.050906
+ROUND_STARTING: countdown 2.949204
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 484 End. Running: 1
+{ "tick": 484, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993507, "hp": 0.000003 }] }
+Loop 485 Start
+Loop dt: 0.000105, Total: 0.051011
+ROUND_STARTING: countdown 2.949094
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 485 End. Running: 1
+{ "tick": 485, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993481, "hp": 0.000003 }] }
+Loop 486 Start
+Loop dt: 0.000103, Total: 0.051115
+ROUND_STARTING: countdown 2.948988
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 486 End. Running: 1
+{ "tick": 486, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993454, "hp": 0.000003 }] }
+Loop 487 Start
+Loop dt: 0.000210, Total: 0.051325
+ROUND_STARTING: countdown 2.948885
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 487 End. Running: 1
+{ "tick": 487, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993401, "hp": 0.000003 }] }
+Loop 488 Start
+Loop dt: 0.000181, Total: 0.051506
+ROUND_STARTING: countdown 2.948675
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 488 End. Running: 1
+{ "tick": 488, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993354, "hp": 0.000003 }] }
+Loop 489 Start
+Loop dt: 0.000117, Total: 0.051623
+ROUND_STARTING: countdown 2.948494
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 489 End. Running: 1
+{ "tick": 489, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993324, "hp": 0.000003 }] }
+Loop 490 Start
+Loop dt: 0.000111, Total: 0.051734
+ROUND_STARTING: countdown 2.948377
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 490 End. Running: 1
+{ "tick": 490, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993295, "hp": 0.000003 }] }
+Loop 491 Start
+Loop dt: 0.000131, Total: 0.051865
+ROUND_STARTING: countdown 2.948266
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 491 End. Running: 1
+{ "tick": 491, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993261, "hp": 0.000003 }] }
+Loop 492 Start
+Loop dt: 0.000125, Total: 0.051990
+ROUND_STARTING: countdown 2.948135
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 492 End. Running: 1
+{ "tick": 492, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993229, "hp": 0.000003 }] }
+Loop 493 Start
+Loop dt: 0.000110, Total: 0.052100
+ROUND_STARTING: countdown 2.948009
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 493 End. Running: 1
+{ "tick": 493, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993200, "hp": 0.000003 }] }
+Loop 494 Start
+Loop dt: 0.000134, Total: 0.052234
+ROUND_STARTING: countdown 2.947900
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 494 End. Running: 1
+{ "tick": 494, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993165, "hp": 0.000003 }] }
+Loop 495 Start
+Loop dt: 0.000125, Total: 0.052358
+ROUND_STARTING: countdown 2.947766
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 495 End. Running: 1
+{ "tick": 495, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993133, "hp": 0.000003 }] }
+Loop 496 Start
+Loop dt: 0.000157, Total: 0.052515
+ROUND_STARTING: countdown 2.947641
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 496 End. Running: 1
+{ "tick": 496, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993092, "hp": 0.000003 }] }
+Loop 497 Start
+Loop dt: 0.000143, Total: 0.052658
+ROUND_STARTING: countdown 2.947485
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 497 End. Running: 1
+{ "tick": 497, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993054, "hp": 0.000003 }] }
+Loop 498 Start
+Loop dt: 0.000117, Total: 0.052774
+ROUND_STARTING: countdown 2.947342
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 498 End. Running: 1
+{ "tick": 498, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.993023, "hp": 0.000003 }] }
+Loop 499 Start
+Loop dt: 0.000101, Total: 0.052876
+ROUND_STARTING: countdown 2.947226
+Landscape::update start. Slices: 500, Chunks: 0x5fc94141c0d8
+Loop 499 End. Running: 1
+{ "tick": 499, "tanks": [{ "id": 0, "x": 0.000001, "y": 4.992997, "hp": 0.000003 }] }

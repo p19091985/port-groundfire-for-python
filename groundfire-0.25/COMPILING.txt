@@ -1,0 +1,47 @@
+Compiling Groundfire
+--------------------
+The makefiles for groundfire are still quite primitive so they may require user
+intervention to get them working properly. Remember, if you are using Windows,
+there are pre-compiled binaries available on the website, so you do not need to
+build Groundfire from the source unless you really want to play with the code.
+
+I will be improving the makefiles for later versions of Groundfire.
+
+* * *
+
+Windows:
+To compile on Windows you must have the following built and installed:
+
+* MinGW v2 C/C++ compiler (available from www.mingw.org)
+* OpenAL SDK              (available from www.openal.org)
+* GLFW                    (available from glfw.sourceforge.net)
+
+For the easiest installation, place the header and library files for GLFW and 
+OpenAL in with the rest of the minGW header and library files.
+
+Once all this is installed, building Groundfire should be as easy as typing 
+'make' in the same directory as this file.
+
+If you want to build groundfire with MSVC++, you must create a new project for 
+it, include all the source files and link it with the OpenAL and GLFW libs.
+Sorry, I don't have MSVC++ available so I cannot test that this works (but it
+should).
+
+* * * 
+
+Linux:
+To compile on Linux you must have the following installed:
+
+* Build essentials (make, g++)
+* OpenAL Soft (libopenal-dev)
+* ALUT / freealut (libalut-dev)
+* GLFW 3 (libglfw3-dev)
+* OpenGL / GLU (usually provided by mesa-common-dev and libglu1-mesa-dev)
+
+Type 'make' or 'make unix' to compile Groundfire.
+Executable 'groundfire' will be created in the top-level directory.
+
+* * *
+
+Good luck ;-) 
+Tom.

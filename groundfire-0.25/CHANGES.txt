@@ -1,0 +1,58 @@
+This file shows the changes to Groundfire added in each release
+- Tom.
+
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+V0.25 - Third Release
+
+* (Windows binary release only): Included the DLL that should make sound work 
+  for those of you who don't have the openAL runtime installed.
+
+* Terrain
+  Made the terrain look more like Death tank. With a nice gradiant colour
+  near the surface. There are still the occasional glitch with this but it's
+  good enough for the time being.
+  
+* Bugfixes
+  Fixed a bug that caused the machine gun sound to play continuously when
+  you change weapons + a few other minor tweaks.
+  
+That's all for now. Not a lot in this release because I've been
+concentrating on adding network play recently. Hopefully the next release will
+feature an experimental network mode for you to try out.
+
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+V0.2 - Second Release (New features & bugfixes)
+
+* Computer controlled tanks added 
+  You can now set some tanks to be controlled by the computer. The AI is
+  currently rather primitive (it won't make use of weapons and it makes no 
+  attempt at avoiding being hit.)
+  
+* Redesigned player select screen
+  The player select screen has been completely changed. This is mainly to allow
+  Computer controlled tanks to be added to the game. It is now far more
+  intuitive and powerful.
+  
+* More frame-rate independent
+  Not a very noticeable change this, especially if the game runs at a good
+  frame rate anyway on your computer. However, this is the first step towards 
+  a networkable version of Groundfire.
+  
+* Mirv
+  This new weapon has been added. Mirvs can be purchased at the shop. Mirvs
+  act like normal shells but when they reach the apex of their trajectory, the
+  mirv will split up into 5 mini shells which will rain down around the area
+  targeted.
+  
+* Bugfixes
+  - Mouse cursor will now not go off the screen in fullscreen mode, so you
+    don't have to worry about losing it anymore.
+  - The options screen controls will default to the current resolution and 
+    screen mode, instead of always to 640x480 fullscreen.
+  - Small tweaks to the game physics (probably unnoticeable) 
+
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+V0.1 - First Release

@@ -1,0 +1,50 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//               Groundfire
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2004, Tom Russell (tom@groundfire.net)
+//
+// This file is part of the Groundfire project, distributed under the MIT 
+// license. See the file 'COPYING', included with this distribution, for a copy
+// of the full MIT licence.
+//
+////////////////////////////////////////////////////////////////////////////////
+//
+//   File name : quitmenu.hh
+//
+//          By : Tom Russell
+//
+//        Date : 31-March-03
+//
+// Description : Handles the quit menu
+//
+//
+//
+////////////////////////////////////////////////////////////////////////////////
+#ifndef __QUITMENU_HH__
+#define __QUITMENU_HH__
+
+////////////////////////////////////////////////////////////////////////////////
+// Includes
+////////////////////////////////////////////////////////////////////////////////
+#include "menu.hh"
+#include "buttons.hh"
+
+class cQuitMenu : public cMenu
+{ 
+public:
+    cQuitMenu (cGame * game);
+    virtual ~cQuitMenu ();
+
+    enumGameState update (double time);
+    void          draw   ();
+
+private:
+    cTextButton * _yes;
+    cTextButton * _no;
+
+};
+
+#endif // __QUITMENU_HH__
