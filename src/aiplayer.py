@@ -39,9 +39,8 @@ class AIPlayer(Player):
         self._shots_in_air = 0
         self._last_shot = False
 
-    def update(self, time: float):
-        super().update(time)
-        # Clear commands
+    def update(self, time: float = 0.0):
+        # Clear commands BEFORE updating tank (avoids double-processing)
         for i in range(11):
             self._commands[i] = False
 
@@ -60,7 +59,11 @@ class AIPlayer(Player):
                      else:
                          self._commands[Player.CMD_FIRE] = True
 
-    def get_command(self, command: int, start_time_ref: List[float]) -> bool:
+        # C++ AIPlayer::update() does NOT call tank.update() — tank calls us, not reverse
+
+    def get_command(self, command: int, start_time_ref=None) -> bool:
+        if start_time_ref is not None and isinstance(start_time_ref, list) and len(start_time_ref) > 0:
+            start_time_ref[0] = 0.0
         return self._commands[command]
 
     def record_fired(self):
@@ -222,7 +225,7 @@ class AIPlayer(Player):
 
     def find_new_target(self):
         players = self._game.get_players()
-        top_score = -999999 
+        top_score = 0
         self._aim_directly = False
         
         for p in players:
@@ -232,7 +235,7 @@ class AIPlayer(Player):
                 enemy_tank = p.get_tank()
                 
                 sx, sy = self._tank.gun_launch_position()
-                ex, ey = enemy_tank.get_centre()
+                ex, ey, _ = enemy_tank.get_centre()
                 
                 landscape = self._game.get_landscape()
                 if landscape:

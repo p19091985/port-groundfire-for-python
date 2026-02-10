@@ -16,8 +16,8 @@ class Entity:
         raise NotImplementedError
 
     def do_pre_round(self):
-        # By default do nothing
-        pass
+        # By default, entity stays alive
+        return True
 
     def do_post_round(self) -> bool:
         # By default signify that the entity was destroyed

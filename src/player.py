@@ -49,7 +49,6 @@ class Player:
 
     def new_round(self):
         self._defeated_players = []
-        self._tank.do_pre_round()
 
     def end_round(self):
         self._tank.do_post_round()
@@ -71,8 +70,10 @@ class Player:
             
         self._money += 10
 
-    def update(self, time: float):
-        self._tank.update(time)
+    def update(self, time: float = 0.0):
+        # Base player update — override in subclasses for AI/human input
+        # C++: virtual void update() — does NOT call tank.update()
+        pass
 
     def defeat(self, dead_player: 'Player'):
         self._defeated_players.append(dead_player)
@@ -83,7 +84,6 @@ class Player:
     def get_name(self) -> str:
         return self._name
         
-    def get_score(self) -> int: return self._score
     def get_score(self) -> int: return self._score
     def get_money(self) -> int: return self._money
     def set_money(self, money: int): self._money = money

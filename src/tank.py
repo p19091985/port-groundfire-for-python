@@ -89,6 +89,7 @@ class Tank(Entity):
         self._switch_weapon_time = 0.0
         self._firing = False
         self._exhaust_time = 0.0
+        self._smoke_timer = 0.0
 
     def draw(self):
         if not self._game.get_interface():
@@ -105,11 +106,11 @@ class Tank(Entity):
             return tx + rx, ty + ry
             
         points = []
-        # Visual Offset increased to 0.3 to prevent slope clipping
-        points.append(transform_point(-self._tank_size, 0.0, self._x, self._y + 0.3, self._tank_angle))
-        points.append(transform_point(-(self._tank_size/2.0), self._tank_size, self._x, self._y + 0.3, self._tank_angle))
-        points.append(transform_point((self._tank_size/2.0), self._tank_size, self._x, self._y + 0.3, self._tank_angle))
-        points.append(transform_point(self._tank_size, 0.0, self._x, self._y + 0.3, self._tank_angle))
+        # Draw at actual position (no visual offset — matches C++)
+        points.append(transform_point(-self._tank_size, 0.0, self._x, self._y, self._tank_angle))
+        points.append(transform_point(-(self._tank_size/2.0), self._tank_size, self._x, self._y, self._tank_angle))
+        points.append(transform_point((self._tank_size/2.0), self._tank_size, self._x, self._y, self._tank_angle))
+        points.append(transform_point(self._tank_size, 0.0, self._x, self._y, self._tank_angle))
         
         screen_points = [interface.game_to_screen(p[0], p[1]) for p in points]
         
@@ -124,11 +125,8 @@ class Tank(Entity):
         pygame.draw.polygon(interface._window, color, screen_points)
         
         if self._state == Tank.TANK_ALIVE:
-             # Calculate Visual Center (sync with Body Offset)
-             # Physics center is self.get_centre() but we drew body at _y + 0.3
-             # So we must draw gun at _y + 0.3 + half_size
-             visual_cy = (self._y + 0.3) + (self._tank_size * 0.5)
-             cx, cy = self._x, visual_cy
+             # Calculate Visual Center at actual position (matches C++)
+             cx, cy, _ = self.get_centre()
              arrow_length = (self._gun_power / 8.0) + (self._tank_size * 2)
              
              arrow_color = (0, 255, 0, 128) if self._weapons[self._selected_weapon].ready_to_fire() else (255, 0, 0, 128)
@@ -232,7 +230,8 @@ class Tank(Entity):
 
 
     def update(self, time):
-        # self._player.update() # Infinite recursion if Player calls Tank.
+        # Update the owner player (used to make the AIs think) — C++ line 377
+        self._player.update()
         
         boost = False
         if self._game.get_game_state() != self._game.GameState.ROUND_STARTING:
@@ -290,9 +289,9 @@ class Tank(Entity):
         
         landscape = self._game.get_landscape()
         if landscape:
-            left_ground_y = landscape.get_landscape_height(left_x)
-            right_ground_y = landscape.get_landscape_height(right_x)
-            mid_ground_y = landscape.get_landscape_height(self._x)
+            left_ground_y = landscape.move_to_ground(left_x, left_y)
+            right_ground_y = landscape.move_to_ground(right_x, right_y)
+            mid_ground_y = landscape.move_to_ground(self._x, self._y)
             
             left_disp = left_ground_y - left_y
             right_disp = right_ground_y - right_y
@@ -333,44 +332,6 @@ class Tank(Entity):
                 self._tank_angle -= rel_disp * 75.0
                 self._y += max_disp
                 
-        if self._state == Tank.TANK_ALIVE and self._game.get_game_state() != self._game.GameState.ROUND_STARTING:
-             self.update_gun(time)
-             
-             if self._switch_weapon_time <= 0.0:
-                 dummy = 0.0
-                 weapon_left = self._player.get_command(Tank.CMD_WEAPONDOWN, dummy)
-                 weapon_right = self._player.get_command(Tank.CMD_WEAPONUP, dummy)
-                 
-                 if weapon_left and not weapon_right:
-                     self._weapons[self._selected_weapon].unselect()
-                     self._firing = False
-                     
-                     while True:
-                         self._selected_weapon -= 1
-                         if self._selected_weapon < 0:
-                             self._selected_weapon = Tank.MAX_WEAPONS - 1
-                             
-                         if self._weapons[self._selected_weapon].select():
-                             break
-                             
-                     self._switch_weapon_time = 0.2
-                     
-                 if weapon_right and not weapon_left:
-                     self._weapons[self._selected_weapon].unselect()
-                     self._firing = False
-                     
-                     while True:
-                         self._selected_weapon += 1
-                         if self._selected_weapon == Tank.MAX_WEAPONS:
-                             self._selected_weapon = 0
-                             
-                         if self._weapons[self._selected_weapon].select():
-                             break
-                             
-                     self._switch_weapon_time = 0.2
-             else:
-                 self._switch_weapon_time -= time
-
         self._weapons[self._selected_weapon].update(time)
         return True
 
@@ -496,25 +457,36 @@ class Tank(Entity):
         self._weapons[self._selected_weapon].fire(fire, time)
 
     def burn(self, time):
-        if self._air_smoke_release_time < 0.0:
-            smoke = Smoke(self._game, self._x, self._y,
-                          0.0, 0.0, 
-                          5, 0.0, 0.0, 1.0) # Fixed texture to 5
+        if self._exhaust_time < 0.0:
+            if self._on_ground:
+                smoke = Smoke(self._game, self._x, self._y,
+                              0.0, 0.5,
+                              5, 0.1, 1.0, 0.3)
+            else:
+                smoke = Smoke(self._game, self._x, self._y,
+                              0.0, 0.5,
+                              5, 0.1, 0.3, 0.3)
             self._game.add_entity(smoke)
-            self._air_smoke_release_time = 0.2 
+            if self._on_ground:
+                self._exhaust_time += self._ground_smoke_release_time
+            else:
+                self._exhaust_time += self._air_smoke_release_time
         else:
-            self._air_smoke_release_time -= time
+            self._exhaust_time -= time
 
     def set_colour(self, c): self._colour = c
     def get_colour(self): return self._colour
     def get_player(self): return self._player
     def get_centre(self):
-        return self._x, self._y + (self._tank_size * 0.5)
+        angle_rads = (self._tank_angle / 180.0) * PI
+        cx = self._x - math.sin(angle_rads) * (self._tank_size / 2.0)
+        cy = self._y + math.cos(angle_rads) * (self._tank_size / 2.0)
+        return cx, cy, self._tank_size * 0.75
 
     def set_position_on_ground(self, x):
         self._x = x
         if self._game.get_landscape():
-            self._y = self._game.get_landscape().get_landscape_height(x)
+            self._y = self._game.get_landscape().move_to_ground(x, 100.0)
         self._tank_angle = 0.0
         self._on_ground = True
         self._airbourne_x_vel = 0.0
@@ -596,26 +568,44 @@ class Tank(Entity):
         return False
 
     def do_damage(self, damage):
-        if self._state != Tank.TANK_ALIVE: return False
         self._health -= damage
-        if self._health <= 0.0:
+        if self._health < 0.0 and self._state == Tank.TANK_ALIVE:
             self._health = 0.0
             self._state = Tank.TANK_DEAD
-            return True 
+            self._game.record_tank_death()
+            self._exhaust_time = -0.5
+            if self._firing:
+                self._weapons[self._selected_weapon].fire(False, 0.0)
+                self._firing = False
+            return True
         return False
 
     def do_pre_round(self):
-        self._health = self._max_health
-        self._fuel = self._total_fuel
-        self._state = Tank.TANK_ALIVE
-        self._switch_weapon_time = 0.0
+        if self._state != Tank.TANK_RESIGNED:
+            self._state = Tank.TANK_ALIVE
+        
+        self._gun_angle = 0.0
+        self._gun_angle_change_speed = 0.0
+        self._gun_power = 10.0
+        self._gun_power_change_speed = 0.0
+        self._tank_angle = 0.0
         self._airbourne_x_vel = 0.0
         self._airbourne_y_vel = 0.0
-        self._tank_angle = 0.0
-        self._on_ground = True
+        self._on_ground = False
+        self._health = self._max_health
+        self._exhaust_time = 0.0
+        self._fuel = self._total_fuel
+        if self._fuel > 1.0:
+            self._fuel = 1.0
         
+        self._selected_weapon = Tank.SHELLS
         for w in self._weapons:
             w.set_ammo_for_round()
+        self._weapons[self._selected_weapon].select()
+        
+        self._switch_weapon_time = 0.0
+        self._firing = False
+        return True
 
     def do_post_round(self):
         if self._firing:
@@ -633,23 +623,20 @@ class Tank(Entity):
     def ready_to_fire(self): return self._weapons[self._selected_weapon].ready_to_fire()
     
     def gun_launch_position(self):
-        cx, cy = self.get_centre()
-        arrow_length = (self._gun_power / 8.0) + (self._tank_size * 2)
-        tip_local_y = arrow_length + (arrow_length / 4.0)
+        cx, cy, _ = self.get_centre()
         
-        rad = math.radians(self._gun_angle)
-        offset_x = -math.sin(rad) * tip_local_y
-        offset_y = math.cos(rad) * tip_local_y
-        
-        return cx + offset_x, cy + offset_y
+        x = cx + (-deg_sin(self._gun_angle) * self._tank_size * 1.2)
+        y = cy + ( deg_cos(self._gun_angle) * self._tank_size * 1.2)
+        return x, y
 
     def gun_launch_velocity(self):
-        return self.gun_launch_velocity_at_power(self._gun_power)
+        vx = self._airbourne_x_vel - deg_sin(self._gun_angle) * self._gun_power
+        vy = self._airbourne_y_vel + deg_cos(self._gun_angle) * self._gun_power
+        return vx, vy
 
     def gun_launch_velocity_at_power(self, power):
-        rad = math.radians(self._gun_angle)
-        vx = -math.sin(rad) * power
-        vy = math.cos(rad) * power
+        vx = self._airbourne_x_vel - deg_sin(self._gun_angle) * power
+        vy = self._airbourne_y_vel + deg_cos(self._gun_angle) * power
         return vx, vy
 
     def gun_launch_angle(self): return self._gun_angle

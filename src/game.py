@@ -49,6 +49,7 @@ class Game:
         self._game_state = GameState.MAIN_MENU
         self._new_state = GameState.MAIN_MENU
         self._state_countdown = 0.0
+        self._number_of_active_tanks = 0
         
         # Default initialization values
         self._width = 640
@@ -239,12 +240,17 @@ class Game:
             else:
                 new_player = HumanPlayer(self, self._number_of_players, name, colour, controller, self._controls)
             self._players[self._number_of_players] = new_player
+            # Add the player's tank entity to the list of entities (C++: addEntity(tank))
+            self.add_entity(new_player.get_tank())
             self._number_of_players += 1
             
     def delete_players(self):
         self._players = [None] * 8
         self._number_of_players = 0
         self._current_round = 0
+        self._entity_list = []
+        self._human_players = False
+        self._number_of_active_tanks = 0
 
     def are_human_players(self) -> bool:
         for i in range(self._number_of_players):
@@ -252,40 +258,51 @@ class Game:
                 return True
         return False
 
+    def record_tank_death(self):
+        """Called every time a tank dies. Determines when to end the round.
+        Matches C++ recordTankDeath()."""
+        self._number_of_active_tanks -= 1
+        if self._number_of_active_tanks < 2 and self._game_state == self.GameState.ROUND_IN_ACTION:
+            # Only one tank left, start a 5 second countdown to end of round
+            self._game_state = self.GameState.ROUND_FINISHING
+            self._state_countdown = 5.0
+
     def offset_viewport(self, x, y):
         if self._interface: self._interface.offset_viewport(x, y)
 
     def explosion(self, x, y, size, damage, hit_tank_idx, sound_id, white_out, player_ref):
-        # Create Blast entity
-        # Sound
-        if sound_id != -1:
-            self._sound.play_sound(sound_id)
-            
-        b = Blast(self, x, y, size, 1.0, white_out)
+        # Blow a hole in the terrain
+        self._landscape.make_hole(x, y, size)
+        
+        # Create blast entity
+        b = Blast(self, x, y, size, 0.8, white_out)
         self.add_entity(b)
         
-        # Damage terrain
-        self._landscape.explosion(x, y, int(size))
+        # Play explosion sound
+        from .soundentity import SoundEntity
+        blast_sound = SoundEntity(self, sound_id, False)
+        self.add_entity(blast_sound)
         
-        # Damage tanks
-        for i in range(self._number_of_players):
-            p = self._players[i]
-            if p:
-                t = p.get_tank()
-                if t.alive():
-                    # Calculate distance
-                    tx, ty = t.get_position()
-                    dist = math.sqrt((tx - x)**2 + (ty - y)**2)
-                    if dist < size:
-                        # Damage formula (faithful to C++ ?)
-                        # C++: damage * (1 - dist/size)
-                        dmg = damage * (1.0 - dist/size)
-                        t.damage(dmg, player_ref)
-                        
-                        # Impulse (knockback)
-                        # Not explicitly requested but good for fidelity if C++ has it.
-                        # C++ Blast::Explode calls tank->addImpulse...
-                        # I haven't implemented impulse in Tank yet, maybe just damage for now.
+        # Damage tanks (faithful to C++ logic)
+        for i in range(8):
+            if self._players[i] is None:
+                break
+            t = self._players[i].get_tank()
+            
+            if i == hit_tank_idx:
+                # Direct hit: apply full damage
+                if t.do_damage(damage):
+                    player_ref.defeat(self._players[i])
+            else:
+                # Splash damage: scale by squared distance
+                tank_x, tank_y, hit_range = t.get_centre()
+                
+                squared_distance = (tank_x - x)**2 + (tank_y - y)**2
+                max_distance = (size + hit_range)**2
+                
+                if squared_distance < max_distance:
+                    if t.do_damage(damage * (1.0 - squared_distance / max_distance)):
+                        player_ref.defeat(self._players[i])
 
     # -------------------------------------------------------------------------
     # Main Loop
@@ -337,7 +354,19 @@ class Game:
              if self._state_countdown < 0.0:
                  self._new_state = self.GameState.ROUND_IN_ACTION
 
-        else:
+        elif self._game_state == self.GameState.ROUND_FINISHING:
+             # When all but one tank is dead, count down to end of round
+             self._update_round(dt)
+             self._draw_round()
+             
+             self._state_countdown -= dt
+             if self._state_countdown < 0.0:
+                 self._end_round()
+                 self._game_state = self.GameState.ROUND_SCORE
+                 self._current_menu = ScoreMenu(self)
+                 self._interface.enable_mouse(True)
+
+        elif self._game_state == self.GameState.ROUND_IN_ACTION:
             # Game Logic
             self._update_round(dt)
             self._draw_round()
@@ -414,14 +443,24 @@ class Game:
         # Generate Terrain
         self._landscape.generate_terrain()
         
+        # Call newRound() on all players (resets defeated lists, etc.)
+        for i in range(self._number_of_players):
+            if self._players[i]:
+                self._players[i].new_round()
+        
+        # Call doPreRound() on all entities (resets tank state, etc.)
+        for e in self._entity_list[:]:
+            if not e.do_pre_round():
+                self._entity_list.remove(e)
+        
         # Place Tanks using Layout logic (C++ port)
         tank_order = []
         active_tanks = 0
         for i in range(self._number_of_players):
-            if self._players[i] and self._players[i].get_tank().alive():
+            if self._players[i]:
                 tank_order.append(i)
                 active_tanks += 1
-                
+
         # Shuffle positions logic
         for _ in range(20):
              if active_tanks > 0:
@@ -433,76 +472,40 @@ class Game:
             p_idx = tank_order[i]
             tank = self._players[p_idx].get_tank()
             
-            # Position logic: -10.0 + (10.0 / active) + (i * (20.0 / active))
-            # C++: -10.0 + (10.0 / _numberOfActiveTanks) + ( i * (20.0 / _numberOfActiveTanks) )
-            # Wait, 1st term: 10/N. 2nd: i * 20/N.
-            # Range -10 to 10?
-            
             x_pos = -10.0 + (10.0 / active_tanks) + (i * (20.0 / active_tanks))
-            tank.set_position(x_pos, 10.0) # Start high
+            tank.set_position_on_ground(x_pos)
             
-        self._entity_list = []
+        self._number_of_active_tanks = active_tanks
         
-        # Add Quake entity (always present for screen shake)
-        self.add_entity(Quake(self))
+        # Add Quake entity at the front (always present for screen shake)
+        # C++: _entityList.push_front(earthquake)
+        self._entity_list.insert(0, Quake(self))
         
     def _update_round(self, dt):
-        # Update Players/Tanks
-        num_alive = 0
-        active_tanks = 0
-        
-        # Check game end
-        for i in range(self._number_of_players):
-            p = self._players[i]
-            if p:
-                p.update(dt) # Updates Tank
-                if p.get_tank().alive():
-                    num_alive += 1
-                    active_tanks += 1
-                    
-        # Update Entities
-        # We need to copy list to iterate safely while modifying
+        """Implements the part of the loop that occurs while a round is
+        in progress. Matches C++ gameLoop()."""
+        # Update landscape first, then entities (C++ order)
+        self._landscape.update(dt)
+
+        # Update entities — if update returns False, entity is dead
         for e in self._entity_list[:]:
             if not e.update(dt):
                 self._entity_list.remove(e)
-                
-        # Landscape updating (falling blocks)
-        self._landscape.update(dt)
-        
-        # Check Round End Condition
-        # If <= 1 survivor (unless 1 player mode? Groundfire usually multiplayer)
-        # If only 1 player, round ends when he dies? Or practice mode?
-        # C++: if (numAlive <= 1 && totalPlayers > 1) or (numAlive == 0 && totalPlayers == 1)
-        
-        round_over = False
-        if self._number_of_players > 1:
-            if num_alive <= 1:
-                round_over = True
-        else:
-            if num_alive == 0:
-                round_over = True
-                
-        if round_over:
-            if self._game_state == self.GameState.ROUND_IN_ACTION:
-                self._game_state = self.GameState.ROUND_FINISHING
-                self._round_end_timer = 0.0
-                
-        if self._game_state == self.GameState.ROUND_FINISHING:
-            self._round_end_timer += dt
-            if self._round_end_timer > 3.0: # 3 seconds delay
-                self._end_round()
-                
+
         # Input for Pause (Escape)
         if self._interface.get_key(pygame.K_ESCAPE):
-            self._new_state = self.GameState.QUIT_MENU # Should contain "Resume" really...
-            # The current quit menu is "Yes/No" to quit game. 
-            # Faithful port: QuitMenu.cc IS the pause menu effectively.
+            self._new_state = self.GameState.QUIT_MENU
 
     def _end_round(self):
-        # Calculate scores
+        # Call endRound() on all players (calculates scores)
         for i in range(self._number_of_players):
             if self._players[i]:
                 self._players[i].end_round()
+        
+        # Call doPostRound() on entities; remove those returning False
+        for e in self._entity_list[:]:
+            if not e.do_post_round():
+                self._entity_list.remove(e)
                 
         self._new_state = self.GameState.ROUND_SCORE
 

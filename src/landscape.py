@@ -287,12 +287,34 @@ class Landscape:
         return self._landscape_width
 
     def move_to_ground(self, x, y):
-        """Moves a point to the ground level at x."""
-        # Find the highest ground at X.
-        # This mirrors moveToGround in C++.
-        # Assuming y is irrelevant or starting point? C++: float moveToGround (float x, float y);
-        # Logic: returns the Y coordinate of the ground at X.
-        return self.get_landscape_height(x)
+        """Given a point, returns the y value of the first point on the
+        terrain exactly below it. Matches C++ moveToGround(x, y)."""
+        slice_idx = self.get_slice_from_world_x(x)
+        x_offset = self.get_slice_offset_from_world_x(x)
+
+        if not (0 <= slice_idx < self._num_of_slices):
+            return -10.0
+
+        height = 0.0
+        old_height = -1000.0
+
+        for chunk in self._land_chunks[slice_idx]:
+            state = self.in_chunk(chunk, x_offset, y)
+
+            if state != 2:  # Not below this chunk
+                height = (chunk.max_height_1 * (1.0 - x_offset)) + \
+                         (chunk.max_height_2 * x_offset)
+
+                if state == 0:  # Inside chunk
+                    break
+
+                # state == 1: Above chunk — track closest ground below us
+                if (y - height) < (y - old_height):
+                    old_height = height
+                else:
+                    height = old_height
+
+        return height
 
     def move_to_ground_at_angle(self, x_ref, y_ref, angle):
         """Moves x,y to ground along an angle vector."""
