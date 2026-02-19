@@ -1,0 +1,88 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="aiohappyeyeballs" />
+          <option value="aiohttp" />
+          <option value="aiosignal" />
+          <option value="altair" />
+          <option value="attrs" />
+          <option value="blinker" />
+          <option value="cachetools" />
+          <option value="certifi" />
+          <option value="charset-normalizer" />
+          <option value="click" />
+          <option value="colorama" />
+          <option value="contourpy" />
+          <option value="cycler" />
+          <option value="filelock" />
+          <option value="fonttools" />
+          <option value="frozenlist" />
+          <option value="fsspec" />
+          <option value="gitdb" />
+          <option value="GitPython" />
+          <option value="greenlet" />
+          <option value="idna" />
+          <option value="Jinja2" />
+          <option value="jsonschema" />
+          <option value="jsonschema-specifications" />
+          <option value="kiwisolver" />
+          <option value="MarkupSafe" />
+          <option value="matplotlib" />
+          <option value="mpmath" />
+          <option value="multidict" />
+          <option value="narwhals" />
+          <option value="networkx" />
+          <option value="numpy" />
+          <option value="opencv-python" />
+          <option value="packaging" />
+          <option value="pandas" />
+          <option value="pillow" />
+          <option value="plotly" />
+          <option value="propcache" />
+          <option value="protobuf" />
+          <option value="psutil" />
+          <option value="py-cpuinfo" />
+          <option value="pyarrow" />
+          <option value="pydeck" />
+          <option value="pymssql" />
+          <option value="pyodbc" />
+          <option value="pyparsing" />
+          <option value="PyQt6" />
+          <option value="PyQt6-Qt6" />
+          <option value="PyQt6_sip" />
+          <option value="python-dateutil" />
+          <option value="pytz" />
+          <option value="PyYAML" />
+          <option value="referencing" />
+          <option value="requests" />
+          <option value="rpds-py" />
+          <option value="scipy" />
+          <option value="six" />
+          <option value="smmap" />
+          <option value="SQLAlchemy" />
+          <option value="streamlit" />
+          <option value="streamlit-image-coordinates" />
+          <option value="sympy" />
+          <option value="tenacity" />
+          <option value="toml" />
+          <option value="torch" />
+          <option value="torchaudio" />
+          <option value="torchvision" />
+          <option value="tornado" />
+          <option value="tqdm" />
+          <option value="ttkthemes" />
+          <option value="typing_extensions" />
+          <option value="tzdata" />
+          <option value="ultralytics" />
+          <option value="ultralytics-thop" />
+          <option value="urllib3" />
+          <option value="watchdog" />
+          <option value="yarl" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

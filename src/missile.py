@@ -118,12 +118,11 @@ class Missile(Entity):
             # Powered flight
             # getCommand returns bool.
             if self._player:
-                # Need to check CMD constants. Usually defined in Controls.
-                # Just string literals or ints in C++.
-                # In Python Controls port: CMD_GUNLEFT=0, etc.
-                # Assuming Player has get_command(cmd_id)
-                steer_left = self._player.get_command(0) # CMD_GUNLEFT
-                steer_right = self._player.get_command(1) # CMD_GUNRIGHT
+                # C++ uses CMD_GUNLEFT/RIGHT to steer missiles
+                from .player import Player
+                dummy = [0.0]
+                steer_left = self._player.get_command(Player.CMD_GUNLEFT, dummy)
+                steer_right = self._player.get_command(Player.CMD_GUNRIGHT, dummy)
                 
                 if steer_left and not steer_right:
                     self._angle_change += Missile.OPTION_SteerSensitivity * time

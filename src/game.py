@@ -61,58 +61,19 @@ class Game:
             # 1. IniFile
             self._settings = ReadIniFile("conf/options.ini")
             
-            # Read Graphics
-            if self._settings.get_string("Graphics", "Fullscreen", "no") == "yes":
-                self._fullscreen = True
-            
-            res = self._settings.get_string("Graphics", "Resolution", "640x480")
-            if "x" in res:
-                self._width, self._height = map(int, res.split("x"))
+            # Read Graphics — matching C++ game.cc constructor:
+            #   _settings.getInt("Graphics", "ScreenWidth",  640)
+            #   _settings.getInt("Graphics", "ScreenHeight", 480)
+            #   _settings.getInt("Graphics", "Fullscreen",   0)
+            self._width = self._settings.get_int("Graphics", "ScreenWidth", 640)
+            self._height = self._settings.get_int("Graphics", "ScreenHeight", 480)
+            self._fullscreen = self._settings.get_int("Graphics", "Fullscreen", 0) != 0
             
             # 2. Interface
             self._interface = Interface(self._width, self._height, self._fullscreen)
             
-            tex_map = {
-                1: "data/landscape.bmp", # Missing
-                2: "data/mask.bmp", # Missing
-                3: "data/fonts.tga",
-                4: "data/tank.tga", # Missing
-                5: "data/highlight.tga", # Missing
-                6: "data/menuback.tga",
-                7: "data/clouds.tga", # Missing
-                8: "data/cursor.tga", # Missing
-                9: "data/logo.tga",
-                10: "data/addbutton.tga",
-                11: "data/removebutton.tga",
-                # The following icons are likely sub-regions of weaponicons.tga in original C++, 
-                # but if the port expects files, they are missing.
-                # I will map them to weaponicons.tga for now to avoid crash, 
-                # but the game logic needs to handle UVs if they are spritesheets.
-                # However, interface.load_texture loads a whole image.
-                # If these files don't exist, I should point to a placeholder or existing file to prevent crash.
-                12: "data/weaponicons.tga",
-                13: "data/weaponicons.tga",
-                14: "data/weaponicons.tga",
-                15: "data/weaponicons.tga",
-                16: "data/weaponicons.tga",
-                17: "data/weaponicons.tga",
-                18: "data/weaponicons.tga",
-                19: "data/smoke.tga",
-                20: "data/explosion.tga", # Missing? No, blast.tga?
-                21: "data/debris.tga", # Missing
-                22: "data/flare.tga" # Missing
-            }
-            # Update: Correct mapping based on 'ls data':
-            # blast.tga, damage.tga, exhaust.tga, fonts.tga, logo.tga, menuback.tga, smoke.tga, trail.tga, weaponicons.tga, addbutton, removebutton.
-            # Missing: landscape.bmp, mask.bmp, tank.tga, highlight.tga, clouds, cursor, explosion, debris, flare.
-            # C++ code likely generated some of these or they are missing from repo?
-            # game.cc loadResources:
-            # blast, trail, exhaust, damage, smoke, menuback, weaponicons, arrow (id 8!), logo, addbutton, removebutton.
-            # It defines 12 textures. 0 to 11.
-            # My python code defines 22?
-            # It seems I ported 'Game' class adding many more textures that don't exist in C++ loadResources?
-            # I should revert to C++ loadResources list.
-            
+            # Texture loading — matching C++ game.cc loadResources()
+            # C++ defines 12 textures (IDs 0-11), skipping ID 3 (loaded by Font).
             self._interface.define_textures(12)
             tex_map = {
                 0: "data/blast.tga",

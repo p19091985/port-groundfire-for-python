@@ -20,6 +20,10 @@ import os
 import math
 import time as time_module
 
+# ── Fix encoding for Windows consoles (cp1252 cannot handle Unicode chars) ──
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 # ── Inserir o diretório raiz no path para importar os módulos do projeto ──
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)

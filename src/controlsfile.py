@@ -28,7 +28,7 @@ class ControlsFile:
             return False
             
         try:
-            with open(self._file_name, 'r') as f:
+            with open(self._file_name, 'r', encoding='utf-8') as f:
                 content = f.read()
         except IOError:
             return False
@@ -130,7 +130,7 @@ class ControlsFile:
 
     def write_file(self) -> bool:
         try:
-            with open(self._file_name, 'w') as f:
+            with open(self._file_name, 'w', encoding='utf-8') as f:
                 f.write("[ Joysticks ]\n\n")
                 
                 for i in range(8):
