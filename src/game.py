@@ -225,7 +225,7 @@ class Game:
         self._number_of_active_tanks -= 1
         if self._number_of_active_tanks < 2 and self._game_state == self.GameState.ROUND_IN_ACTION:
             # Only one tank left, start a 5 second countdown to end of round
-            self._game_state = self.GameState.ROUND_FINISHING
+            self._new_state = self.GameState.ROUND_FINISHING
             self._state_countdown = 5.0
 
     def offset_viewport(self, x, y):
@@ -323,9 +323,6 @@ class Game:
              self._state_countdown -= dt
              if self._state_countdown < 0.0:
                  self._end_round()
-                 self._game_state = self.GameState.ROUND_SCORE
-                 self._current_menu = ScoreMenu(self)
-                 self._interface.enable_mouse(True)
 
         elif self._game_state == self.GameState.ROUND_IN_ACTION:
             # Game Logic

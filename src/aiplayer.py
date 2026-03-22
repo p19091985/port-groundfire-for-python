@@ -71,6 +71,8 @@ class AIPlayer(Player):
 
     def record_shot(self, x: float, y: float, hit_tank: int):
         self._shots_in_air -= 1
+        if self._shots_in_air < 0:
+             self._shots_in_air = 0
         
         players = self._game.get_players()
         

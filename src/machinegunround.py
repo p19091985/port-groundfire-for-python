@@ -52,6 +52,7 @@ class MachineGunRound(Entity):
         w = landscape.get_landscape_width() if landscape else 10.0
         
         if self._x > w or self._x < -w:
+            self._player.record_shot(self._x, self._y, -1)
             self._kill_next_frame = True
             return True
             
@@ -60,6 +61,7 @@ class MachineGunRound(Entity):
             if coll[0]:
                 self._x = coll[1]
                 self._y = coll[2]
+                self._player.record_shot(self._x, self._y, -1)
                 self._kill_next_frame = True
                 return True
                 
@@ -74,6 +76,7 @@ class MachineGunRound(Entity):
                      if p.get_tank().do_damage(self._damage):
                          self._player.defeat(p)
                          
+                     self._player.record_shot(self._x, self._y, i)
                      self._kill_next_frame = True
                      break
                      
