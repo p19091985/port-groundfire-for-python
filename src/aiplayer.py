@@ -52,9 +52,13 @@ class AIPlayer(Player):
              # Placeholder for when ShopMenu is implemented
              current_menu = self._game.get_current_menu()
              if current_menu:
-                 # Duck typing
-                 if hasattr(current_menu, 'player_select_pos'):
-                     if current_menu.player_select_pos[self._number] != 10:
+                 shop_positions = getattr(
+                     current_menu,
+                     "_player_select_pos",
+                     getattr(current_menu, "player_select_pos", None),
+                 )
+                 if shop_positions is not None:
+                     if shop_positions[self._number] != 10:
                          self._commands[Player.CMD_GUNUP] = True
                      else:
                          self._commands[Player.CMD_FIRE] = True

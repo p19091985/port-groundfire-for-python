@@ -397,9 +397,9 @@ class Game:
 
     def _start_round(self):
         self._current_round += 1
-        
-        # Generate Terrain
-        self._landscape.generate_terrain()
+
+        # Create a new landscape for this round, matching the C++ lifecycle.
+        self._landscape = Landscape(self._settings, self._time)
         
         # Call newRound() on all players (resets defeated lists, etc.)
         for i in range(self._number_of_players):
@@ -464,7 +464,8 @@ class Game:
         for e in self._entity_list[:]:
             if not e.do_post_round():
                 self._entity_list.remove(e)
-                
+
+        self._landscape = None
         self._new_state = self.GameState.ROUND_SCORE
 
     def _draw_round(self):

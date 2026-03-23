@@ -1,143 +1,143 @@
-import sys
-import os
-import time
+import unittest
 
-# Ensure src is in path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from tests.support import CommandPlayer, DummySoundManager, FlatLandscape
 
-import pygame
-os.environ["SDL_VIDEODRIVER"] = "windows"
-os.environ["SDL_VIDEO_WINDOW_POS"] = "-5000,-5000"
-
-from src.game import Game, GameState
-from src.tank import Tank
-from src.weapons_impl import ShellWeapon, MissileWeapon, MirvWeapon, NukeWeapon, MachineGunWeapon
+from src.machinegunround import MachineGunRound
 from src.mirv import Mirv
 from src.missile import Missile
 from src.shell import Shell
-from src.machinegunround import MachineGunRound
 
-def setup_game():
-    pygame.init()
-    g = Game()
-    g.add_player(-1, "AI-1", (1.0, 0.0, 0.0))
-    g.add_player(-1, "AI-2", (0.0, 1.0, 0.0))
-    g.set_num_of_rounds(1)
-    return g
 
-def test_1_state_machine_traversal(game):
-    print("--- Test 1: State Machine Traversal ---")
-    states_to_visit = [
-        GameState.MAIN_MENU,
-        GameState.ROUND_STARTING,
-        GameState.ROUND_IN_ACTION,
-        GameState.ROUND_FINISHING,
-        GameState.ROUND_SCORE,
-        GameState.SHOP_MENU,
-        GameState.WINNER_MENU
-    ]
-    
-    for s in states_to_visit:
-        game._change_state(s)
-        # Run 5 updates to ensure neither the game nor the menu crashes in this state
-        for _ in range(5):
-             game.loop_once()
-    
-    print("  [OK] Successfully transitioned and ticked all states.")
+class ProjectileGame:
+    def __init__(self, landscape=None):
+        self._landscape = landscape or FlatLandscape()
+        self._players = [None] * 8
+        self._entities = []
+        self._explosions = []
+        self._time = 0.0
+        self._sound = DummySoundManager()
 
-def test_2_exhaustive_weapons(game):
-    print("--- Test 2: Weapon Arsenal Mechanics Simulation ---")
-    game._change_state(GameState.ROUND_STARTING)
-    game.loop_once() # Will put game in ROUND_IN_ACTION
-    
-    player = game.get_players()[0]
-    tank = player.get_tank()
-    
-    # We will instantiate projectiles manually and fast forward to watch them hit or despawn
-    weapons_to_test = [
-        Shell(game, player, 0, 5, 0, 0, 0, 1, 10, False),
-        Missile(game, player, 0, 5, 45, 1, 10),
-        Mirv(game, player, 0, 5, 0, 0, 0, 1, 10),
-        MachineGunRound(game, player, 0, 5, 1, -1, game.get_time(), 5)
-    ]
-    
-    for w in weapons_to_test:
-        game.add_entity(w)
-        
-    print(f"  Spawned {len(weapons_to_test)} projectiles. Fast forwarding 500 frames...")
-    
-    dt = 0.016
-    for _ in range(500):
-        # Update landscape
-        landscape = game.get_landscape()
-        landscape.update(dt)
-        # Update entities
-        for e in game._entity_list[:]:
-            if not e.update(dt):
-                game._entity_list.remove(e)
-                
-    print("  [OK] All weapons fired, updated, simulated impact and despawned safely without crashes.")
+    def add_entity(self, entity):
+        self._entities.append(entity)
 
-def test_3_landscape_deformation_limits(game):
-    print("--- Test 3: Landscape Deformation Limits ---")
-    
-    landscape = game.get_landscape()
-    # Bombard the landscape with 1,000 huge holes randomly
-    for i in range(100):
-        # Coordinates in game are roughly x: -10 to 10
-        x = -10.0 + (i % 20)
-        landscape.make_hole(x, 0.0, 5.0)
-        
-    # Run an update to allow falling mechanics
-    for _ in range(10):
-        landscape.update(0.1)
-        
-    print("  [OK] Landscape survived extreme contiguous deformation and smoothing.")
+    def get_landscape(self):
+        return self._landscape
 
-def test_4_edge_cases_and_memory(game):
-    print("--- Test 4: Edge Cases (Simultaneous Deaths & Entity Limits) ---")
-    
-    from src.quake import Quake
-    # Inject 5,000 Quake entities to ensure no OOM or slowdown crash in loops
-    for _ in range(5000):
-        game.add_entity(Quake(game))
-        
-    for _ in range(5):
-        for e in game._entity_list[:]:
-            if not e.update(0.1):
-                game._entity_list.remove(e)
-                
-    print(f"  [OK] Successfully ticked 5000 concurrent Quake entities.")
-    
-    # Force both tanks to die instantly
-    tank1 = game.get_players()[0].get_tank()
-    tank2 = game.get_players()[1].get_tank()
-    
-    tank1.do_damage(1000)
-    tank2.do_damage(1000)
-    
-    print(f"  [OK] Handled simultaneous tank deaths safely.")
+    def get_players(self):
+        return self._players
 
-def run_all():
-    print("===========================================================")
-    print("  Exhaustive Game Logic & Mechanics Simulation Suite")
-    print("===========================================================")
-    g = setup_game()
-    
-    try:
-        test_1_state_machine_traversal(g)
-        test_2_exhaustive_weapons(g)
-        test_3_landscape_deformation_limits(g)
-        test_4_edge_cases_and_memory(g)
-        
-        print("\n===========================================================")
-        print("  ALL EXHAUSTIVE SIMULATIONS PASSED! SYSTEM PERFECT.")
-        print("===========================================================")
-        sys.exit(0)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    def set_players(self, players):
+        self._players = list(players) + [None] * (8 - len(players))
 
-if __name__ == '__main__':
-    run_all()
+    def get_time(self):
+        return self._time
+
+    def set_time(self, value):
+        self._time = value
+
+    def explosion(self, *args):
+        self._explosions.append(args)
+
+    def get_interface(self):
+        return None
+
+    def get_sound(self):
+        return self._sound
+
+
+class HitTank:
+    def __init__(self, intersect=False, lethal=False):
+        self._intersect = intersect
+        self._lethal = lethal
+        self.damage_calls = []
+
+    def intersect_tank(self, _x1, _y1, _x2, _y2):
+        return self._intersect
+
+    def do_damage(self, damage):
+        self.damage_calls.append(damage)
+        return self._lethal
+
+
+class HitPlayer:
+    def __init__(self, tank):
+        self._tank = tank
+
+    def get_tank(self):
+        return self._tank
+
+
+class ProjectileSimulationTests(unittest.TestCase):
+    def test_shell_reports_miss_when_it_leaves_the_map(self):
+        game = ProjectileGame(FlatLandscape(width=1.0))
+        player = CommandPlayer()
+        shell = Shell(game, player, 0.0, 0.0, 2.0, 0.0, 0.0, 0.25, 40.0, False)
+        game.set_time(1.0)
+
+        self.assertFalse(shell.update(0.1))
+        self.assertEqual(len(player.recorded_shots), 1)
+        self.assertEqual(player.recorded_shots[0][2], -1)
+        self.assertEqual(game._explosions, [])
+
+    def test_shell_ground_impact_triggers_game_explosion(self):
+        landscape = FlatLandscape()
+        landscape.collisions.append((True, 0.3, -0.2))
+        game = ProjectileGame(landscape)
+        player = CommandPlayer()
+        shell = Shell(game, player, 0.0, 0.0, 1.0, 1.0, 0.0, 0.25, 40.0, False)
+        game.set_time(0.2)
+
+        self.assertFalse(shell.update(0.1))
+        self.assertEqual(len(game._explosions), 1)
+        self.assertEqual(game._explosions[0][4], -1)
+        self.assertEqual(player.recorded_shots[-1][2], -1)
+
+    def test_missile_explode_matches_cpp_and_does_not_record_shot(self):
+        game = ProjectileGame()
+        player = CommandPlayer()
+        missile = Missile(game, player, 0.0, 0.0, 0.0, 0.3, 40.0)
+
+        self.assertFalse(missile.explode(1.0, 2.0, -1))
+        self.assertEqual(len(game._explosions), 1)
+        self.assertEqual(player.recorded_shots, [])
+
+    def test_mirv_splits_into_shell_fragments_at_apex(self):
+        game = ProjectileGame()
+        player = CommandPlayer()
+        mirv = Mirv(game, player, 0.0, 0.0, 2.0, 10.0, 0.0, 0.3, 30.0)
+        game.set_time(mirv._apex_time + 0.01)
+
+        self.assertFalse(mirv.update(0.1))
+        fragments = [entity for entity in game._entities if isinstance(entity, Shell)]
+        self.assertEqual(len(fragments), Mirv.OPTION_Fragments)
+
+    def test_machine_gun_round_dies_next_frame_after_ground_hit_without_recording_shot(self):
+        landscape = FlatLandscape()
+        landscape.collisions.append((True, 0.4, -0.1))
+        game = ProjectileGame(landscape)
+        player = CommandPlayer()
+        round_ = MachineGunRound(game, player, 0.0, 0.0, 3.0, 2.0, 0.0, 2.0)
+        game.set_time(0.2)
+
+        self.assertTrue(round_.update(0.1))
+        self.assertTrue(round_._kill_next_frame)
+        self.assertEqual(player.recorded_shots, [])
+
+        self.assertFalse(round_.update(0.1))
+
+    def test_machine_gun_round_credits_kill_without_record_shot_side_effect(self):
+        game = ProjectileGame()
+        player = CommandPlayer()
+        target_tank = HitTank(intersect=True, lethal=True)
+        target_player = HitPlayer(target_tank)
+        game.set_players([target_player])
+        round_ = MachineGunRound(game, player, 0.0, 0.0, 3.0, 2.0, 0.0, 2.0)
+        game.set_time(0.2)
+
+        self.assertTrue(round_.update(0.1))
+        self.assertEqual(player.defeated, [target_player])
+        self.assertEqual(player.recorded_shots, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

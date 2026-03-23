@@ -30,3 +30,6 @@ class SoundEntity(Entity):
         # Not implemented in original but header had it?
         # Orig uses _die flag or just delete logic
         self._die = True
+
+    def set_inactive(self):
+        self._die = True

@@ -438,11 +438,11 @@ class Tank(Entity):
         if self._gun_angle < -self._gun_angle_max: self._gun_angle = -self._gun_angle_max
         if self._gun_angle > self._gun_angle_max: self._gun_angle = self._gun_angle_max
         
-        if more_power and not less_power:
+        if more_power:
              self._gun_power_change_speed += time * self._gun_power_change_acceleration
              if self._gun_power_change_speed > self._gun_power_max_change_speed:
                  self._gun_power_change_speed = self._gun_power_max_change_speed
-        elif less_power and not more_power:
+        elif less_power:
              self._gun_power_change_speed -= time * self._gun_power_change_acceleration
              if self._gun_power_change_speed < -self._gun_power_max_change_speed:
                  self._gun_power_change_speed = -self._gun_power_max_change_speed
@@ -452,16 +452,25 @@ class Tank(Entity):
         self._gun_power += time * self._gun_power_change_speed
         if self._gun_power < self._gun_power_min: self._gun_power = self._gun_power_min
         if self._gun_power > self._gun_power_max: self._gun_power = self._gun_power_max
-        
-        self._firing = fire
-        self._weapons[self._selected_weapon].fire(fire, time)
+
+        if fire and not self._firing:
+            if not self._weapons[self._selected_weapon].fire(True, 0.0):
+                self._selected_weapon = Tank.SHELLS
+                self._weapons[self._selected_weapon].select()
+            else:
+                self._firing = True
+        elif self._firing and not fire:
+            if not self._weapons[self._selected_weapon].fire(False, 0.0):
+                self._selected_weapon = Tank.SHELLS
+                self._weapons[self._selected_weapon].select()
+            self._firing = False
 
     def burn(self, time):
         if self._exhaust_time < 0.0:
             if self._on_ground:
-                smoke = Smoke(self._game, self._x, self._y,
+                smoke = Smoke(self._game, self._x, self._y + 0.2,
                               0.0, 0.5,
-                              5, 0.1, 1.0, 0.3)
+                              5, 0.1, 0.3, 0.15)
             else:
                 smoke = Smoke(self._game, self._x, self._y,
                               0.0, 0.5,
@@ -643,6 +652,8 @@ class Tank(Entity):
     
     def get_weapon(self, index): return self._weapons[index]
     def get_selected_weapon(self): return self._selected_weapon
+    def get_total_fuel(self): return self._total_fuel
+    def set_total_fuel(self, total_fuel): self._total_fuel = total_fuel
 
     def alive(self):
         return self._state == Tank.TANK_ALIVE

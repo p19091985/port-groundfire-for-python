@@ -1,318 +1,278 @@
-# 🎮 Groundfire — Port para Python
+# Groundfire - Python Port
 
-<p align="center">
-  <strong>Um jogo de artilharia 2D com tanques, terreno destrutível e combate por turnos em tempo real.</strong><br>
-  <em>Port do jogo original Groundfire v0.25 (C++/OpenGL) para Python/Pygame.</em>
-</p>
+<div align="center">
 
----
+<pre>
+   ____                             _  __ _           
+  / ___|_ __ ___  _   _ _ __   __ _| |/ _(_)_ __ ___ 
+ | |  _| '__/ _ \| | | | '_ \ / _` | | |_| | '__/ _ \
+ | |_| | | | (_) | |_| | | | | (_| | |  _| | | |  __/
+  \____|_|  \___/ \__,_|_| |_|\__, |_|_| |_|_|  \___|
+                              |___/                   
+</pre>
 
-> ⚠️ **PROJETO EM DESENVOLVIMENTO** — Este port está sendo portado ativamente do código-fonte original em C++ para Python. Algumas funcionalidades podem ainda não estar completas ou podem apresentar diferenças em relação à versão original.
+**A preservation-focused Python/Pygame port of the original Groundfire v0.25**
 
----
+[![Python](https://img.shields.io/badge/Python-3.10%20to%203.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Pygame](https://img.shields.io/badge/Pygame-2.6.1-1f6f43?style=for-the-badge)](https://www.pygame.org/)
+[![Status](https://img.shields.io/badge/Status-In%20Development-bd3b3b?style=for-the-badge)](#project-status)
+[![License](https://img.shields.io/badge/License-MIT-black?style=for-the-badge)](LICENSE)
 
-## 📖 Sobre o Jogo
+<br />
+<br />
 
-**Groundfire** é um jogo clássico de artilharia 2D, originalmente desenvolvido por **Tom Russell** em C++ com OpenGL. O jogo coloca jogadores no comando de tanques de guerra posicionados sobre um terreno destrutível, onde o objetivo é destruir os tanques adversários utilizando uma variedade de armas e estratégias.
+<img src="docs/media/readme-hero.png" alt="Groundfire hero art built from the game's own assets" width="100%" />
 
-O gameplay combina física de projéteis (gravidade, ângulo e potência), terreno que pode ser destruído por explosões, sistema de economia para compra de armamentos e inteligência artificial para oponentes controlados pelo computador.
+</div>
 
-### 🎯 Mecânicas Principais
+> Groundfire is a classic artillery tank game with destructible terrain, ballistic combat, weapon shopping between rounds, and computer-controlled opponents. This repository ports the original C++/OpenGL game to Python with Pygame while keeping the structure, behavior, and feel of the original as close as practical.
 
-- **Combate por Artilharia** — Ajuste o ângulo e a potência do canhão para atingir os inimigos
-- **Terreno Destrutível** — Explosões criam crateras reais no terreno, mudando o campo de batalha
-- **Física Realista** — Trajetórias de projéteis com gravidade, cálculos balísticos precisos
-- **Terremotos** — Eventos periódicos que fazem o terreno baixar, forçando adaptação
+<div align="center">
 
-## 🔫 Arsenal de Armas
+**Original Groundfire created by Tom Russell. This port exists to preserve and modernize that work.**
 
-| Arma | Descrição | Tipo |
-|------|-----------|------|
-| **Shell** (Projétil) | Arma padrão, disponível ilimitadamente. Dano e explosão moderados. | Padrão |
-| **Missile** (Míssil) | Projétil guiado pelo jogador após o disparo. Combustível limitado. | Comprável |
-| **MIRV** | Projétil que se divide em múltiplos fragmentos no ponto mais alto da trajetória. | Comprável |
-| **Nuke** (Nuclear) | Explosão massiva com grande raio de destruição e efeito de "whiteout". | Comprável |
-| **Machine Gun** (Metralhadora) | Disparo rápido de múltiplos projéteis de baixo dano. | Comprável |
+</div>
 
-## 🤖 Inteligência Artificial
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <strong>PLAY</strong><br />
+      Ballistic tank duels, destructible terrain, splash damage, round economy, and fast restarts.
+    </td>
+    <td width="33%" valign="top">
+      <strong>PRESERVE</strong><br />
+      The original C++ source is included in the repo so the Python port can be compared against the real thing.
+    </td>
+    <td width="33%" valign="top">
+      <strong>PORT</strong><br />
+      Systems are migrated carefully with automated tests instead of being replaced by a loose remake.
+    </td>
+  </tr>
+</table>
 
-Os jogadores controlados pelo computador (IA) possuem um sistema de decisão que inclui:
+## Why This Project Exists
 
-- **Seleção de alvo** — A IA escolhe o oponente mais próximo como alvo
-- **Estimativa de mira** — Calcula ângulo e potência necessários para atingir o alvo
-- **Ajuste iterativo** — Após cada tiro, a IA ajusta sua mira com base em onde o projétil caiu
-- **Reação a eventos** — A IA reage quando seu tanque é atingido ou quando o alvo é destruído
+This port is both a technical exercise and a preservation effort.
 
-## 🎮 Controles
+- It keeps the original `groundfire-0.25/` source tree in the repository as a live reference.
+- It ports gameplay systems one piece at a time instead of rewriting the game from scratch.
+- It uses automated tests to protect behavior while the port continues to evolve.
+- It aims to make the game easier to run, inspect, and extend on modern Python setups.
 
-### Jogador 1 (Teclado)
+## Highlights
 
-| Ação | Tecla |
-|------|-------|
-| Atirar | `Espaço` |
-| Mirar canhão (cima) | `W` |
-| Mirar canhão (baixo) | `S` |
-| Rotacionar canhão (esquerda) | `A` |
-| Rotacionar canhão (direita) | `D` |
-| Mover tanque (esquerda) | `J` |
-| Mover tanque (direita) | `L` |
-| Jump Jets (saltar) | `I` |
-| Escudo | `K` |
-| Próxima arma | `O` |
-| Arma anterior | `U` |
+- Destructible terrain that changes the battlefield after every explosion
+- Turn-based artillery combat with angle, power, gravity, and splash damage
+- Multiple weapons including Shells, Missiles, MIRVs, Nukes, and Machine Gun
+- AI players that choose targets, estimate aim, and adjust after each shot
+- Between-round shop with ammo and jump jet upgrades
+- Original C++ source included for side-by-side comparison and reference
 
-> **Nota:** Os controles podem ser personalizados em `conf/controls.ini` ou pelo menu do jogo "Set Controls".
+## Visual Showcase
 
-## 🛒 Sistema de Loja
+<div align="center">
 
-Entre as rodadas, os jogadores podem comprar armas e upgrades com o dinheiro ganho em combate:
+<img src="docs/media/readme-showcase.png" alt="Groundfire showcase art with battlefield and shop styling" width="100%" />
 
-- **Ganhos por eliminação:** +50 moedas por oponente destruído
-- **Bônus por líder:** Pontos dobrados por matar o líder do placar
-- **Sobrevivência:** +25 moedas por sobreviver à rodada
-- **Renda fixa:** +10 moedas por rodada para todos os jogadores
+</div>
 
-## 🗂️ Estrutura do Projeto
+## Quick Start
 
-```
-port-groundfire-for-python/
-├── src/                    # Código-fonte Python (port)
-│   ├── main.py             # Ponto de entrada do jogo
-│   ├── game.py             # Loop principal e gerenciamento de estado
-│   ├── tank.py             # Lógica do tanque (movimento, dano, armas)
-│   ├── player.py           # Classe base do jogador
-│   ├── aiplayer.py         # Inteligência artificial
-│   ├── humanplayer.py      # Jogador humano (controles)
-│   ├── landscape.py        # Terreno destrutível
-│   ├── entity.py           # Classe base para todas as entidades
-│   ├── weapon.py           # Classe base de armas
-│   ├── weapons_impl.py     # Implementações: Shell, Missile, MIRV, Nuke, MG
-│   ├── shell.py            # Projétil de canhão
-│   ├── missile.py          # Míssil guiado
-│   ├── mirv.py             # Projétil MIRV
-│   ├── machinegunround.py  # Projétil de metralhadora
-│   ├── blast.py            # Efeito visual de explosão
-│   ├── smoke.py            # Efeito visual de fumaça
-│   ├── trail.py            # Rastro de projéteis
-│   ├── quake.py            # Sistema de terremotos
-│   ├── interface.py        # Interface gráfica (Pygame)
-│   ├── font.py             # Renderização de texto
-│   ├── sounds.py           # Sistema de áudio
-│   ├── controls.py         # Mapeamento de controles
-│   ├── common.py           # Funções matemáticas e constantes
-│   ├── inifile.py          # Parser de arquivos INI
-│   ├── menu.py             # Classe base de menus
-│   ├── mainmenu.py         # Menu principal
-│   ├── playermenu.py       # Menu de jogadores
-│   ├── shopmenu.py         # Loja entre rodadas
-│   ├── scoremenu.py        # Placar de pontuação
-│   ├── optionmenu.py       # Menu de opções
-│   ├── winnermenu.py       # Tela de vitória
-│   └── ...                 # Outros módulos auxiliares
-├── groundfire-0.25/        # Código-fonte original em C++ (referência)
-│   ├── src/                # Implementações C++ (.cc)
-│   └── src/includes/       # Headers C++ (.hh)
-├── data/                   # Assets do jogo
-│   ├── *.tga               # Texturas (explosões, fumaça, ícones, fontes)
-│   └── *.wav               # Efeitos sonoros
-├── conf/                   # Arquivos de configuração
-│   ├── options.ini         # Configurações gerais do jogo
-│   └── controls.ini        # Mapeamento de controles
-├── tests/                  # Testes de fidelidade do port
-│   └── test_port_fidelity.py  # 17 testes de consistência C++ ↔ Python
-├── requirements.txt        # Dependências Python
-├── run_game.sh             # Script para executar o jogo
-└── LICENSE                 # Licença MIT
-```
+The launcher scripts are the easiest way to run the game. If the project is not installed yet, they will:
 
-## 🚀 Instalação e Execução
+1. Find a compatible Python version
+2. Create or repair `.venv`
+3. Upgrade `pip`
+4. Install dependencies
+5. Start the game
 
-### Pré-requisitos
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <strong>Windows CMD</strong>
+      <pre lang="bat">run_game.bat</pre>
+    </td>
+    <td width="33%" valign="top">
+      <strong>Windows PowerShell</strong>
+      <pre lang="powershell">./run_game.ps1</pre>
+    </td>
+    <td width="33%" valign="top">
+      <strong>Linux / macOS / WSL</strong>
+      <pre lang="sh">./run_game.sh</pre>
+    </td>
+  </tr>
+</table>
 
-- **Python** 3.10 ou superior
-- **Pygame** 2.0.0 ou superior
+## Manual Setup
 
-### Passo a passo
+If you prefer to manage the environment yourself:
 
 ```bash
-# 1. Clone o repositório
 git clone https://github.com/p19091985/port-groundfire-for-python.git
 cd port-groundfire-for-python
+python -m venv .venv
+```
 
-# 2. Crie e ative o ambiente virtual
-python3 -m venv .venv
+### Activate the virtual environment
+
+```bash
+# Linux / macOS / WSL
 source .venv/bin/activate
 
-# 3. Instale as dependências
-pip install -r requirements.txt
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
 
-# 4. Execute o jogo
+# Windows CMD
+.venv\Scripts\activate.bat
+```
+
+### Install and run
+
+```bash
+pip install -r requirements.txt
 python src/main.py
 ```
 
-Ou utilize o script de execução:
+## Requirements
+
+- Python 3.10, 3.11, 3.12, or 3.13
+- `pygame==2.6.1`
+
+## Gameplay Snapshot
+
+### Core mechanics
+
+- Artillery aiming with gun angle and shot power
+- Destructible landscape with crater formation
+- Tank movement, jump jets, and terrain interaction
+- Scoring and economy across multiple rounds
+- Shopping between rounds for stronger weapons and mobility
+
+### Available weapons in the Python port
+
+| Weapon | Role |
+| --- | --- |
+| Shell | Default explosive projectile |
+| Machine Gun | Rapid-fire burst weapon |
+| MIRV | Splits into multiple sub-projectiles |
+| Missile | Guided projectile |
+| Nuke | Large-radius high-impact explosion |
+
+## Controls
+
+Default keyboard controls for Player 1:
+
+| Action | Key |
+| --- | --- |
+| Fire | `Space` |
+| Gun up | `W` |
+| Gun down | `S` |
+| Gun left | `A` |
+| Gun right | `D` |
+| Move tank left | `J` |
+| Move tank right | `L` |
+| Jump jets | `I` |
+| Shield | `K` |
+| Next weapon | `O` |
+| Previous weapon | `U` |
+
+Controls can be adjusted in [conf/controls.ini](conf/controls.ini) or through the in-game control menus.
+
+## Project Status
+
+This is still an active port, not a final release.
+
+- Core gameplay systems are already playable
+- Fidelity to the original codebase remains a major goal
+- Some subsystems are still being refined, corrected, or expanded
+- The codebase includes test coverage for gameplay flow, fidelity checks, and terrain behavior
+
+> The goal is not just to make Groundfire run in Python. The goal is to make it still feel like Groundfire.
+
+## Repository Tour
+
+```text
+port-groundfire-for-python/
+|-- src/                 Python port source code
+|-- data/                Textures, sounds, and other assets
+|-- conf/                Game options and control mappings
+|-- tests/               Automated regression and fidelity tests
+|-- groundfire-0.25/     Original C++ source used as reference
+|-- run_game.bat         Windows CMD launcher with auto-install
+|-- run_game.ps1         Windows PowerShell launcher with auto-install
+|-- run_game.sh          Unix launcher with auto-install
+`-- requirements.txt     Python dependencies
+```
+
+## Architecture at a Glance
+
+```text
+Game
+|-- Landscape
+|-- Entity List
+|   |-- Projectiles
+|   |-- Blast / Smoke / Trail / Quake
+|   `-- Sound entities
+`-- Players
+    |-- HumanPlayer
+    `-- AIPlayer
+        `-- Tank
+            `-- Weapons
+```
+
+Some key modules:
+
+- [src/main.py](src/main.py): entry point
+- [src/game.py](src/game.py): game loop and state transitions
+- [src/tank.py](src/tank.py): tank movement, damage, firing, and round lifecycle
+- [src/aiplayer.py](src/aiplayer.py): AI targeting and aiming
+- [src/shopmenu.py](src/shopmenu.py): between-round purchasing flow
+- [src/weapons_impl.py](src/weapons_impl.py): concrete weapon implementations
+
+## Running Tests
+
+Run the full test suite with:
 
 ```bash
-./run_game.sh
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
-## ⚙️ Configuração
+Useful targeted runs:
 
-### Opções do Jogo (`conf/options.ini`)
-
-O arquivo de configuração permite ajustar diversos parâmetros:
-
-- **Gráficos** — Resolução (`ScreenWidth`, `ScreenHeight`), modo tela cheia
-- **Gameplay** — Dano das armas, tempo de recarga, propriedades do terreno
-- **Tanque** — Velocidade de movimento, combustível dos Jump Jets, potência máxima
-- **Terremotos** — Frequência, duração, intensidade
-- **Efeitos** — Taxa de desvanecimento de explosões, trilhas e fumaça
-
-### Controles (`conf/controls.ini`)
-
-Mapeamento de teclas por jogador, suportando múltiplos esquemas de controle.
-
-## 🔄 Status do Port (C++ → Python)
-
-### ✅ Componentes Portados
-
-| Componente | Arquivo C++ | Arquivo Python | Status |
-|-----------|-------------|----------------|--------|
-| Motor do Jogo | `game.cc/.hh` | `game.py` | ✅ Portado |
-| Tanque | `tank.cc/.hh` | `tank.py` | ✅ Portado |
-| Jogador | `player.cc/.hh` | `player.py` | ✅ Portado |
-| Jogador IA | `aiplayer.cc/.hh` | `aiplayer.py` | ✅ Portado |
-| Jogador Humano | `humanplayer.cc/.hh` | `humanplayer.py` | ✅ Portado |
-| Terreno | `landscape.cc/.hh` | `landscape.py` | ✅ Portado |
-| Entidade Base | `entity.cc/.hh` | `entity.py` | ✅ Portado |
-| Arma Base | `weapon.cc/.hh` | `weapon.py` | ✅ Portado |
-| Projétil Shell | `shell.cc/.hh` | `shell.py` | ✅ Portado |
-| Míssil | `missile.cc/.hh` | `missile.py` | ✅ Portado |
-| MIRV | `mirv.cc/.hh` | `mirv.py` | ✅ Portado |
-| Metralhadora | `machinegunround.cc/.hh` | `machinegunround.py` | ✅ Portado |
-| ShellWeapon | `shellweapon.cc/.hh` | `weapons_impl.py` | ✅ Portado |
-| MissileWeapon | `missileweapon.cc/.hh` | `weapons_impl.py` | ✅ Portado |
-| MirvWeapon | `mirvweapon.cc/.hh` | `weapons_impl.py` | ✅ Portado |
-| NukeWeapon | `nukeweapon.cc/.hh` | `weapons_impl.py` | ✅ Portado |
-| MachineGunWeapon | `machinegunweapon.cc/.hh` | `weapons_impl.py` | ✅ Portado |
-| Explosão | `blast.cc/.hh` | `blast.py` | ✅ Portado |
-| Fumaça | `smoke.cc/.hh` | `smoke.py` | ✅ Portado |
-| Trilha | `trail.cc/.hh` | `trail.py` | ✅ Portado |
-| Terremoto | `quake.cc/.hh` | `quake.py` | ✅ Portado |
-| Interface | `interface.cc/.hh` | `interface.py` | ✅ Portado (Pygame) |
-| Som | `sounds.cc/.hh` | `sounds.py` | ✅ Portado |
-| Fontes | `font.cc/.hh` | `font.py` | ✅ Portado |
-| Menus | `*menu.cc/.hh` | `*menu.py` | ✅ Portado |
-| Controles | `controls.cc/.hh` | `controls.py` | ✅ Portado |
-| Leitor INI | `inifile.cc/.hh` | `inifile.py` | ✅ Portado |
-| Funções Comuns | `common.hh` | `common.py` | ✅ Portado |
-
-### 🔧 Diferenças Técnicas entre C++ e Python
-
-| Aspecto | C++ Original | Python Port |
-|---------|-------------|-------------|
-| **Gráficos** | OpenGL direto | Pygame (SDL2) |
-| **Áudio** | OpenAL/ALUT | Pygame.mixer |
-| **Janela** | GLFW | Pygame display |
-| **Texturas** | TGA via OpenGL | TGA via Pygame Surface |
-| **Compilação** | Makefile + g++ | Interpretado (Python 3) |
-| **Armas** | Cada arma em arquivo separado | Consolidadas em `weapons_impl.py` |
-
-### 🧪 Testes de Fidelidade
-
-O projeto inclui uma suíte de **17 testes de fidelidade** (`tests/test_port_fidelity.py`) que verificam a consistência entre a implementação C++ original e o port Python:
-
-1. **Funções matemáticas** — `PI`, `sqr`, `deg_sin`, `deg_cos`
-2. **Parsing de INI** — Leitura correta de `groundfire.ini`
-3. **Centro do tanque** — `Tank.get_centre()` retorna valores corretos
-4. **Posição de lançamento** — Cálculos de posição do canhão
-5. **Velocidade de lançamento** — Cálculos de velocidade dos projéteis
-6. **Sistema de dano** — `Tank.do_damage()` com lógica fiel ao original
-7. **Reset pré-rodada** — `Tank.do_pre_round()` reinicializa estados
-8. **Dano de explosão** — Cálculos de dano por proximidade
-9. **Pontuação** — `Player.end_round()` com scoring correto
-10. **Comportamento da IA** — Lógica de decisão e mira
-11. **Ciclo de vida de entidades** — `do_pre_round` / `do_post_round`
-12. **Início de rodada** — `Game._start_round()` inicializa corretamente
-13. **Fim de rodada** — `Game._end_round()` e limpeza de jogadores
-14. **Integridade de métodos** — Sem duplicação acidental de código
-15. **Sistema de combustão** — `Tank.burn()` com `_exhaust_time`
-16. **Cadeia de update** — `Tank.update()` → `Player.update()` corretamente
-17. **Explosão no terreno** — `Explosion` usa `make_hole` no landscape
-
-Executar os testes:
 ```bash
-python tests/test_port_fidelity.py
+python -m unittest tests.test_port_fidelity
+python -m unittest tests.test_fuzz_gameplay
+python -m unittest tests.test_landscape_fidelity
 ```
 
-## 📋 Arquitetura do Sistema
+## Configuration
 
-```
-┌──────────────────────────────────────────────┐
-│                 Game (game.py)                │
-│          Loop principal + Estado              │
-├─────────┬─────────────┬──────────────────────┤
-│         │             │                      │
-│    Landscape     Entity List            Players
-│  (landscape.py)  (entity.py)         (player.py)
-│         │             │                  │
-│   Terreno        Projéteis          ┌────┴────┐
-│   destrutível    Explosões          │         │
-│   Colisões       Fumaça         AIPlayer  HumanPlayer
-│                  Trilhas        (aiplayer) (humanplayer)
-│                                     │         │
-│                                     └────┬────┘
-│                                          │
-│                                       Tank
-│                                     (tank.py)
-│                                        │
-│                                     Weapons
-│                                (weapon.py + weapons_impl.py)
-└──────────────────────────────────────────────┘
-```
+- [conf/options.ini](conf/options.ini) controls graphics, terrain, tank tuning, and gameplay values
+- [conf/controls.ini](conf/controls.ini) stores controller and keyboard mappings
 
-### Fluxo do Loop Principal
+## Preservation Notes
 
-1. **`Game.loop_once()`** — Chamado a cada frame
-2. Calcula o tempo decorrido (`elapsed_time`)
-3. Se em jogo → **`game_loop()`**: atualiza todas as entidades e verifica fim de rodada
-4. Se em menu → **`menu_loop()`**: atualiza e desenha o menu atual
-5. Desenha a interface e atualiza a tela
+The original Groundfire C++ source is intentionally kept in this repository under [groundfire-0.25/](groundfire-0.25/). That directory is not just archival material; it is part of the workflow for verifying behavior and port fidelity.
 
-### Cadeia de Atualização dos Tanques
+## Credits
 
-```
-Tank.update(time)
-  ├── move_tank(time)      → Movimento horizontal e Jump Jets
-  ├── update_gun(time)     → Ângulo e potência do canhão
-  ├── weapon.fire()        → Disparo de armas
-  ├── weapon.update()      → Cooldown e estado das armas
-  ├── player.update(time)  → IA pensa / Humano lê inputs
-  └── burn(time)           → Fumaça se o tanque está destruído
-```
+This section is intentionally prominent because the original game deserves clear attribution.
 
-> **Nota importante:** No C++ original, `Tank::update()` chama `Player::update()`, e **não** o contrário. A IA em `AIPlayer.update()` **não** chama `Tank.update()`, evitando recursão infinita. Esta arquitetura foi fielmente mantida no port Python.
+- Original game, design, and C++ code: **Tom Russell**
+- Original project: **Groundfire v0.25**
+- Original contact listed in the historic source: `tom@groundfire.net`
+- Python port and ongoing preservation work: [p19091985](https://github.com/p19091985)
 
-## 🏆 Sistema de Pontuação
+If you are here because you loved the original game, this repository exists because that work was worth preserving.
 
-| Evento | Pontos | Moedas |
-|--------|--------|--------|
-| Destruir oponente | +100 | +50 |
-| Destruir o líder | +200 | +50 |
-| Destruir a si mesmo | -50 | +0 |
-| Sobreviver à rodada | +100 | +25 |
-| Cada rodada (todos) | — | +10 |
+## License
 
-## 📜 Licença e Créditos
-
-- **Autor original:** Tom Russell (`tom@groundfire.net`)
-- **Port para Python:** [p19091985](https://github.com/p19091985)
-- **Licença:** MIT License (ver arquivo `LICENSE`)
-- **Website original:** www.groundfire.net (histórico)
+This repository is distributed under the MIT License. See [LICENSE](LICENSE) for the full text.
 
 ---
 
-<p align="center">
-  <em>Este projeto é um port educacional e de preservação do jogo Groundfire v0.25.</em><br>
-  <em>O código-fonte original em C++ está incluído no diretório <code>groundfire-0.25/</code> para referência.</em>
-</p>
+<div align="center">
+
+**Groundfire lives here in two forms: the original C++ game and a modern Python port, side by side.**
+
+</div>

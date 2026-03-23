@@ -198,7 +198,6 @@ class Missile(Entity):
 
     def explode(self, x, y, hit_tank):
         self._game.explosion(x, y, self._size, self._damage, hit_tank, 6, False, self._player)
-        self._player.record_shot(x, y, hit_tank)
         if self._fuel >= 0:
             self._trail.set_inactive()
         return False

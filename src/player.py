@@ -51,8 +51,6 @@ class Player:
         self._defeated_players = []
 
     def end_round(self):
-        self._tank.do_post_round()
-        
         for defeated_player in self._defeated_players:
             if defeated_player == self:
                 # Suicide

@@ -267,7 +267,7 @@ class MachineGunWeapon(Weapon):
         self._quantity = 0
         self._cost = MachineGunWeapon.OPTION_Cost
         self._available_quantity = 0
-        self._gun_sound = None
+        self._gun_source = None
 
     @staticmethod
     def read_settings(settings: ReadIniFile):
@@ -278,21 +278,11 @@ class MachineGunWeapon(Weapon):
 
     def fire(self, firing, time):
         if firing:
-            if not self._gun_sound:
-                # Sound 8 looping
-                self._gun_sound = SoundEntity(self._game, 8, True)
-                # Need to add to game? cSoundEntity constructor doesn't add itself usually?
-                # Orig: _gunSound = new cSound::cSoundSource (_game->getSound (), 8, true);
-                # Ah, _gunSound in MachineGunWeapon is a SoundSource pointer, not an Entity?
-                # C++: _gunSound = new cSound::cSoundSource.
-                # Unlike other weapons creating cSoundEntity.
-                if self._game.get_sound():
-                    self._gun_source = self._game.get_sound().SoundSource(self._game.get_sound(), 8, True)
-                else:
-                    self._gun_source = None
+            if self._gun_source is None and self._game.get_sound():
+                self._gun_source = self._game.get_sound().SoundSource(self._game.get_sound(), 8, True)
         else:
-            self._gun_source = None # Stop sound (Python GC or explicit stop?)
-            
+            self._gun_source = None
+
         if self._available_quantity == 0:
             return False
         return True

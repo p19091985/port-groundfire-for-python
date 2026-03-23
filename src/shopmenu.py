@@ -15,7 +15,7 @@ class ShopMenu(Menu):
         self._player_select_pos = [0] * 8
         self._player_select_delay = [0.4] * 8
         self._player_done = [False] * 8
-        self._line_lit = [False] * 10
+        self._line_lit = [False] * 11
         
         settings = game.get_settings()
         self._jumpjets_cost = settings.get_int("Price", "Jumpjets", 50)
