@@ -258,10 +258,22 @@ The original Groundfire C++ source is intentionally kept in this repository unde
 
 This section is intentionally prominent because the original game deserves clear attribution.
 
-- Original game, design, and C++ code: **Tom Russell**
+- Original game, design, programming, and C++ code: **Tom Russell**
+- Official historical website: [groundfire.net](http://www.groundfire.net/)
 - Original project: **Groundfire v0.25**
+- The official Groundfire site describes the game as a free, open-source Windows/Linux project designed and programmed entirely by Tom Russell, based on Sega Saturn's *Death Tank*.
+- The historical site also credits Tom Russell for the website design and implementation in 2004.
+- Historical timeline visible on the official site: `v0.25` released on `15 May 2004`, with a later project update posted on `20 Apr 2006`.
 - Original contact listed in the historic source: `tom@groundfire.net`
 - Python port and ongoing preservation work: [p19091985](https://github.com/p19091985)
+
+<div align="center">
+  <a href="http://www.groundfire.net/" title="Visit the original Groundfire website">
+    <img src="docs/media/siteTom.png" alt="Screenshot of Tom Russell's original Groundfire website" width="100%" />
+  </a>
+  <br />
+  <sub>Historical official Groundfire website created by Tom Russell.</sub>
+</div>
 
 If you are here because you loved the original game, this repository exists because that work was worth preserving.
 

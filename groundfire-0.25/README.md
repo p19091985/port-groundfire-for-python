@@ -75,7 +75,16 @@ You can customize game settings in `conf/options.ini`:
 ## License & Credits
 
 *   **Original Author**: Tom Russell (`tom@groundfire.net`)
+*   **Original Website**: [groundfire.net](http://www.groundfire.net/) (historical official site)
+*   **Historical credit from the official site**: Groundfire is described there as a free, open-source Windows/Linux game, designed and programmed entirely by Tom Russell, based on Sega Saturn's *Death Tank*.
+*   **Website credit from the official site**: design and implementation by Tom Russell (2004)
+*   **Historical timeline visible on the official site**: `v0.25` released on `15 May 2004`, with a later project update posted on `20 Apr 2006`
 *   **License**: MIT License (See `COPYING` file)
-*   **Original Website**: www.groundfire.net (Historical)
+
+<div align="center">
+  <a href="http://www.groundfire.net/" title="Visit the original Groundfire website">
+    <img src="../docs/media/siteTom.png" alt="Screenshot of Tom Russell's original Groundfire website" width="100%" />
+  </a>
+</div>
 
 *Project ported to modern Linux/C++ standards.*
