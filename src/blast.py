@@ -1,5 +1,6 @@
 from .entity import Entity
-import pygame
+from .networkstate import EntitySnapshot
+from .renderprimitives import EntityRenderState, FullscreenOverlayPrimitive, TextureCenteredPrimitive
 
 class Blast(Entity):
     # Static settings
@@ -21,38 +22,61 @@ class Blast(Entity):
         Blast.OPTION_WhiteoutFadeRate = settings.get_float("Effects", "WhiteoutFadeRate", 0.6)
 
     def draw(self):
+        graphics = self.get_graphics()
         # Draw Blast
         # Texture 0 is blast texture.
-        tex = self._game.get_interface().get_texture_surface(0)
-        if tex:
+        if self._game.get_interface().get_texture_surface(0):
             # Blast size
             blast_size = self._size * 1.1
-            target_px = self._game.get_interface().scale_len(blast_size * 2)
-            
-            if target_px > 0:
-                scaled = pygame.transform.scale(tex, (target_px, target_px))
-                alpha = int(self._fade_away * 255)
-                if alpha < 0: alpha = 0
-                scaled.set_alpha(alpha)
-                
-                sx, sy = self._game.get_interface().game_to_screen(self._x, self._y)
-                rect = scaled.get_rect(center=(sx, sy))
-                
-                if self._game.get_interface()._window:
-                     self._game.get_interface()._window.blit(scaled, rect)
+            alpha = max(0, int(self._fade_away * 255))
+            graphics.draw_texture_centered(0, self._x, self._y, blast_size * 2.0, alpha=alpha)
 
         # Draw Whiteout
         if self._white_out:
-            # Full screen white rectangle
-            # Pygame surface with alpha
-            w, h, _ = self._game.get_interface().get_window_settings()
-            s = pygame.Surface((w, h), pygame.SRCALPHA)
-            
-            alpha_val = int(self._white_out_level * 255)
-            if alpha_val < 0: alpha_val = 0
-            
-            s.fill((255, 255, 255, alpha_val))
-            self._game.get_interface()._window.blit(s, (0, 0))
+            alpha_val = max(0, int(self._white_out_level * 255))
+            graphics.draw_fullscreen_overlay((255, 255, 255, alpha_val))
+
+    def get_render_state(self):
+        primitives = []
+        interface = self._game.get_interface()
+        if interface and interface.get_texture_surface(0):
+            blast_size = self._size * 1.1
+            primitives.append(
+                TextureCenteredPrimitive(
+                    texture_id=0,
+                    x=self._x,
+                    y=self._y,
+                    width=blast_size * 2.0,
+                    alpha=max(0, int(self._fade_away * 255)),
+                )
+            )
+
+        if self._white_out:
+            primitives.append(
+                FullscreenOverlayPrimitive(
+                    colour=(255, 255, 255, max(0, int(self._white_out_level * 255)))
+                )
+            )
+
+        return EntityRenderState(
+            entity_id=self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            primitives=tuple(primitives),
+            metadata={"size": self._size, "fade_away": self._fade_away, "white_out": self._white_out},
+        )
+
+    def build_network_snapshot(self):
+        return EntitySnapshot(
+            entity_id=-1 if self.get_entity_id() is None else self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            position=self.get_position(),
+            payload={
+                "size": self._size,
+                "fade_away": self._fade_away,
+                "white_out": self._white_out,
+                "white_out_level": self._white_out_level,
+            },
+        )
 
     def update(self, time):
         self._fade_away -= time * Blast.OPTION_BlastFadeRate

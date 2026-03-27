@@ -129,9 +129,24 @@ source .venv/bin/activate
 ### Install and run
 
 ```bash
-pip install -r requirements.txt
-python src/main.py
+pip install -e .
+groundfire
+
+# Or, without console scripts:
+python -m groundfire.client
+
+# Start local play directly, skipping the launch menu:
+python -m groundfire.client --classic-local
+
+# Explicitly force the standard modern local runtime:
+python -m groundfire.client --canonical-local
+
+# Dedicated headless server entrypoint:
+groundfire-server
 ```
+
+The default local launch uses the modern runtime with the classic Groundfire presentation.
+`--classic-local` is kept as a direct-start shortcut on that same classic frontend.
 
 ## Requirements
 
@@ -222,7 +237,9 @@ Game
 
 Some key modules:
 
-- [src/main.py](src/main.py): entry point
+- [src/groundfire/client.py](src/groundfire/client.py): canonical client entry point
+- [src/groundfire/server.py](src/groundfire/server.py): canonical server entry point
+- [src/main.py](src/main.py): legacy compatibility entry point
 - [src/game.py](src/game.py): game loop and state transitions
 - [src/tank.py](src/tank.py): tank movement, damage, firing, and round lifecycle
 - [src/aiplayer.py](src/aiplayer.py): AI targeting and aiming

@@ -8,14 +8,14 @@ set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
 call :ensure_venv
 if errorlevel 1 goto :fail
 
-"%VENV_PYTHON%" "%~dp0src\main.py"
+"%VENV_PYTHON%" "%~dp0src\main.py" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 popd
 exit /b %EXIT_CODE%
 
 :ensure_venv
 if exist "%VENV_PYTHON%" (
-    "%VENV_PYTHON%" -c "import sys, pygame; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
+    "%VENV_PYTHON%" -c "import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
     if not errorlevel 1 exit /b 0
     echo Ambiente virtual existente ausente de dependencias ou com Python incompativel. Reconfigurando...
 ) else (
@@ -45,8 +45,7 @@ echo Atualizando pip...
 call ".venv\Scripts\python.exe" -m pip install --upgrade pip
 if errorlevel 1 exit /b 1
 
-echo Instalando dependencias...
-call ".venv\Scripts\python.exe" -m pip install --only-binary=pygame -r requirements.txt
+call :install_requirements
 if errorlevel 1 exit /b 1
 
 if not exist "%VENV_PYTHON%" (
@@ -54,7 +53,7 @@ if not exist "%VENV_PYTHON%" (
     exit /b 1
 )
 
-"%VENV_PYTHON%" -c "import sys, pygame; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
+"%VENV_PYTHON%" -c "import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
 if errorlevel 1 (
     echo Falha: o ambiente virtual nao foi criado corretamente.
     exit /b 1
@@ -95,6 +94,15 @@ py -%~1 -c "import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <=
 if errorlevel 1 exit /b 0
 set "PYTHON_CMD=py -%~1"
 exit /b 0
+
+:install_requirements
+echo Instalando dependencias...
+call ".venv\Scripts\python.exe" -m pip install --only-binary=pygame -r requirements.txt
+if not errorlevel 1 exit /b 0
+
+echo Instalacao com wheel precompilado do pygame falhou. Tentando fallback generico...
+call ".venv\Scripts\python.exe" -m pip install -r requirements.txt
+exit /b %ERRORLEVEL%
 
 :fail
 popd

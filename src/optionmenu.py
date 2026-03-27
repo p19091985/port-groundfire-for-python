@@ -3,7 +3,6 @@ from .menu import Menu
 from .selector import Selector
 from .buttons import TextButton
 from .common import GameState
-import pygame
 
 if TYPE_CHECKING:
     from .game import Game
@@ -70,17 +69,13 @@ class OptionMenu(Menu):
     
     def draw(self):
         self.draw_background()
-        
-        interface = self._game.get_interface()
-        
         black_boxes = [
             [(-7.0, -3.0), (7.0, -3.0), (7.0, 3.0), (-7.0, 3.0)],
             [(-7.0, -6.6), (7.0, -6.6), (7.0, -4.4), (-7.0, -4.4)]
         ]
         
         for pts in black_boxes:
-            screen_pts = [interface.game_to_screen(x, y) for x, y in pts]
-            self._draw_transparent_poly(screen_pts, (0, 0, 0, 128))
+            self.draw_game_polygon(pts, (0, 0, 0, 128))
             
         brown = (153, 76, 0, 128)
         brown_boxes = [
@@ -92,19 +87,12 @@ class OptionMenu(Menu):
         ]
         
         for pts in brown_boxes:
-             screen_pts = [interface.game_to_screen(x, y) for x, y in pts]
-             self._draw_transparent_poly(screen_pts, brown)
-             
-        font = self._game.get_font()
-        font.set_colour((1.0, 1.0, 1.0))
-        font.set_size(0.6, 0.6, 0.5)
-        font.print_centred_at(0.0, 6.5, "Options")
-        
-        font.set_colour((0.0, 1.0, 1.0))
-        font.set_size(0.6, 0.6, 0.5)
-        
-        font.print_centred_at(-3.0, 0.7, "Resolution:")
-        font.print_centred_at(-3.0, -0.3, "Screen Mode:")
+             self.draw_game_polygon(pts, brown)
+
+        self._ui.draw_centered_text(0.0, 6.5, "Options", style=self._ui.style(0.6, (1.0, 1.0, 1.0), shadow=True))
+        label_style = self._ui.style(0.6, (0.0, 1.0, 1.0))
+        self._ui.draw_centered_text(-3.0, 0.7, "Resolution:", style=label_style)
+        self._ui.draw_centered_text(-3.0, -0.3, "Screen Mode:", style=label_style)
         
         self._resolutions.draw()
         self._screen_mode.draw()
@@ -112,17 +100,3 @@ class OptionMenu(Menu):
         self._define_controls.draw()
         self._apply_button.draw()
         self._back_button.draw()
-
-    def _draw_transparent_poly(self, points, color):
-        if not points: return
-        xs = [p[0] for p in points]
-        ys = [p[1] for p in points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        w, h = max_x - min_x, max_y - min_y
-        if w < 1 or h < 1: return
-        
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        local_points = [(p[0] - min_x, p[1] - min_y) for p in points]
-        pygame.draw.polygon(s, color, local_points)
-        self._game.get_interface()._window.blit(s, (min_x, min_y))

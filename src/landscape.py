@@ -7,6 +7,7 @@ import random
 import pygame
 
 from .common import sqr
+from .gamegraphics import get_interface_graphics
 from .inifile import ReadIniFile
 from .interface import Colour, Interface
 
@@ -203,6 +204,7 @@ class Landscape:
         interface = Interface.current_interface
         if not interface:
             return
+        graphics = get_interface_graphics(interface)
 
         width, height, _ = interface.get_window_settings()
         for band in range(24):
@@ -215,7 +217,7 @@ class Landscape:
             )
             bottom_y = int(height * ratio_bottom)
             top_y = int(height * ratio_top)
-            pygame.draw.rect(interface._window, top_colour, (0, top_y, width, max(1, bottom_y - top_y)))
+            graphics.draw_screen_rect((0, top_y, width, max(1, bottom_y - top_y)), top_colour)
 
         for slice_idx in range(self._num_of_slices):
             x1 = self.get_world_x_from_slice(slice_idx)
@@ -231,7 +233,7 @@ class Landscape:
                 avg_r = (chunk.min_colour_1.r + chunk.max_colour_1.r + chunk.max_colour_2.r + chunk.min_colour_2.r) / 4.0
                 avg_g = (chunk.min_colour_1.g + chunk.max_colour_1.g + chunk.max_colour_2.g + chunk.min_colour_2.g) / 4.0
                 avg_b = (chunk.min_colour_1.b + chunk.max_colour_1.b + chunk.max_colour_2.b + chunk.min_colour_2.b) / 4.0
-                pygame.draw.polygon(interface._window, (int(avg_r * 255), int(avg_g * 255), int(avg_b * 255)), points)
+                graphics.draw_screen_polygon(points, (int(avg_r * 255), int(avg_g * 255), int(avg_b * 255)))
 
     def make_hole(self, x, y, radius):
         min_slice = self.get_slice_from_world_x(x - radius)

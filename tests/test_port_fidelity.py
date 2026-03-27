@@ -168,6 +168,35 @@ class TankFidelityTests(unittest.TestCase):
         self.assertEqual((texture, rotation, growth, fade_rate), (5, 0.1, 0.3, 0.15))
         self.assertAlmostEqual(self.tank._exhaust_time, 0.9)
 
+    def test_render_state_and_network_snapshot_expose_visual_and_sync_data(self):
+        self.tank.assign_entity_id(42)
+        self.tank._x = 1.5
+        self.tank._y = 2.5
+        self.tank._gun_power = 12.0
+        self.tank._fuel = 0.4
+
+        render_state = self.tank.get_render_state()
+        snapshot = self.tank.build_network_snapshot()
+
+        self.assertEqual(render_state.entity_id, 42)
+        self.assertEqual(render_state.entity_type, "tank")
+        self.assertGreaterEqual(len(render_state.primitives), 3)
+        self.assertEqual(snapshot.entity_id, 42)
+        self.assertEqual(snapshot.payload["fuel"], 0.4)
+        self.assertEqual(snapshot.payload["player_number"], 0)
+
+    def test_get_colour_uses_player_colour_for_hud_and_rendering(self):
+        self.player._colour = (12, 34, 56)
+        self.tank._colour = (255, 255, 255)
+
+        self.assertEqual(self.tank.get_colour(), (12, 34, 56))
+        self.assertEqual(self.tank._colour, (12, 34, 56))
+
+        self.tank.set_colour((90, 80, 70))
+
+        self.assertEqual(self.player._colour, (90, 80, 70))
+        self.assertEqual(self.tank.get_colour(), (90, 80, 70))
+
 
 class PlayerAndSoundFidelityTests(unittest.TestCase):
     def test_end_round_matches_cpp_scoring_without_extra_post_round(self):

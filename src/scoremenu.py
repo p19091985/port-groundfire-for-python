@@ -88,8 +88,6 @@ class ScoreMenu(Menu):
 
     def draw(self):
         self.draw_background()
-        interface = self._game.get_interface()
-        
         grey = (0, 0, 0, 128)
         
         for i in range(self._num_of_players):
@@ -101,12 +99,9 @@ class ScoreMenu(Menu):
             box3 = [(4.8, y_top), (9.0, y_top), (9.0, y_bot), (4.8, y_bot)]
             
             for b in [box1, box2, box3]:
-                 self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b], grey)
-                 
-        font = self._game.get_font()
-        font.set_shadow(True)
-        font.set_size(0.5, 0.5, 0.4)
-        font.set_colour((230, 230, 230))
+                 self.draw_game_polygon(b, grey)
+        
+        heading_style = self._ui.style(0.5, (230, 230, 230), spacing=0.4, shadow=True)
         
         for i in range(self._num_of_players):
             y_pos = 5.1 - i * 1.6
@@ -118,17 +113,14 @@ class ScoreMenu(Menu):
             if i > 0 and self._ordered_players[i].get_score() == self._ordered_players[i-1].get_score():
                  txt = " = "
                  
-            font.print_centred_at(-9.0, y_pos, txt)
+            self._ui.draw_centered_text(-9.0, y_pos, txt, style=heading_style)
             
-        font.set_size(0.5, 0.5, 0.4)
-        font.print_centred_at(-6.3, 6.5, "Player")
-        font.print_centred_at(0.0, 6.5, "Scoring for Round")
-        font.print_centred_at(6.9, 6.5, "Total Score")
+        self._ui.draw_centered_text(-6.3, 6.5, "Player", style=heading_style)
+        self._ui.draw_centered_text(0.0, 6.5, "Scoring for Round", style=heading_style)
+        self._ui.draw_centered_text(6.9, 6.5, "Total Score", style=heading_style)
         
         for i in range(self._num_of_players):
             self._draw_score_for_player(self._ordered_players[i], 6.0 - i * 1.6)
-            
-        font.set_shadow(False)
 
     def _draw_score_for_player(self, player, y_pos):
         interface = self._game.get_interface()
@@ -136,59 +128,33 @@ class ScoreMenu(Menu):
         r, g, b = tank.get_colour()
         
         t_pts = [(-7.0, y_pos - 0.8), (-6.7, y_pos - 0.2), (-6.1, y_pos - 0.2), (-5.8, y_pos - 0.8)]
-        pygame.draw.polygon(interface._window, (r, g, b), [interface.game_to_screen(x,y) for x,y in t_pts])
+        self.draw_game_polygon(t_pts, (r, g, b))
         
         x_pos = 0.0
-        tex = interface.get_texture_image(4)
         
         for i in range(len(player.get_defeated_players())): # Fix: get_defeated_players_count()? or just len
              # Assuming get_defeated_players returns list
              defeated = player.get_defeated_players()[i]
              dr, dg, db = defeated.get_tank().get_colour()
              
-             p1 = interface.game_to_screen(-4.0 + x_pos, y_pos - 0.3)
-             tl = interface.game_to_screen(-4.0 + x_pos, y_pos - 0.3)
-             br = interface.game_to_screen(-3.1 + x_pos, y_pos - 0.9)
-             
-             w_px = br[0] - tl[0]
-             h_px = br[1] - tl[1]
-             
-             if w_px > 0 and h_px > 0 and tex:
-                 scaled = pygame.transform.scale(tex, (int(w_px), int(h_px)))
-                 tinted = scaled.copy()
-                 color_surf = pygame.Surface((int(w_px), int(h_px))).convert_alpha()
-                 color_surf.fill((dr, dg, db, 255))
-                 tinted.blit(color_surf, (0,0), special_flags=pygame.BLEND_MULT)
-                 interface._window.blit(tinted, tl)
+             self._graphics.draw_texture_world_rect(
+                 4,
+                 -4.0 + x_pos,
+                 y_pos - 0.3,
+                 -3.1 + x_pos,
+                 y_pos - 0.9,
+                 tint=(dr, dg, db),
+             )
 
              if defeated.is_leader():
                  pole = [(-3.7+x_pos, y_pos - 0.9), (-3.7+x_pos, y_pos - 0.3), (-3.6+x_pos, y_pos - 0.3), (-3.6+x_pos, y_pos - 0.9)]
-                 pygame.draw.polygon(interface._window, (128, 128, 128), [interface.game_to_screen(x,y) for x,y in pole])
+                 self.draw_game_polygon(pole, (128, 128, 128))
                  
                  fr, fg, fb = defeated.get_tank().get_colour()
                  flag1 = [(-3.6+x_pos, y_pos - 0.75), (-3.6+x_pos, y_pos - 0.3), (-2.9+x_pos, y_pos - 0.3), (-2.9+x_pos, y_pos - 0.75)]
-                 pygame.draw.polygon(interface._window, (fr, fg, fb), [interface.game_to_screen(x,y) for x,y in flag1])
+                 self.draw_game_polygon(flag1, (fr, fg, fb))
                  
              x_pos += 1.3
               
-        font = self._game.get_font()
-        font.set_colour((255, 255, 255))
-        font.set_size(0.3, 0.3, 0.2)
-        font.print_centred_at(-6.4, y_pos - 1.15, player.get_name())
-        
-        font.set_size(0.5, 0.5, 0.4)
-        font.print_centred_at(6.9, y_pos - 0.9, str(player.get_score()))
-
-    def _draw_transparent_poly(self, points, color):
-        if not points: return
-        xs = [p[0] for p in points]
-        ys = [p[1] for p in points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        w, h = max_x - min_x, max_y - min_y
-        if w < 1 or h < 1: return
-        
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        local_points = [(p[0] - min_x, p[1] - min_y) for p in points]
-        pygame.draw.polygon(s, color, local_points)
-        self._game.get_interface()._window.blit(s, (min_x, min_y))
+        self._ui.draw_centered_text(-6.4, y_pos - 1.15, player.get_name(), style=self._ui.style(0.3, (255, 255, 255), spacing=0.2))
+        self._ui.draw_centered_text(6.9, y_pos - 0.9, str(player.get_score()), style=self._ui.style(0.5, (255, 255, 255), spacing=0.4))

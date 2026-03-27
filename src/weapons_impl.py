@@ -5,7 +5,7 @@ from .mirv import Mirv
 from .machinegunround import MachineGunRound
 from .soundentity import SoundEntity
 from .inifile import ReadIniFile
-import pygame
+from .renderprimitives import RectPrimitive
 
 # -----------------------------------------------------------------------------
 # ShellWeapon
@@ -56,6 +56,10 @@ class ShellWeapon(Weapon):
 
     def draw_graphic(self, x):
         self.draw_icon(x, 0)
+
+    def get_graphic_primitives(self, x: float) -> tuple[object, ...]:
+        primitive = self._build_icon_primitive(x, 0)
+        return () if primitive is None else (primitive,)
 
 # -----------------------------------------------------------------------------
 # MissileWeapon
@@ -127,15 +131,16 @@ class MissileWeapon(Weapon):
         # width 0.15 height 0.1
         
         interface = self._game.get_interface()
-        w = interface.scale_len(0.15)
-        h = interface.scale_len(0.1)
         
         for i in range(self._available_quantity):
              gx = x + i * 0.2 + 0.40
-             gy = 6.9 # Top Y in GL
-             
-             sx, sy = interface.game_to_screen(gx, gy)
-             pygame.draw.rect(interface._window, (255, 255, 255), (sx, sy, w, h))
+             self._game.get_graphics().draw_world_rect(gx, 6.9, gx + 0.15, 6.8, (255, 255, 255))
+
+    def get_graphic_primitives(self, x: float) -> tuple[object, ...]:
+        primitive = self._build_icon_primitive(x, 10)
+        if primitive is None:
+            return ()
+        return (primitive,) + self._build_ammo_bar_primitives(x, self._available_quantity)
 
 # -----------------------------------------------------------------------------
 # MirvWeapon
@@ -192,6 +197,10 @@ class MirvWeapon(Weapon):
 
     def draw_graphic(self, x):
         self.draw_icon(x, 4)
+
+    def get_graphic_primitives(self, x: float) -> tuple[object, ...]:
+        primitive = self._build_icon_primitive(x, 4)
+        return () if primitive is None else (primitive,)
 
 # -----------------------------------------------------------------------------
 # NukeWeapon
@@ -251,6 +260,10 @@ class NukeWeapon(Weapon):
 
     def draw_graphic(self, x):
         self.draw_icon(x, 1)
+
+    def get_graphic_primitives(self, x: float) -> tuple[object, ...]:
+        primitive = self._build_icon_primitive(x, 1)
+        return () if primitive is None else (primitive,)
 
 # -----------------------------------------------------------------------------
 # MachineGunWeapon
@@ -334,12 +347,14 @@ class MachineGunWeapon(Weapon):
         y_top = 6.95
         y_bot = 6.75
         
-        interface = self._game.get_interface()
-        
-        # game_to_screen
-        sx, sy = interface.game_to_screen(x_start, y_top) # Top-left
-        
-        width = interface.scale_len(amt)
-        height = interface.scale_len(0.2) # 6.95 - 6.75
-        
-        pygame.draw.rect(interface._window, (255, 255, 255), (sx, sy, width, height))
+        self._game.get_graphics().draw_world_rect(x_start, y_top, x_start + amt, y_bot, (255, 255, 255))
+
+    def get_graphic_primitives(self, x: float) -> tuple[object, ...]:
+        primitive = self._build_icon_primitive(x, 2)
+        if primitive is None:
+            return ()
+        amt = self._available_quantity / 50.0
+        return (
+            primitive,
+            RectPrimitive(x + 0.40, 6.95, x + 0.40 + amt, 6.75, (255, 255, 255)),
+        )

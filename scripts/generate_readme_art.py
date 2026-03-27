@@ -26,7 +26,8 @@ def get_font(size: int, bold: bool = False) -> pygame.font.Font:
 
 
 def load_image(name: str) -> pygame.Surface:
-    return pygame.image.load(str(DATA_DIR / name)).convert_alpha()
+    candidate = DATA_DIR / name
+    return pygame.image.load(str(candidate)).convert_alpha()
 
 
 def make_tiled_background(size: tuple[int, int], tile: pygame.Surface) -> pygame.Surface:
@@ -128,8 +129,8 @@ def draw_badge(surface: pygame.Surface, text: str, pos: tuple[int, int], accent:
 
 
 def make_hero() -> None:
-    background_tile = load_image("menuback.tga")
-    logo = load_image("logo.tga")
+    background_tile = load_image("menuback.png")
+    logo = load_image("logo.png")
 
     surface = make_tiled_background(HERO_SIZE, background_tile)
     add_vertical_gradient(surface, (4, 18, 35, 70), (3, 10, 18, 200))
@@ -201,8 +202,8 @@ def draw_tank(surface: pygame.Surface, x: int, y: int, color: tuple[int, int, in
 
 
 def make_showcase() -> None:
-    background_tile = load_image("menuback.tga")
-    logo = load_image("logo.tga")
+    background_tile = load_image("menuback.png")
+    logo = load_image("logo.png")
 
     surface = make_tiled_background(SHOWCASE_SIZE, background_tile)
     add_vertical_gradient(surface, (10, 30, 52, 90), (4, 12, 22, 220))

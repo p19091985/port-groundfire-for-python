@@ -123,15 +123,13 @@ class SetControlsMenu(Menu):
 
     def draw(self):
         self.draw_background()
-        interface = self._game.get_interface()
-        
         boxes = [
             [(-7.0, -4.0), (7.0, -4.0), (7.0, 6.0), (-7.0, 6.0)],
             [(-7.0, -6.6), (7.0, -6.6), (7.0, -4.4), (-7.0, -4.4)]
         ]
         dark = (0, 0, 0, 128)
         for b in boxes:
-            self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b], dark)
+            self.draw_game_polygon(b, dark)
             
         brown = (153, 76, 0, 128)
         
@@ -140,29 +138,26 @@ class SetControlsMenu(Menu):
             y_bot = 4.6 - i * 0.8
             lb = [(-6.0, y_top), (0.0, y_top), (0.0, y_bot), (-6.0, y_bot)]
             rb = [(0.1, y_top), (6.0, y_top), (6.0, y_bot), (0.1, y_bot)]
-            self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in lb], brown)
-            self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in rb], brown)
+            self.draw_game_polygon(lb, brown)
+            self.draw_game_polygon(rb, brown)
             
         bb1 = [(-4.0, -5.4), (4.0, -5.4), (4.0, -4.6), (-4.0, -4.6)]
         bb2 = [(-4.0, -6.4), (4.0, -6.4), (4.0, -5.6), (-4.0, -5.6)]
-        self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in bb1], brown)
-        self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in bb2], brown)
-        
-        font = self._game.get_font()
-        font.set_shadow(True)
-        font.set_size(0.6, 0.6, 0.5)
-        font.set_colour((1.0, 1.0, 1.0))
-        
+        self.draw_game_polygon(bb1, brown)
+        self.draw_game_polygon(bb2, brown)
+
         title = f"Editing Keyboard Layout {self._layout + 1}" if self._layout < 2 else f"Editing Joystick Layout {self._layout - 1}"
-        font.print_centred_at(0.0, 6.5, title)
+        self._ui.draw_centered_text(0.0, 6.5, title, style=self._ui.style(0.6, (1.0, 1.0, 1.0), shadow=True))
         
         if self._waiting_for_key != -1:
-            font.set_colour((0.5, 0.5, 0.5))
-            font.print_centred_at(0.0, -4.0, f"Press Button for '{self.CONTROL_STRINGS[self._waiting_for_key]}'")
-            
-        font.set_size(0.5, 0.5, 0.4)
-        font.set_colour((0.0, 1.0, 1.0))
-        
+            self._ui.draw_centered_text(
+                0.0,
+                -4.0,
+                f"Press Button for '{self.CONTROL_STRINGS[self._waiting_for_key]}'",
+                style=self._ui.style(0.6, (0.5, 0.5, 0.5), shadow=True),
+            )
+
+        value_style = self._ui.style(0.5, (0.0, 1.0, 1.0), spacing=0.4)
         for i in range(self.NUM_OF_CONTROLS):
             key = self._control_key[i]
             txt = "<Undefined>"
@@ -180,24 +175,10 @@ class SetControlsMenu(Menu):
                      else:
                          txt = f"Axis {idx}"
             
-            font.print_centred_at(3.0, 4.7 - i * 0.8, txt)
+            self._ui.draw_centered_text(3.0, 4.7 - i * 0.8, txt, style=value_style)
             
         for i in range(self.NUM_OF_CONTROLS):
             self._control_buttons[i].draw()
             
         self._reset_button.draw()
         self._done_button.draw()
-
-    def _draw_transparent_poly(self, points, color):
-        if not points: return
-        xs = [p[0] for p in points]
-        ys = [p[1] for p in points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        w, h = max_x - min_x, max_y - min_y
-        if w < 1 or h < 1: return
-        
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        local_points = [(p[0] - min_x, p[1] - min_y) for p in points]
-        pygame.draw.polygon(s, color, local_points)
-        self._game.get_interface()._window.blit(s, (min_x, min_y))

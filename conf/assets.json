@@ -1,0 +1,28 @@
+{
+  "textures": [
+    {"id": 0, "key": "blast", "candidates": ["data/blast.png"]},
+    {"id": 1, "key": "trail", "candidates": ["data/trail.png"]},
+    {"id": 2, "key": "exhaust", "candidates": ["data/exhaust.png"]},
+    {"id": 3, "key": "font_atlas", "candidates": ["data/fonts.png"]},
+    {"id": 4, "key": "damage", "candidates": ["data/damage.png"]},
+    {"id": 5, "key": "smoke", "candidates": ["data/smoke.png"]},
+    {"id": 6, "key": "menu_background", "candidates": ["data/menuback.png"]},
+    {"id": 7, "key": "weapon_icons", "candidates": ["data/weaponicons.png"]},
+    {"id": 8, "key": "cursor", "candidates": ["data/arrow.png"]},
+    {"id": 9, "key": "logo", "candidates": ["data/logo.png"]},
+    {"id": 10, "key": "add_button", "candidates": ["data/addbutton.png"]},
+    {"id": 11, "key": "remove_button", "candidates": ["data/removebutton.png"]}
+  ],
+  "sounds": [
+    {"id": 0, "key": "fire_shell", "candidates": ["data/fireshell.wav"]},
+    {"id": 1, "key": "shell_death", "candidates": ["data/shelldeath.wav"]},
+    {"id": 2, "key": "quake", "candidates": ["data/quake.wav"]},
+    {"id": 3, "key": "jumpjets", "candidates": ["data/jumpjets.wav"]},
+    {"id": 4, "key": "missile", "candidates": ["data/missile.wav"]},
+    {"id": 5, "key": "launch_missile", "candidates": ["data/launchmissile.wav"]},
+    {"id": 6, "key": "missile_death", "candidates": ["data/missiledeath.wav"]},
+    {"id": 7, "key": "nuke", "candidates": ["data/nuke.wav"]},
+    {"id": 8, "key": "machinegun", "candidates": ["data/machinegun.wav"]},
+    {"id": 9, "key": "metal", "candidates": ["data/metal.wav"]}
+  ]
+}

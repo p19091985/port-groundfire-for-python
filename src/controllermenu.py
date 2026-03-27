@@ -69,8 +69,6 @@ class ControllerMenu(Menu):
 
     def draw(self):
         self.draw_background()
-        interface = self._game.get_interface()
-        
         dark = (0, 0, 0, 128)
         brown = (153, 76, 0, 128)
         
@@ -81,7 +79,7 @@ class ControllerMenu(Menu):
         ]
         
         for b in boxes:
-            self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b], dark)
+            self.draw_game_polygon(b, dark)
             
         brown_boxes = [
             [(-4.0, -6.4), (4.0, -6.4), (4.0, -5.6), (-4.0, -5.6)],
@@ -90,63 +88,37 @@ class ControllerMenu(Menu):
         ]
         
         for b in brown_boxes:
-            self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b], brown)
+            self.draw_game_polygon(b, brown)
             
         for i in range(8):
              y_base = 0.75 - i * 0.8
              pts = [(-6.4, y_base), (6.4, y_base), (6.4, y_base + 0.7), (-6.4, y_base + 0.7)]
-             self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in pts], brown)
-             
-        font = self._game.get_font()
-        font.set_shadow(True)
-        font.set_size(0.6, 0.6, 0.5)
-        font.set_colour((1.0, 1.0, 1.0))
-        font.print_centred_at(0.0, 6.5, "Set Controls")
-        
-        font.set_shadow(False)
-        font.set_size(0.4, 0.4, 0.3)
-        font.set_colour((0.5, 0.5, 0.5))
-        
-        font.print_centred_at(0.0, 2.2, "Joystick")
-        font.print_centred_at(0.0, 1.8, "layout number")
-        font.print_centred_at(4.5, 2.2, "Change")
-        font.print_centred_at(4.5, 1.8, "joystick layout")
-        
-        font.print_centred_at(2.0, 5.4, "Change")
-        font.print_centred_at(2.0, 5.0, "keyboard layout")
-        
-        font.set_size(0.6, 0.6, 0.5)
-        font.set_colour((0.0, 1.0, 1.0))
-        font.print_centred_at(-2.0, 4.3, "Keyboard 1")
-        font.print_centred_at(-2.0, 3.5, "Keyboard 2")
-        
-        font.set_colour((0.5, 0.5, 0.5))
+             self.draw_game_polygon(pts, brown)
+
+        self._ui.draw_centered_text(0.0, 6.5, "Set Controls", style=self._ui.style(0.6, (1.0, 1.0, 1.0), shadow=True))
+        info_style = self._ui.style(0.4, (0.5, 0.5, 0.5), spacing=0.3)
+        self._ui.draw_centered_text(0.0, 2.2, "Joystick", style=info_style)
+        self._ui.draw_centered_text(0.0, 1.8, "layout number", style=info_style)
+        self._ui.draw_centered_text(4.5, 2.2, "Change", style=info_style)
+        self._ui.draw_centered_text(4.5, 1.8, "joystick layout", style=info_style)
+        self._ui.draw_centered_text(2.0, 5.4, "Change", style=info_style)
+        self._ui.draw_centered_text(2.0, 5.0, "keyboard layout", style=info_style)
+
+        keyboard_style = self._ui.style(0.6, (0.0, 1.0, 1.0))
+        self._ui.draw_centered_text(-2.0, 4.3, "Keyboard 1", style=keyboard_style)
+        self._ui.draw_centered_text(-2.0, 3.5, "Keyboard 2", style=keyboard_style)
+
+        disconnected_style = self._ui.style(0.5, (0.5, 0.5, 0.5), spacing=0.4)
         connected_joys = len(self._joysticks)
         for i in range(connected_joys, 8):
-            font.print_centred_at(-4.6, 0.8 - i*0.8, f"Joystick {i+1}")
-            font.print_centred_at(2.0, 0.8 - i*0.8, "<<Not Connected>>")
+            self._ui.draw_centered_text(-4.6, 0.8 - i*0.8, f"Joystick {i+1}", style=disconnected_style)
+            self._ui.draw_centered_text(2.0, 0.8 - i*0.8, "<<Not Connected>>", style=disconnected_style)
             
         for i in range(connected_joys):
-            font.set_size(0.6, 0.6, 0.5)
-            font.set_colour((0.0, 1.0, 1.0))
-            font.print_centred_at(-4.6, 0.8 - i*0.8, f"Joystick {i+1}")
+            self._ui.draw_centered_text(-4.6, 0.8 - i*0.8, f"Joystick {i+1}", style=keyboard_style)
             self._joysticks[i].layout.draw()
             self._joysticks[i].define.draw()
             
         self._keyboard[0].draw()
         self._keyboard[1].draw()
         self._back_button.draw()
-
-    def _draw_transparent_poly(self, points, color):
-        if not points: return
-        xs = [p[0] for p in points]
-        ys = [p[1] for p in points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        w, h = max_x - min_x, max_y - min_y
-        if w < 1 or h < 1: return
-        
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        local_points = [(p[0] - min_x, p[1] - min_y) for p in points]
-        pygame.draw.polygon(s, color, local_points)
-        self._game.get_interface()._window.blit(s, (min_x, min_y))

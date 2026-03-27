@@ -1,7 +1,6 @@
 from .entity import Entity
-import pygame
-from .common import sqr # common.py must have sqr or math
-import math
+from .networkstate import EntitySnapshot
+from .renderprimitives import EntityRenderState, TextureCenteredPrimitive
 
 # Need to ensure drawing logic.
 # Smoke rotates and scales a texture.
@@ -31,45 +30,46 @@ class Smoke(Entity):
         tex = self._game.get_interface().get_texture_surface(self._texture_id)
         if not tex:
             return
-            
-        # Prepare surface
-        # 1. Scale
-        # In OpenGL size=0.25 means width is 0.5 (from -size to size).
-        # We need to convert game unit size to pixels.
-        # scale_len gives pixel dimension.
-        # But wait, original is quad (-size to size), so width is size*2
-        
-        target_size_px = self._game.get_interface().scale_len(self._size * 2)
-        if target_size_px <= 0: return
 
-        # Scale texture
-        scaled_surf = pygame.transform.scale(tex, (target_size_px, target_size_px))
-        
-        # 2. Rotate
-        # Pygame rotation expands the rect, so we need to handle centering.
-        rotated_surf = pygame.transform.rotate(scaled_surf, -self._rotate) # Pygame angle is counter-clockwise? OpenGLglRotate is usually CCW for Z axis.
-        # Check sign. glRotate(angle, 0,0,1).
-        
-        # 3. Alpha
-        # FadeAway 0.7 -> 0.0
-        alpha = int(self._fade_away * 255)
-        if alpha < 0: alpha = 0
-        rotated_surf.set_alpha(alpha)
-        
-        # 4. Position
-        # _x, _y is center in Game Units.
-        screen_x, screen_y = self._game.get_interface().game_to_screen(self._x, self._y)
-        
-        # Blit centered
-        rect = rotated_surf.get_rect(center=(screen_x, screen_y))
-        
-        # Blending? GL_MODULATE + GL_BLEND usually means standard alpha blending.
-        # Pygame blit uses alpha by default if source has alpha.
-        # "Modulate" implies multiply color. Smoke is usually grey/white.
-        # If we need additive blending (fire), we'd use special flags. 
-        # But default smoke is usually alpha-over.
-        
-        self._game.get_interface()._window.blit(rotated_surf, rect)
+        alpha = max(0, int(self._fade_away * 255))
+        self.get_graphics().draw_texture_centered(
+            self._texture_id,
+            self._x,
+            self._y,
+            self._size * 2.0,
+            alpha=alpha,
+            rotation=-self._rotate,
+        )
+
+    def get_render_state(self):
+        return EntityRenderState(
+            entity_id=self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            primitives=(
+                TextureCenteredPrimitive(
+                    texture_id=self._texture_id,
+                    x=self._x,
+                    y=self._y,
+                    width=self._size * 2.0,
+                    alpha=max(0, int(self._fade_away * 255)),
+                    rotation=-self._rotate,
+                ),
+            ),
+            metadata={"size": self._size, "fade_away": self._fade_away},
+        )
+
+    def build_network_snapshot(self):
+        return EntitySnapshot(
+            entity_id=-1 if self.get_entity_id() is None else self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            position=self.get_position(),
+            payload={
+                "texture_id": self._texture_id,
+                "rotation": self._rotate,
+                "size": self._size,
+                "fade_away": self._fade_away,
+            },
+        )
 
     def update(self, time):
         self._rotate += time * self._rotation_rate

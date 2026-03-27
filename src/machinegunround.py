@@ -1,6 +1,7 @@
 from .entity import Entity
+from .networkstate import EntitySnapshot
+from .renderprimitives import EntityRenderState, LinePrimitive
 from .soundentity import SoundEntity
-import pygame
 
 class MachineGunRound(Entity):
     def __init__(self, game, player, x_launch, y_launch, x_launch_vel, y_launch_vel, launch_time, damage):
@@ -24,10 +25,34 @@ class MachineGunRound(Entity):
         # Draw as line
         if not self._game.get_interface(): return
         
-        p1 = self._game.get_interface().game_to_screen(self._x_back, self._y_back)
-        p2 = self._game.get_interface().game_to_screen(self._x, self._y)
-        
-        pygame.draw.line(self._game.get_interface()._window, (255, 255, 255), p1, p2)
+        self.get_graphics().draw_world_line((self._x_back, self._y_back), (self._x, self._y), (255, 255, 255))
+
+    def get_render_state(self):
+        return EntityRenderState(
+            entity_id=self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            primitives=(
+                LinePrimitive(
+                    start=(self._x_back, self._y_back),
+                    end=(self._x, self._y),
+                    colour=(255, 255, 255),
+                ),
+            ),
+            metadata={"damage": self._damage, "kill_next_frame": self._kill_next_frame},
+        )
+
+    def build_network_snapshot(self):
+        return EntitySnapshot(
+            entity_id=-1 if self.get_entity_id() is None else self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            position=self.get_position(),
+            payload={
+                "back_position": (self._x_back, self._y_back),
+                "damage": self._damage,
+                "kill_next_frame": self._kill_next_frame,
+                "player_number": getattr(self._player, "_number", None),
+            },
+        )
 
     def update(self, time):
         if self._kill_next_frame:

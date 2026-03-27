@@ -1,8 +1,9 @@
 from .entity import Entity
+from .networkstate import EntitySnapshot
+from .renderprimitives import EntityRenderState, PolygonPrimitive
 from .trail import Trail
 from .common import PI
 import math
-import pygame
 # from .controls import Controls # Removed to fix circular import
 
 class Missile(Entity):
@@ -74,15 +75,6 @@ class Missile(Entity):
         # Tip (0, 0.08), Left (-0.08, -0.16), Right (0.08, -0.16).
         # Center of rotation is (0,0).
         
-        screen_pts = []
-        rad = math.radians(self._angle) # Angle is in degrees? C++ glRotate uses degrees.
-        # math.cos/sin take radians.
-        # Rotation logic: 
-        # C++ glRotate(_angle, 0,0,1). Z-axis rotation. CCW.
-        # NewX = x * cos - y * sin
-        # NewY = x * sin + y * cos
-        
-        import math
         cos_a = math.cos(math.radians(self._angle))
         sin_a = math.sin(math.radians(self._angle))
         
@@ -92,6 +84,7 @@ class Missile(Entity):
             (0.08, -0.16), (0.08, 0.0)
         ]
         
+        world_pts = []
         for rx, ry in raw_verts:
              # Rotate
              tx = rx * cos_a - ry * sin_a
@@ -101,9 +94,46 @@ class Missile(Entity):
              wx = self._x + tx
              wy = self._y + ty
              
-             screen_pts.append(self._game.get_interface().game_to_screen(wx, wy))
-             
-        pygame.draw.polygon(self._game.get_interface()._window, (255, 255, 255), screen_pts)
+             world_pts.append((wx, wy))
+
+        self.get_graphics().draw_world_polygon(world_pts, (255, 255, 255))
+
+    def get_render_state(self):
+        cos_a = math.cos(math.radians(self._angle))
+        sin_a = math.sin(math.radians(self._angle))
+        raw_verts = [
+            (0.0, 0.08),
+            (-0.08, 0.0),
+            (-0.08, -0.16),
+            (0.08, -0.16),
+            (0.08, 0.0),
+        ]
+        world_pts = []
+        for rx, ry in raw_verts:
+            tx = rx * cos_a - ry * sin_a
+            ty = rx * sin_a + ry * cos_a
+            world_pts.append((self._x + tx, self._y + ty))
+
+        return EntityRenderState(
+            entity_id=self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            primitives=(PolygonPrimitive(points=tuple(world_pts), colour=(255, 255, 255)),),
+            metadata={"angle": self._angle, "fuel": self._fuel, "size": self._size, "damage": self._damage},
+        )
+
+    def build_network_snapshot(self):
+        return EntitySnapshot(
+            entity_id=-1 if self.get_entity_id() is None else self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            position=self.get_position(),
+            payload={
+                "angle": self._angle,
+                "fuel": self._fuel,
+                "size": self._size,
+                "damage": self._damage,
+                "player_number": getattr(self._player, "_number", None),
+            },
+        )
 
     def update(self, time):
         old_x = self._x

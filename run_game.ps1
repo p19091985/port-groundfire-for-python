@@ -3,7 +3,7 @@
 Push-Location $PSScriptRoot
 $script:venvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 $script:versionCheck = "import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)"
-$script:runtimeCheck = "import sys, pygame; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)"
+$script:runtimeCheck = "import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)"
 
 function Test-Interpreter {
     param(
@@ -81,9 +81,7 @@ function Ensure-GameEnvironment {
         return $false
     }
 
-    Write-Host "Instalando dependencias..."
-    & $script:venvPython -m pip install --only-binary=pygame -r (Join-Path $PSScriptRoot "requirements.txt")
-    if ($LASTEXITCODE -ne 0) {
+    if (-not (Install-GameRequirements)) {
         return $false
     }
 
@@ -95,12 +93,24 @@ function Ensure-GameEnvironment {
     return $true
 }
 
+function Install-GameRequirements {
+    Write-Host "Instalando dependencias..."
+    & $script:venvPython -m pip install --only-binary=pygame -r (Join-Path $PSScriptRoot "requirements.txt")
+    if ($LASTEXITCODE -eq 0) {
+        return $true
+    }
+
+    Write-Host "Instalacao com wheel precompilado do pygame falhou. Tentando fallback generico..."
+    & $script:venvPython -m pip install -r (Join-Path $PSScriptRoot "requirements.txt")
+    return $LASTEXITCODE -eq 0
+}
+
 if (-not (Ensure-GameEnvironment)) {
     Pop-Location
     exit 1
 }
 
-& $script:venvPython (Join-Path $PSScriptRoot "src\main.py")
+& $script:venvPython (Join-Path $PSScriptRoot "src\main.py") @args
 $exitCode = $LASTEXITCODE
 Pop-Location
 exit $exitCode

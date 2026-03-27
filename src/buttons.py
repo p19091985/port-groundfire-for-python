@@ -35,22 +35,19 @@ class TextButton(Button):
         self._text = text
 
     def draw(self):
-        font = self._menu._game.get_font()
-        
         if self._disabled:
-            font.set_colour(self._disabled_col)
+            colour = self._disabled_col
         elif self._highlighted:
-            font.set_colour(self._selected_col)
+            colour = self._selected_col
         else:
-            font.set_colour(self._normal_col)
-            
-        if not self._disabled:
-            font.set_shadow(True)
-            
-        # size matches original C++: size, size, size-0.1
-        font.set_size(self._size, self._size, self._size - 0.1)
-        font.print_centred_at(self._x, self._y - self._size / 2.0, self._text)
-        font.set_shadow(False)
+            colour = self._normal_col
+
+        self._menu._ui.draw_centered_text(
+            self._x,
+            self._y - self._size / 2.0,
+            self._text,
+            style=self._menu._ui.style(self._size, colour, shadow=not self._disabled),
+        )
 
     def update(self) -> bool:
         if not self._disabled:
@@ -65,9 +62,10 @@ class TextButton(Button):
             
             if (self._y + self._size / 2.0) > my and (self._y - self._size / 2.0) < my:
                 # Check Horizontal
-                font = self._menu._game.get_font()
-                font.set_size(self._size, self._size, self._size - 0.1)
-                length = font.find_string_length(self._text)
+                length = self._menu._ui.measure_text(
+                    self._text,
+                    style=self._menu._ui.style(self._size, self._normal_col),
+                )
                 
                 if (self._x + length / 2.0) > mx and (self._x - length / 2.0) < mx:
                     self._highlighted = True
@@ -146,41 +144,12 @@ class GfxButton(Button):
         # Simplified for now: just draw un-tinted texture if normal, or tinted if highlighted?
         # C++ tints: Yellow if highlighted. White if normal.
         
-        tex = interface.get_texture_image(raw_tex_id)
-        if tex:
-            # Scale
-            # Quad from (x-half, y-half) to (x+half, y+half) (game coords)
-            # Size in game units = self._size
-            # We need to project to screen.
-            
-            p1 = interface.game_to_screen(self._x - self._size/2, self._y + self._size/2) # Top Left
-            p2 = interface.game_to_screen(self._x + self._size/2, self._y - self._size/2) # Bottom Right
-            
-            w = p2[0] - p1[0]
-            h = p2[1] - p1[1]
-            
-            if w > 0 and h > 0:
-                scaled_tex = pygame.transform.scale(tex, (int(w), int(h)))
-                
-                # Tinting: create Surface of color, mult blend
-                if color != (255, 255, 255) or alpha != 255:
-                    tint_surf = pygame.Surface((int(w), int(h)), pygame.SRCALPHA)
-                    r,g,b = color
-                    tint_surf.fill((r, g, b, alpha))
-                    # Basic modulation approximation:
-                    # scaled_tex.blit(tint_surf, (0,0), special_flags=pygame.BLEND_RGBA_MULT)
-                    # But if texture has alpha, we need to respect it.
-                    
-                    # For now just blit texture, then if highlighted draw yellow rect border?
-                    # Or proper tint.
-                    
-                    # A robust way:
-                    # Copy texture
-                    # Fill with color mult
-                    pass 
-                
-                # Handling alpha for disabled
-                if alpha < 255:
-                    scaled_tex.set_alpha(alpha)
-                
-                interface._window.blit(scaled_tex, p1)
+        self._menu._graphics.draw_texture_world_rect(
+            raw_tex_id,
+            self._x - self._size / 2.0,
+            self._y + self._size / 2.0,
+            self._x + self._size / 2.0,
+            self._y - self._size / 2.0,
+            alpha=alpha,
+            tint=color,
+        )

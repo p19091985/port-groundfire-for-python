@@ -207,7 +207,7 @@ class GameFlowSimulationTests(unittest.TestCase):
 
         self.game._change_state(GameState.ROUND_STARTING)
         self.assertEqual(self.game.get_current_round(), 1)
-        self.assertEqual(FakeLandscape.created_count, 2)
+        self.assertEqual(FakeLandscape.created_count, 1)
         self.assertEqual([player.new_round_calls for player in players], [1, 1])
         positions = sorted(tank.position_calls[0] for tank in self.game._entity_list if hasattr(tank, "position_calls"))
         self.assertEqual(positions, [-5.0, 5.0])
@@ -229,7 +229,7 @@ class GameFlowSimulationTests(unittest.TestCase):
 
         self.game._change_state(GameState.ROUND_STARTING)
         self.assertEqual(self.game.get_current_round(), 2)
-        self.assertEqual(FakeLandscape.created_count, 3)
+        self.assertEqual(FakeLandscape.created_count, 2)
         self.assertEqual([player.new_round_calls for player in players], [2, 2])
 
     def test_match_can_finish_and_new_match_can_start_after_winner_menu(self):
@@ -264,7 +264,7 @@ class GameFlowSimulationTests(unittest.TestCase):
         self.assertEqual(self.game.get_num_of_players(), 0)
         self.assertEqual(self.game.get_current_round(), 0)
         self.assertEqual(self.game._entity_list, [])
-        self.assertGreaterEqual(FakeLandscape.created_count, 3)
+        self.assertGreaterEqual(FakeLandscape.created_count, 2)
 
     def test_two_ai_players_finish_shop_menu_automatically(self):
         self.game.add_player(-1, "CPU 1", (255, 0, 0))

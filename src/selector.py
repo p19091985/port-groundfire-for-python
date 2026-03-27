@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING, List
-import pygame
 
 if TYPE_CHECKING:
     from .menu import Menu
@@ -93,19 +92,15 @@ class Selector:
         self._draw_arrow(self._x + self._width/2.0, self._y, False, self._highlighted == 2)
         
         if not self._disabled and self._options:
-             font = self._menu._game.get_font()
-             font.set_shadow(True)
-             font.set_colour(self._normal_col)
-             font.set_size(self._size, self._size, self._size - 0.1)
-             
              if 0 <= self._current_option < len(self._options):
-                 font.print_centred_at(self._x, self._y - self._size/2.0, self._options[self._current_option])
-             
-             font.set_shadow(False)
+                 self._menu._ui.draw_centered_text(
+                     self._x,
+                     self._y - self._size/2.0,
+                     self._options[self._current_option],
+                     style=self._menu._ui.style(self._size, self._normal_col, shadow=True),
+                 )
 
     def _draw_arrow(self, x, y, direction_left, highlighted):
-        interface = self._menu._game.get_interface()
-        
         color = self._normal_col
         alpha = 255
         
@@ -128,22 +123,6 @@ class Selector:
             points.append((x + self._size, y))
             points.append((x, y + self._size/2.0))
             points.append((x, y - self._size/2.0))
-            
-        screen_points = [interface.game_to_screen(px, py) for px, py in points]
-        
-        # Draw with alpha if needed (Pygame needs surface for alpha shapes usually)
-        if alpha < 255:
-            # Bounding box
-            xs = [p[0] for p in screen_points]
-            ys = [p[1] for p in screen_points]
-            min_x, max_x = min(xs), max(xs)
-            min_y, max_y = min(ys), max(ys)
-            w, h = max_x - min_x, max_y - min_y
-            
-            if w > 0 and h > 0:
-                s = pygame.Surface((w, h), pygame.SRCALPHA)
-                local_pts = [(p[0] - min_x, p[1] - min_y) for p in screen_points]
-                pygame.draw.polygon(s, color + (alpha,), local_pts)
-                interface._window.blit(s, (min_x, min_y))
-        else:
-            pygame.draw.polygon(interface._window, color, screen_points)
+
+        colour = color if alpha == 255 else color + (alpha,)
+        self._menu._graphics.draw_world_polygon(points, colour)

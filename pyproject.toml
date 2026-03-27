@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "groundfire"
+version = "0.25.0"
+description = "Preservation-focused Python/Pygame port of Groundfire v0.25."
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "pygame==2.6.1",
+    "msgpack==1.1.2",
+    "mpgameserver==0.2.4",
+]
+
+[project.scripts]
+groundfire = "groundfire.client:main"
+groundfire-server = "groundfire.server:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["groundfire*", "src*"]
+exclude = ["tests*", "groundfire-0.25*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E741"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = false
+check_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

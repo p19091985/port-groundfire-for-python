@@ -1,11 +1,12 @@
 from .entity import Entity
 from .common import PI, deg_sin, deg_cos
+from .networkstate import EntitySnapshot
+from .renderprimitives import EntityRenderState, PolygonPrimitive, RectPrimitive
 from .soundentity import SoundEntity
 from .smoke import Smoke
 from .weapons_impl import ShellWeapon, MachineGunWeapon, MirvWeapon, MissileWeapon, NukeWeapon
 from .inifile import ReadIniFile
 import math
-import pygame
 
 class Tank(Entity):
     # Enums
@@ -96,6 +97,7 @@ class Tank(Entity):
             return
 
         interface = self._game.get_interface()
+        graphics = self.get_graphics()
         
         def transform_point(lx, ly, tx, ty, angle_deg):
             rad = math.radians(angle_deg)
@@ -112,8 +114,6 @@ class Tank(Entity):
         points.append(transform_point((self._tank_size/2.0), self._tank_size, self._x, self._y, self._tank_angle))
         points.append(transform_point(self._tank_size, 0.0, self._x, self._y, self._tank_angle))
         
-        screen_points = [interface.game_to_screen(p[0], p[1]) for p in points]
-        
         if self._player:
             self._colour = self._player._colour
         
@@ -122,7 +122,7 @@ class Tank(Entity):
              # Draw with texture/damage logic if needed (placeholder)
              pass
         
-        pygame.draw.polygon(interface._window, color, screen_points)
+        graphics.draw_world_polygon(points, color)
         
         if self._state == Tank.TANK_ALIVE:
              # Calculate Visual Center at actual position (matches C++)
@@ -138,12 +138,11 @@ class Tank(Entity):
              s_pts.append((0.1, arrow_length))
              s_pts.append((0.1, self._tank_size * 1.5))
              
-             screen_s_pts = []
+             shaft_points = []
              for lx, ly in s_pts:
-                 wx, wy = transform_point(lx, ly, cx, cy, self._gun_angle)
-                 screen_s_pts.append(interface.game_to_screen(wx, wy))
+                 shaft_points.append(transform_point(lx, ly, cx, cy, self._gun_angle))
              
-             self._draw_transparent_poly(screen_s_pts, arrow_color)
+             graphics.draw_world_polygon(shaft_points, arrow_color)
                  
              # Head
              h_pts = []
@@ -151,12 +150,11 @@ class Tank(Entity):
              h_pts.append((0.0, arrow_length + (arrow_length / 4.0)))
              h_pts.append((0.2, arrow_length))
              
-             screen_h_pts = []
+             head_points = []
              for lx, ly in h_pts:
-                  wx, wy = transform_point(lx, ly, cx, cy, self._gun_angle)
-                  screen_h_pts.append(interface.game_to_screen(wx, wy))
+                  head_points.append(transform_point(lx, ly, cx, cy, self._gun_angle))
                   
-             self._draw_transparent_poly(screen_h_pts, arrow_color)
+             graphics.draw_world_polygon(head_points, arrow_color)
              
              # Stats Panel
              start_of_bar = -10.0 + (2.5 * self._stats_position) + 0.1
@@ -167,8 +165,7 @@ class Tank(Entity):
                  (start_of_bar + 2.3, 6.6),
                  (start_of_bar, 6.6)
              ]
-             screen_panel = [interface.game_to_screen(px, py) for px, py in panel_rect]
-             self._draw_transparent_poly(screen_panel, (128, 230, 153, 76)) 
+             graphics.draw_world_polygon(panel_rect, (128, 230, 153, 76)) 
              
              # Energy Bar
              start_bar_x = start_of_bar + 0.1
@@ -178,13 +175,8 @@ class Tank(Entity):
              hg = min(255, int((0.5 + (self._health / 200.0)) * 255))
              hb = 128
              
-             p1 = interface.game_to_screen(start_bar_x, 7.4)
-             p2 = interface.game_to_screen(end_bar_x, 7.3)
-             
-             rect_w = p2[0] - p1[0]
-             rect_h = p2[1] - p1[1]
-             if rect_w > 0:
-                 pygame.draw.rect(interface._window, (hr, hg, hb), (p1[0], p1[1], rect_w, rect_h))
+             if end_bar_x > start_bar_x:
+                 graphics.draw_world_rect(start_bar_x, 7.4, end_bar_x, 7.3, (hr, hg, hb))
                  
              # Fuel Bar
              end_fuel_x = start_bar_x + 2.1 * self._fuel
@@ -193,13 +185,8 @@ class Tank(Entity):
              fg = 128
              fb = min(255, int((0.5 + (self._fuel * 0.5)) * 255))
              
-             p3 = interface.game_to_screen(start_bar_x, 7.2)
-             p4 = interface.game_to_screen(end_fuel_x, 7.1)
-             
-             fw = p4[0] - p3[0]
-             fh = p4[1] - p3[1]
-             if fw > 0:
-                  pygame.draw.rect(interface._window, (fr, fg, fb), (p3[0], p3[1], fw, fh))
+             if end_fuel_x > start_bar_x:
+                  graphics.draw_world_rect(start_bar_x, 7.2, end_fuel_x, 7.1, (fr, fg, fb))
                   
              # Small tank icon
              t_pts = [
@@ -208,25 +195,125 @@ class Tank(Entity):
                  (start_of_bar + 0.60, 6.7),
                  (start_of_bar + 0.45, 7.0)
              ]
-             screen_t = [interface.game_to_screen(tx, ty) for tx, ty in t_pts]
-             pygame.draw.polygon(interface._window, self._colour, screen_t)
+             graphics.draw_world_polygon(t_pts, self._colour)
              
              self._weapons[self._selected_weapon].draw_graphic(start_of_bar + 0.7)
 
+    def get_render_state(self):
+        if self._player:
+            self._colour = self._player._colour
 
-    def _draw_transparent_poly(self, points, color):
-        if not points: return
-        xs = [p[0] for p in points]
-        ys = [p[1] for p in points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        w, h = max_x - min_x, max_y - min_y
-        if w == 0 or h == 0: return
-        
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        local_points = [(p[0] - min_x, p[1] - min_y) for p in points]
-        pygame.draw.polygon(s, color, local_points)
-        self._game.get_interface()._window.blit(s, (min_x, min_y))
+        primitives = [
+            PolygonPrimitive(points=tuple(self._build_body_points()), colour=self._colour),
+        ]
+
+        if self._state == Tank.TANK_ALIVE:
+            primitives.extend(self._build_gun_primitives())
+            primitives.extend(self._build_hud_primitives())
+
+        return EntityRenderState(
+            entity_id=self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            primitives=tuple(primitives),
+            metadata={
+                "state": self._state,
+                "health": self._health,
+                "fuel": self._fuel,
+                "selected_weapon": self._selected_weapon,
+            },
+        )
+
+    def build_network_snapshot(self):
+        return EntitySnapshot(
+            entity_id=-1 if self.get_entity_id() is None else self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            position=self.get_position(),
+            payload={
+                "state": self._state,
+                "health": self._health,
+                "fuel": self._fuel,
+                "gun_angle": self._gun_angle,
+                "gun_power": self._gun_power,
+                "tank_angle": self._tank_angle,
+                "player_number": getattr(self._player, "_number", None),
+            },
+        )
+
+    def _build_body_points(self):
+        return [
+            self._transform_point(-self._tank_size, 0.0, self._x, self._y, self._tank_angle),
+            self._transform_point(-(self._tank_size / 2.0), self._tank_size, self._x, self._y, self._tank_angle),
+            self._transform_point((self._tank_size / 2.0), self._tank_size, self._x, self._y, self._tank_angle),
+            self._transform_point(self._tank_size, 0.0, self._x, self._y, self._tank_angle),
+        ]
+
+    def _build_gun_primitives(self):
+        cx, cy, _ = self.get_centre()
+        arrow_length = (self._gun_power / 8.0) + (self._tank_size * 2)
+        arrow_color = (0, 255, 0, 128) if self._weapons[self._selected_weapon].ready_to_fire() else (255, 0, 0, 128)
+
+        shaft_points = [
+            self._transform_point(lx, ly, cx, cy, self._gun_angle)
+            for lx, ly in [(-0.1, self._tank_size * 1.5), (-0.1, arrow_length), (0.1, arrow_length), (0.1, self._tank_size * 1.5)]
+        ]
+        head_points = [
+            self._transform_point(lx, ly, cx, cy, self._gun_angle)
+            for lx, ly in [(-0.2, arrow_length), (0.0, arrow_length + (arrow_length / 4.0)), (0.2, arrow_length)]
+        ]
+
+        return [
+            PolygonPrimitive(points=tuple(shaft_points), colour=arrow_color),
+            PolygonPrimitive(points=tuple(head_points), colour=arrow_color),
+        ]
+
+    def _build_hud_primitives(self):
+        start_of_bar = -10.0 + (2.5 * self._stats_position) + 0.1
+        start_bar_x = start_of_bar + 0.1
+        end_bar_x = start_bar_x + 2.1 * (self._health / 100.0)
+        end_fuel_x = start_bar_x + 2.1 * self._fuel
+
+        hr = min(255, int((1.0 - (self._health / 200.0)) * 255))
+        hg = min(255, int((0.5 + (self._health / 200.0)) * 255))
+        fr = min(255, int((0.5 - (self._fuel * 0.5)) * 255))
+        fb = min(255, int((0.5 + (self._fuel * 0.5)) * 255))
+
+        primitives = [
+            PolygonPrimitive(
+                points=(
+                    (start_of_bar, 7.4),
+                    (start_of_bar + 2.3, 7.4),
+                    (start_of_bar + 2.3, 6.6),
+                    (start_of_bar, 6.6),
+                ),
+                colour=(128, 230, 153, 76),
+            ),
+            PolygonPrimitive(
+                points=(
+                    (start_of_bar + 0.15, 7.0),
+                    (start_of_bar + 0.00, 6.7),
+                    (start_of_bar + 0.60, 6.7),
+                    (start_of_bar + 0.45, 7.0),
+                ),
+                colour=self._colour,
+            ),
+        ]
+
+        if end_bar_x > start_bar_x:
+            primitives.append(RectPrimitive(start_bar_x, 7.4, end_bar_x, 7.3, (hr, hg, 128)))
+
+        if end_fuel_x > start_bar_x:
+            primitives.append(RectPrimitive(start_bar_x, 7.2, end_fuel_x, 7.1, (fr, 128, fb)))
+
+        primitives.extend(self._weapons[self._selected_weapon].get_graphic_primitives(start_of_bar + 0.7))
+        return primitives
+
+    def _transform_point(self, lx, ly, tx, ty, angle_deg):
+        rad = math.radians(angle_deg)
+        c = math.cos(rad)
+        s = math.sin(rad)
+        rx = lx * c - ly * s
+        ry = lx * s + ly * c
+        return tx + rx, ty + ry
 
 
     def update(self, time):
@@ -483,8 +570,15 @@ class Tank(Entity):
         else:
             self._exhaust_time -= time
 
-    def set_colour(self, c): self._colour = c
-    def get_colour(self): return self._colour
+    def set_colour(self, c):
+        self._colour = c
+        if self._player and hasattr(self._player, "_colour"):
+            self._player._colour = c
+
+    def get_colour(self):
+        if self._player and hasattr(self._player, "_colour"):
+            self._colour = self._player._colour
+        return self._colour
     def get_player(self): return self._player
     def get_centre(self):
         angle_rads = (self._tank_angle / 180.0) * PI

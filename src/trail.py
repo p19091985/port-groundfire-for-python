@@ -1,7 +1,8 @@
 from .entity import Entity
+from .networkstate import EntitySnapshot
 import math
-import pygame
 from .common import sqr, PI # Assuming common defines these
+from .renderprimitives import EntityRenderState, TextureCenteredPrimitive
 
 class Segment:
     def __init__(self, x, y, fade_away, length, angle):
@@ -51,57 +52,49 @@ class Trail(Entity):
         for seg in self._trail_segment_list:
             total_h = 0.4 + seg.length
             
-            w_px = self._game.get_interface().scale_len(width_units)
-            h_px = self._game.get_interface().scale_len(total_h)
-            
-            if w_px <= 0 or h_px <= 0: continue
-            
-            # Scale
-            scaled = pygame.transform.scale(tex, (w_px, h_px))
-            
-            # Rotate
-            rotated = pygame.transform.rotate(scaled, -seg.angle)
-            
-            # Alpha
-            alpha = int(seg.fade_away * 255)
-            if alpha < 0: alpha = 0
-            rotated.set_alpha(alpha)
-            
-            # Position
-            # Segment x,y is center of rotation?
-            # C++: glTranslatef (seg->x, seg->y, -6.0f); glRotatef...
-            # The verts are relative to (0,0). (0,0) is roughly top-center of the quad?
-            # Top Y is 0.2. Bottom Y is -0.2-len.
-            # Center of the quad logic is: Ymid = (0.2 + (-0.2 - len))/2 = -len/2.
-            # So the visual Quad is shifted down by len/2 relative to seg->x,y.
-            
-            # Correct Pygame rotation center logic:
-            # We must map (0, -len/2) rotated by angle to screen, then blit center.
-            
-            # Let's simplify: map seg.x, seg.y to screen.
-            sx, sy = self._game.get_interface().game_to_screen(seg.x, seg.y)
-            
-            # But the pivot point in C++ glRotate is (0,0,0).
-            # The quad is drawn relative to that pivot.
-            # Since the quad verts are not centered on 0,0, rotation swings it.
-            # Center of Quad geometry: X=0, Y=-len/2.
-            # So it pivots around a point 0.2 units below its top edge ??
-            
-            # Actually easier:
-            # Just rotate the surface. The center of the Pygame surface corresponds to the center of the image.
-            # We need to align the "pivot" (0,0 in local coords) with (seg.x, seg.y) on screen.
-            # In local coords, (0,0) is... where?
-            # Verts Y range: [0.2, -0.2-len].
-            # 0.0 is inside this range.
-            # 0.0 is 0.2 units from the top edge. 
-            # Total height H = 0.4+len.
-            # 0.0 is at (0.2 / H) fraction from top.
-            
-            # This is complex in Pygame without vector math.
-            # Using simple center blit for now might look slightly off but acceptable.
-            
-            rect = rotated.get_rect(center=(sx, sy))
-            self._game.get_interface()._window.blit(rotated, rect)
+            alpha = max(0, int(seg.fade_away * 255))
+            self.get_graphics().draw_texture_centered(
+                1,
+                seg.x,
+                seg.y,
+                width_units,
+                total_h,
+                alpha=alpha,
+                rotation=-seg.angle,
+            )
+
+    def get_render_state(self):
+        primitives = []
+        for seg in self._trail_segment_list:
+            primitives.append(
+                TextureCenteredPrimitive(
+                    texture_id=1,
+                    x=seg.x,
+                    y=seg.y,
+                    width=0.2,
+                    height=0.4 + seg.length,
+                    alpha=max(0, int(seg.fade_away * 255)),
+                    rotation=-seg.angle,
+                )
+            )
+
+        return EntityRenderState(
+            entity_id=self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            primitives=tuple(primitives),
+            metadata={"active": self._active, "segment_count": len(self._trail_segment_list)},
+        )
+
+    def build_network_snapshot(self):
+        return EntitySnapshot(
+            entity_id=-1 if self.get_entity_id() is None else self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            position=(self._last_x, self._last_y),
+            payload={
+                "active": self._active,
+                "segment_count": len(self._trail_segment_list),
+            },
+        )
 
     def update(self, time):
         # Filter list in place

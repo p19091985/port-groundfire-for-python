@@ -5,7 +5,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$SCRIPT_DIR
 VENV_PYTHON="$PROJECT_DIR/.venv/bin/python"
 VERSION_CHECK='import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
-RUNTIME_CHECK='import sys, pygame; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
+RUNTIME_CHECK='import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
 
 test_interpreter() {
     interpreter=$1
@@ -57,8 +57,7 @@ ensure_venv() {
     echo "Atualizando pip..."
     "$VENV_PYTHON" -m pip install --upgrade pip
 
-    echo "Instalando dependencias..."
-    "$VENV_PYTHON" -m pip install -r "$PROJECT_DIR/requirements.txt"
+    install_requirements
 
     if [ ! -x "$VENV_PYTHON" ] || ! test_interpreter "$VENV_PYTHON" "$RUNTIME_CHECK"; then
         echo "Falha: o ambiente virtual nao foi criado corretamente." >&2
@@ -66,5 +65,15 @@ ensure_venv() {
     fi
 }
 
+install_requirements() {
+    echo "Instalando dependencias..."
+    if "$VENV_PYTHON" -m pip install --only-binary=pygame -r "$PROJECT_DIR/requirements.txt"; then
+        return 0
+    fi
+
+    echo "Instalacao com wheel precompilado do pygame falhou. Tentando fallback generico..."
+    "$VENV_PYTHON" -m pip install -r "$PROJECT_DIR/requirements.txt"
+}
+
 ensure_venv
-exec "$VENV_PYTHON" "$PROJECT_DIR/src/main.py"
+exec "$VENV_PYTHON" "$PROJECT_DIR/src/main.py" "$@"

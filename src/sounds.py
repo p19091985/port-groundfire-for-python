@@ -1,16 +1,19 @@
-import pygame
-from .report import report, debug
+from .pygamebackend import PygameBackend
+from .report import debug, report
+
 
 class SoundError(Exception):
     pass
 
 class Sound:
-    def __init__(self, num_of_sounds):
+    def __init__(self, num_of_sounds, *, pygame_module=None):
+        self._backend = PygameBackend.create(pygame_module)
+        self._pygame = self._backend.pygame
         try:
-            pygame.mixer.init()
+            self._pygame.mixer.init()
             # Reserve enough channels
-            pygame.mixer.set_num_channels(32)
-        except pygame.error as e:
+            self._pygame.mixer.set_num_channels(32)
+        except self._pygame.error as e:
             report(f"ERROR: Could not initialise sound: {e}")
             raise SoundError()
 
@@ -19,14 +22,15 @@ class Sound:
         self._active_sources = []
 
     def __del__(self):
-        pygame.mixer.quit()
+        if hasattr(self, "_pygame"):
+            self._pygame.mixer.quit()
 
     def load_sound(self, buffer_num, file_name):
-        if not pygame.mixer.get_init():
+        if not self._pygame.mixer.get_init():
             return
 
         try:
-            sound = pygame.mixer.Sound(file_name)
+            sound = self._pygame.mixer.Sound(file_name)
             self._buffers[buffer_num] = sound
         except Exception:
              debug(f"WARNING: Could not load sound file : '{file_name}'")
@@ -76,10 +80,10 @@ class Sound:
         
         def __del__(self):
             if self._channel:
-                 try:
-                     self._channel.stop()
-                 except:
-                     pass
+                try:
+                    self._channel.stop()
+                except Exception:
+                    pass
 
         def is_source_playing(self):
             if self._channel:

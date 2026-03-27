@@ -55,18 +55,13 @@ class WinnerMenu(Menu):
         
     def draw(self):
         self.draw_background()
-        
-        font = self._game.get_font()
-        font.set_size(0.6, 0.6, 0.5)
-        font.set_colour((1.0, 1.0, 1.0))
-        font.set_shadow(True)
-        
-        font.print_centred_at(0.0, 6.5, "Final Result")
-        
+        title_style = self._ui.style(0.6, (1.0, 1.0, 1.0), shadow=True)
+        self._ui.draw_centered_text(0.0, 6.5, "Final Result", style=title_style)
+
         if self._is_draw:
-            font.print_centred_at(0.0, 5.5, "It's a tie!")
+            self._ui.draw_centered_text(0.0, 5.5, "It's a tie!", style=title_style)
         else:
-            font.print_centred_at(0.0, 5.5, "We have a winner!")
+            self._ui.draw_centered_text(0.0, 5.5, "We have a winner!", style=title_style)
             
         num_winners = len(self._winners)
         
@@ -88,24 +83,15 @@ class WinnerMenu(Menu):
             y = (cols_count * 2.0) - col * 4.0
             
             t_pts = [(x - 1.5, y - 0.75), (x - 0.75, y + 0.75), (x + 0.75, y + 0.75), (x + 1.5, y - 0.75)]
-            pygame.draw.polygon(interface._window, (r, g, b), [interface.game_to_screen(px, py) for px, py in t_pts])
+            self.draw_game_polygon(t_pts, (r, g, b))
             
-            font.set_size(0.4, 0.4, 0.35)
-            font.set_colour((1.0, 1.0, 1.0))
-            font.print_centred_at(x, y - 1.2, self._winners[i].get_name())
-            
-            font.set_size(0.6, 0.6, 0.5)
-            font.set_colour((1.0, 1.0, 1.0))
-            font.set_proportional(False)
+            self._ui.draw_centered_text(x, y - 1.2, self._winners[i].get_name(), style=self._ui.style(0.4, (1.0, 1.0, 1.0), spacing=0.35, shadow=True))
             
             txt = "Winner!"
             base_angle = self._spinning
             for char_idx, char in enumerate(txt):
                 angle = base_angle - (char_idx * 0.2)
                 self._draw_spinning_letter(x, y - 0.4, angle, char)
-                
-            font.set_orientation(0.0)
-            font.set_proportional(True)
             
             row += 1
             if row > 3:
@@ -114,13 +100,9 @@ class WinnerMenu(Menu):
                 rem = num_winners - (col * 4)
                 w_in_row = rem if rem < 5 else 4
                 col_start = -((w_in_row - 1) * 2.0)
-                
-        font.set_shadow(False)
 
     def _draw_spinning_letter(self, cx, cy, angle, char):
-        font = self._game.get_font()
         deg = (angle / PI) * 180.0 - 90.0
-        font.set_orientation(deg)
         px = cx + math.cos(angle) * 1.8
         py = cy + math.sin(angle) * 1.8
-        font.print_at(px, py, char)
+        self._ui.draw_text(px, py, char, style=self._ui.style(0.6, (1.0, 1.0, 1.0), shadow=True, proportional=False, orientation=deg))

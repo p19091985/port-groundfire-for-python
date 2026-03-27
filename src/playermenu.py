@@ -187,18 +187,15 @@ class PlayerMenu(Menu):
 
     def draw(self):
         self.draw_background()
-        
-        font = self._game.get_font()
-        font.set_shadow(True)
-        font.set_size(0.6, 0.6, 0.5)
-        font.set_colour((1.0, 1.0, 1.0))
-        font.print_centred_at(0.0, 6.5, "Select Players")
-        
-        font.set_size(0.4, 0.4, 0.35)
-        font.print_centred_at(0.0, 5.5, "Add a player by clicking on a '+' icon or press the 'Fire' Button on any Controller")
-        
+        self._ui.draw_centered_text(0.0, 6.5, "Select Players", style=self._ui.style(0.6, (1.0, 1.0, 1.0), shadow=True))
+        self._ui.draw_centered_text(
+            0.0,
+            5.5,
+            "Add a player by clicking on a '+' icon or press the 'Fire' Button on any Controller",
+            style=self._ui.style(0.4, (1.0, 1.0, 1.0), spacing=0.35, shadow=True),
+        )
+
         interface = self._game.get_interface()
-        
         poly_list = [
             ([(-7.0, -6.6), (7.0, -6.6), (7.0, -3.4), (-7.0, -3.4)], (0, 0, 0, 128)),
             ([(-4.0, -4.4), (4.0, -4.4), (4.0, -3.6), (-4.0, -3.6)], (153, 76, 0, 128)),
@@ -208,13 +205,12 @@ class PlayerMenu(Menu):
         ]
         
         for pts, col in poly_list:
-            sc_pts = [interface.game_to_screen(x,y) for x,y in pts]
-            self._draw_transparent_poly(sc_pts, col)
+            self.draw_game_polygon(pts, col)
             
         for i in range(8):
             if self._players[i].enabled:
                 row_pts = [(-8.8, 3.2 - i*0.8), (8.8, 3.2 - i*0.8), (8.8, 3.8 - i*0.8), (-8.8, 3.8 - i*0.8)]
-                self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in row_pts], (153, 76, 0, 128))
+                self.draw_game_polygon(row_pts, (153, 76, 0, 128))
                 
                 c = self._players[i].colour
             else:
@@ -228,48 +224,27 @@ class PlayerMenu(Menu):
                (-7.2, 3.3 - i*0.8)
             ]
             
-            sc_t_pts = [interface.game_to_screen(x,y) for x,y in t_pts]
-            pygame.draw.polygon(interface._window, c, sc_t_pts)
+            self.draw_game_polygon(t_pts, c)
             
-        font.set_size(0.5, 0.5, 0.4)
-        font.set_colour((1.0, 1.0, 1.0))
+        name_style = self._ui.style(0.5, (1.0, 1.0, 1.0), spacing=0.4)
         for i in range(8):
             if self._players[i].enabled:
-                 font.print_at(-6.0, 3.3 - i*0.8, self._players[i].name)
+                 self._ui.draw_text(-6.0, 3.3 - i*0.8, self._players[i].name, style=name_style)
                  
-        font.set_size(0.3, 0.3, 0.25)
-        font.set_colour((0.0, 1.0, 1.0))
-        font.print_centred_at(-8.0, 4.3, "Add/Remove")
-        font.print_centred_at(-8.0, 4.0, "Player")
-        font.print_centred_at(-4.0, 4.1, "Name")
-        font.print_centred_at(1.6, 4.1, "Controlled by")
-        font.print_centred_at(6.3, 4.1, "Controller")
-        
-        font.set_size(0.7, 0.7, 0.6)
-        font.set_colour((1.0, 1.0, 1.0))
-        font.print_centred_at(-2.0, -4.35, "Rounds :")
-        font.set_shadow(False)
+        header_style = self._ui.style(0.3, (0.0, 1.0, 1.0), spacing=0.25)
+        self._ui.draw_centered_text(-8.0, 4.3, "Add/Remove", style=header_style)
+        self._ui.draw_centered_text(-8.0, 4.0, "Player", style=header_style)
+        self._ui.draw_centered_text(-4.0, 4.1, "Name", style=header_style)
+        self._ui.draw_centered_text(1.6, 4.1, "Controlled by", style=header_style)
+        self._ui.draw_centered_text(6.3, 4.1, "Controller", style=header_style)
+        self._ui.draw_centered_text(-2.0, -4.35, "Rounds :", style=self._ui.style(0.7, (1.0, 1.0, 1.0), spacing=0.6, shadow=True))
         
         for i in range(8):
             self._players[i].add_button.draw()
             self._players[i].remove_button.draw()
             self._players[i].human_ai_selector.draw()
             self._players[i].controller.draw()
-            
+        
         self._number_of_rounds.draw()
         self._start_button.draw()
         self._back_button.draw()
-
-    def _draw_transparent_poly(self, points, color):
-        if not points: return
-        xs = [p[0] for p in points]
-        ys = [p[1] for p in points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        w, h = max_x - min_x, max_y - min_y
-        if w < 1 or h < 1: return
-        
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
-        local_points = [(p[0] - min_x, p[1] - min_y) for p in points]
-        pygame.draw.polygon(s, color, local_points)
-        self._game.get_interface()._window.blit(s, (min_x, min_y))

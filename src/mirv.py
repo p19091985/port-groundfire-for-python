@@ -1,4 +1,6 @@
 from .entity import Entity
+from .networkstate import EntitySnapshot
+from .renderprimitives import EntityRenderState, PolygonPrimitive
 from .trail import Trail
 from .shell import Shell
 from .inifile import ReadIniFile
@@ -39,12 +41,44 @@ class Mirv(Entity):
         # Draw as tiny triangle (same as Shell)
         if not self._game.get_interface(): return
         
-        p1 = self._game.get_interface().game_to_screen(self._x + 0.00, self._y + 0.018)
-        p2 = self._game.get_interface().game_to_screen(self._x + 0.03, self._y - 0.018)
-        p3 = self._game.get_interface().game_to_screen(self._x - 0.03, self._y - 0.018)
-        
-        import pygame
-        pygame.draw.polygon(self._game.get_interface()._window, (255, 255, 255), [p1, p2, p3])
+        self.get_graphics().draw_world_polygon(
+            [
+                (self._x + 0.00, self._y + 0.018),
+                (self._x + 0.03, self._y - 0.018),
+                (self._x - 0.03, self._y - 0.018),
+            ],
+            (255, 255, 255),
+        )
+
+    def get_render_state(self):
+        return EntityRenderState(
+            entity_id=self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            primitives=(
+                PolygonPrimitive(
+                    points=(
+                        (self._x + 0.00, self._y + 0.018),
+                        (self._x + 0.03, self._y - 0.018),
+                        (self._x - 0.03, self._y - 0.018),
+                    ),
+                    colour=(255, 255, 255),
+                ),
+            ),
+            metadata={"size": self._size, "damage": self._damage, "apex_time": self._apex_time},
+        )
+
+    def build_network_snapshot(self):
+        return EntitySnapshot(
+            entity_id=-1 if self.get_entity_id() is None else self.get_entity_id(),
+            entity_type=self.get_entity_type(),
+            position=self.get_position(),
+            payload={
+                "size": self._size,
+                "damage": self._damage,
+                "fragments": Mirv.OPTION_Fragments,
+                "player_number": getattr(self._player, "_number", None),
+            },
+        )
 
     def update(self, time):
         old_x = self._x
