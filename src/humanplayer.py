@@ -1,5 +1,5 @@
 from .player import Player
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from .game import Game
@@ -14,8 +14,13 @@ class HumanPlayer(Player):
     def get_controller(self) -> int:
         return self._controller
 
-    def get_command(self, command: int, start_time_ref: List[float]) -> bool:
-        if start_time_ref and len(start_time_ref) > 0:
+    def get_command(self, command: int, start_time_ref: Optional[List[float]] = None) -> bool:
+        if isinstance(start_time_ref, list) and start_time_ref:
             start_time_ref[0] = 0.0
-            
-        return self._controls.get_command(self._controller, command)
+
+        return self._game.get_network_session().get_command(
+            self._number,
+            self._controller,
+            command,
+            self._controls,
+        )

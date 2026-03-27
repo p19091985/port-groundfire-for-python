@@ -103,6 +103,27 @@ The launcher scripts are the easiest way to run the game. If the project is not 
   </tr>
 </table>
 
+### Dedicated Server Preview
+
+The standalone dedicated server preview can be opened with:
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <strong>Windows CMD</strong>
+      <pre lang="bat">run_server.bat</pre>
+    </td>
+    <td width="33%" valign="top">
+      <strong>Windows PowerShell</strong>
+      <pre lang="powershell">./run_server.ps1</pre>
+    </td>
+    <td width="33%" valign="top">
+      <strong>Linux / macOS / WSL</strong>
+      <pre lang="sh">./run_server.sh</pre>
+    </td>
+  </tr>
+</table>
+
 ## Manual Setup
 
 If you prefer to manage the environment yourself:
@@ -194,6 +215,7 @@ This is still an active port, not a final release.
 ```text
 port-groundfire-for-python/
 |-- src/                 Python port source code
+|-- interface_net/       Camada central para integracao de jogo em rede
 |-- data/                Textures, sounds, and other assets
 |-- conf/                Game options and control mappings
 |-- tests/               Automated regression and fidelity tests

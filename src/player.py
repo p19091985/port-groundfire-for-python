@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 from .tank import Tank
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ class Player:
     def get_controller(self) -> int:
         return -1
         
-    def get_command(self, command: int, start_time_ref: List[float]) -> bool:
+    def get_command(self, command: int, start_time_ref: Optional[List[float]] = None) -> bool:
         return False
 
     def record_shot(self, x: float, y: float, hit_tank: int):

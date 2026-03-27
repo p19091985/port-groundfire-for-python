@@ -11,15 +11,19 @@ class MainMenu(Menu):
     def __init__(self, game: 'Game'):
         super().__init__(game)
         
-        self._start_button = TextButton(self, 0.0, -4.0, 0.7, "Start Game")
-        self._options_button = TextButton(self, 0.0, -5.0, 0.7, "Options")
-        self._quit_button = TextButton(self, 0.0, -6.0, 0.7, "Quit")
+        self._start_button = TextButton(self, 0.0, -3.8, 0.7, "Start Game")
+        self._find_servers_button = TextButton(self, 0.0, -4.8, 0.7, "Find Servers")
+        self._options_button = TextButton(self, 0.0, -5.8, 0.7, "Options")
+        self._quit_button = TextButton(self, 0.0, -6.8, 0.7, "Quit")
 
     def update(self, time: float) -> int:
         self.update_background(time)
         
         if self._start_button.update():
             return GameState.SELECT_PLAYERS_MENU
+
+        if self._find_servers_button.update():
+            return GameState.FIND_SERVERS_MENU
         
         if self._options_button.update():
             return GameState.OPTION_MENU
@@ -47,24 +51,27 @@ class MainMenu(Menu):
                 interface._window.blit(scaled_logo, p1)
         
         box_pts = [
-            (-7.0, -6.6),
-            ( 7.0, -6.6),
-            ( 7.0, -3.4),
-            (-7.0, -3.4)
+            (-7.0, -7.4),
+            ( 7.0, -7.4),
+            ( 7.0, -3.2),
+            (-7.0, -3.2)
         ]
         screen_box = [interface.game_to_screen(x, y) for x, y in box_pts]
         self._draw_transparent_poly(screen_box, (0, 0, 0, 128))
         
         btn_bg_color = (153, 76, 0, 255)
         
-        b1_pts = [(-4.0, -4.4), (4.0, -4.4), (4.0, -3.6), (-4.0, -3.6)]
+        b1_pts = [(-4.0, -4.2), (4.0, -4.2), (4.0, -3.4), (-4.0, -3.4)]
         self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b1_pts], btn_bg_color)
         
-        b2_pts = [(-4.0, -5.4), (4.0, -5.4), (4.0, -4.6), (-4.0, -4.6)]
+        b2_pts = [(-4.0, -5.2), (4.0, -5.2), (4.0, -4.4), (-4.0, -4.4)]
         self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b2_pts], btn_bg_color)
         
-        b3_pts = [(-4.0, -6.4), (4.0, -6.4), (4.0, -5.6), (-4.0, -5.6)]
+        b3_pts = [(-4.0, -6.2), (4.0, -6.2), (4.0, -5.4), (-4.0, -5.4)]
         self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b3_pts], btn_bg_color)
+
+        b4_pts = [(-4.0, -7.2), (4.0, -7.2), (4.0, -6.4), (-4.0, -6.4)]
+        self._draw_transparent_poly([interface.game_to_screen(x,y) for x,y in b4_pts], btn_bg_color)
         
         font = self._game.get_font()
         font.set_size(0.4, 0.4, 0.35)
@@ -79,6 +86,7 @@ class MainMenu(Menu):
         font.set_shadow(False)
         
         self._start_button.draw()
+        self._find_servers_button.draw()
         self._options_button.draw()
         self._quit_button.draw()
 

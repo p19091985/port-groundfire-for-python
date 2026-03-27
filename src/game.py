@@ -4,6 +4,9 @@ import random
 import pygame
 import time
 
+from interface_net import build_network_session
+from interface_net.online_match import OnlineMatchSetup
+
 from .interface import Interface, Colour, InterfaceError
 from .inifile import ReadIniFile
 from .controls import Controls
@@ -13,11 +16,14 @@ from .sounds import Sound
 from .landscape import Landscape
 from .humanplayer import HumanPlayer
 from .aiplayer import AIPlayer
+from .onlineaiplayer import OnlineAIPlayer
+from .onlineremoteplayer import OnlineRemotePlayer
 from .blast import Blast
 from .quake import Quake
 
 # Menus
 from .mainmenu import MainMenu
+from .findserversmenu import FindServersMenu
 from .playermenu import PlayerMenu
 from .optionmenu import OptionMenu
 from .shopmenu import ShopMenu
@@ -60,6 +66,7 @@ class Game:
         try:
             # 1. IniFile
             self._settings = ReadIniFile("conf/options.ini")
+            self._network_session = build_network_session(self._settings)
             
             # Read Graphics — matching C++ game.cc constructor:
             #   _settings.getInt("Graphics", "ScreenWidth",  640)
@@ -142,6 +149,7 @@ class Game:
             # Start game with Main Menu
             self._current_menu = MainMenu(self)
             self._interface.enable_mouse(True)
+            self._network_session.attach_game(self)
             
             # Initial time
             self._time = time.time()
@@ -174,6 +182,7 @@ class Game:
     def get_game_state(self) -> int: return self._game_state
     def get_landscape(self) -> 'Landscape': return self._landscape
     def get_interface(self) -> Interface: return self._interface
+    def get_network_session(self): return self._network_session
     def get_settings(self) -> ReadIniFile: return self._settings
     def get_controls(self) -> Controls: return self._controls
     def get_controls_file(self) -> ControlsFile: return self._controls_file
@@ -193,16 +202,61 @@ class Game:
     def set_num_of_rounds(self, rounds: int): self._num_of_rounds = rounds
     def get_num_of_rounds(self) -> int: return self._num_of_rounds
     def get_current_round(self) -> int: return self._current_round
+
+    def _get_player_colour(self, player_number: int) -> tuple:
+        slot = player_number + 1
+        red = self._settings.get_float("Colours", f"Tank{slot}red", 1.0)
+        green = self._settings.get_float("Colours", f"Tank{slot}green", 1.0)
+        blue = self._settings.get_float("Colours", f"Tank{slot}blue", 1.0)
+        return (int(red * 255), int(green * 255), int(blue * 255))
+
+    def prepare_online_match(self, match_setup: OnlineMatchSetup) -> None:
+        self.delete_players()
+        self._network_session.activate_online_match(match_setup)
+        self.set_num_of_rounds(match_setup.rounds)
+        self._current_round = 0
+
+        players = sorted(match_setup.players, key=lambda player: player.player_number)
+        for player in players:
+            controller = 0 if player.is_local else -100 - player.player_number
+            colour = self._get_player_colour(player.player_number)
+            if player.is_local and player.uses_ai:
+                new_player = OnlineAIPlayer(self, player.player_number, player.name, colour)
+            elif player.is_local:
+                new_player = HumanPlayer(self, player.player_number, player.name, colour, controller, self._controls)
+            else:
+                new_player = OnlineRemotePlayer(
+                    self,
+                    player.player_number,
+                    player.name,
+                    colour,
+                    controller,
+                    self._controls,
+                    uses_ai=player.uses_ai,
+                )
+
+            self._players[player.player_number] = new_player
+            self.add_entity(new_player.get_tank())
+            self._network_session.register_player(
+                player.player_number,
+                controller,
+                player.name,
+                player.uses_ai,
+            )
+
+        self._number_of_players = len(players)
     
     def add_player(self, controller: int, name: str, colour: tuple):
         if self._number_of_players < 8:
+            player_number = self._number_of_players
             if controller == -1:
-                new_player = AIPlayer(self, self._number_of_players, name, colour)
+                new_player = AIPlayer(self, player_number, name, colour)
             else:
-                new_player = HumanPlayer(self, self._number_of_players, name, colour, controller, self._controls)
-            self._players[self._number_of_players] = new_player
+                new_player = HumanPlayer(self, player_number, name, colour, controller, self._controls)
+            self._players[player_number] = new_player
             # Add the player's tank entity to the list of entities (C++: addEntity(tank))
             self.add_entity(new_player.get_tank())
+            self._network_session.register_player(player_number, controller, name, controller == -1)
             self._number_of_players += 1
             
     def delete_players(self):
@@ -212,6 +266,8 @@ class Game:
         self._entity_list = []
         self._human_players = False
         self._number_of_active_tanks = 0
+        self._network_session.clear_players()
+        self._network_session.clear_online_match()
 
     def are_human_players(self) -> bool:
         for i in range(self._number_of_players):
@@ -273,10 +329,12 @@ class Game:
         current_time = time.time()
         dt = current_time - self._last_time
         self._last_time = current_time
-        self._time += dt
         
         # Max dt clamp to prevent physics explosion on lag
         if dt > 0.1: dt = 0.1
+        dt = self._network_session.override_frame_dt(dt)
+        self._time += dt
+        self._network_session.begin_frame(self._time, dt)
         
         # Check window close
         if self._interface.should_close():
@@ -334,6 +392,7 @@ class Game:
         # State Transitions
         if self._new_state != self.GameState.CURRENT_STATE and self._new_state != self._game_state:
             self._change_state(self._new_state)
+        self._network_session.end_frame(self._time, dt)
             
         return self._game_state != self.GameState.EXITED
 
@@ -358,6 +417,11 @@ class Game:
             if prev_state == self.GameState.MAIN_MENU:
                  pass # self.delete_players() called inside playermenu? No, playermenu manages it.
             self._current_menu = PlayerMenu(self)
+
+        elif new_state == self.GameState.FIND_SERVERS_MENU:
+            self._current_menu = FindServersMenu(self)
+            self._interface.enable_mouse(True)
+            self._interface.offset_viewport(0, 0)
             
         elif new_state == self.GameState.OPTION_MENU:
             self._current_menu = OptionMenu(self)
@@ -397,9 +461,13 @@ class Game:
 
     def _start_round(self):
         self._current_round += 1
+        self._network_session.before_round_start(self._current_round)
 
         # Create a new landscape for this round, matching the C++ lifecycle.
-        self._landscape = Landscape(self._settings, self._time)
+        self._landscape = Landscape(
+            self._settings,
+            self._network_session.get_landscape_seed(self._current_round, self._time),
+        )
         
         # Call newRound() on all players (resets defeated lists, etc.)
         for i in range(self._number_of_players):
@@ -420,11 +488,16 @@ class Game:
                 active_tanks += 1
 
         # Shuffle positions logic
-        for _ in range(20):
-             if active_tanks > 0:
-                 t1 = random.randint(0, active_tanks - 1)
-                 t2 = random.randint(0, active_tanks - 1)
-                 tank_order[t1], tank_order[t2] = tank_order[t2], tank_order[t1]
+        shuffle_seed = self._network_session.get_tank_shuffle_seed(self._current_round)
+        if shuffle_seed is None:
+            for _ in range(20):
+                 if active_tanks > 0:
+                     t1 = random.randint(0, active_tanks - 1)
+                     t2 = random.randint(0, active_tanks - 1)
+                     tank_order[t1], tank_order[t2] = tank_order[t2], tank_order[t1]
+        else:
+            seeded_random = random.Random(int(shuffle_seed))
+            seeded_random.shuffle(tank_order)
         
         for i in range(active_tanks):
             p_idx = tank_order[i]
@@ -455,6 +528,8 @@ class Game:
             self._new_state = self.GameState.QUIT_MENU
 
     def _end_round(self):
+        self._network_session.after_round_end(self._current_round)
+
         # Call endRound() on all players (calculates scores)
         for i in range(self._number_of_players):
             if self._players[i]:
