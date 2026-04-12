@@ -1,12 +1,19 @@
 <p align="center">
+  <strong>Idioma / Language:</strong>
+  <a href="#portugues"><kbd>Português</kbd></a>
+  <a href="#english"><kbd>English</kbd></a>
+</p>
+
+<p align="center">
   <img src="media/img/readme-hero.png" alt="Groundfire - arte de abertura montada com assets do jogo" width="1460">
 </p>
 
 <h1 align="center">Groundfire - Port Python</h1>
 
 <p align="center">
-  <a href="#portugues"><img src="https://img.shields.io/badge/Idioma-Portugu%C3%AAs-1f6f43?style=for-the-badge" alt="Português"></a>
-  <a href="#english"><img src="https://img.shields.io/badge/Language-English-3776AB?style=for-the-badge" alt="English"></a>
+  <strong>Idioma / Language:</strong>
+  <a href="#portugues"><kbd>Português</kbd></a>
+  <a href="#english"><kbd>English</kbd></a>
 </p>
 
 <p align="center">
@@ -19,6 +26,12 @@
 </p>
 
 <a id="portugues"></a>
+
+<p align="center">
+  <strong>Idioma / Language:</strong>
+  <a href="#portugues"><kbd>Português</kbd></a>
+  <a href="#english"><kbd>English</kbd></a>
+</p>
 
 ## Português
 
@@ -1560,8 +1573,9 @@ Este repositório é distribuído sob a licença MIT. Consulte [`LICENSE`](LICEN
 ## English
 
 <p align="center">
-  <a href="#portugues"><img src="https://img.shields.io/badge/Idioma-Portugu%C3%AAs-1f6f43?style=for-the-badge" alt="Português"></a>
-  <a href="#english"><img src="https://img.shields.io/badge/Language-English-3776AB?style=for-the-badge" alt="English"></a>
+  <strong>Idioma / Language:</strong>
+  <a href="#portugues"><kbd>Português</kbd></a>
+  <a href="#english"><kbd>English</kbd></a>
 </p>
 
 <p align="center"><strong>A Python/Pygame port of Groundfire v0.25, focused on preservation, classic gameplay, and modern compatibility.</strong></p>
