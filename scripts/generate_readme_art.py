@@ -10,7 +10,7 @@ import pygame
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
-OUT_DIR = ROOT / "docs" / "media"
+OUT_DIR = ROOT / "media" / "img"
 
 HERO_SIZE = (1600, 900)
 SHOWCASE_SIZE = (1600, 900)
