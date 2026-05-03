@@ -19,15 +19,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--discovery-port", type=int, default=DEFAULT_DISCOVERY_PORT, help="LAN discovery UDP port.")
     parser.add_argument("--ticks", type=int, default=0, help="If set, run only this many simulation ticks.")
     parser.add_argument("--server-name", default="Groundfire Server", help="Name announced to clients.")
+    parser.add_argument("--password", default="", help="Require this password before accepting players.")
+    parser.add_argument("--region", default="world", help="Region announced to browsers and master servers.")
+    parser.add_argument(
+        "--insecure",
+        action="store_true",
+        help="Advertise this server as insecure in browser filters.",
+    )
+    parser.add_argument(
+        "--master-server",
+        action="append",
+        default=[],
+        help="Register with a Groundfire master server in host[:port] form. Can be used multiple times.",
+    )
     parser.add_argument(
         "--server-private-key",
         default=str(DEFAULT_SERVER_PRIVATE_KEY_PATH),
-        help="PEM file for the secure online server private key. Created automatically if missing.",
+        help="Deprecated compatibility option; native UDP server mode does not use key files.",
     )
     parser.add_argument(
         "--server-public-key",
         default=str(DEFAULT_SERVER_PUBLIC_KEY_PATH),
-        help="PEM file where the secure online server public key is written.",
+        help="Deprecated compatibility option; native UDP server mode does not use key files.",
     )
     parser.add_argument(
         "--headless",
@@ -44,7 +57,11 @@ def main(argv: list[str] | None = None) -> int:
         port=args.port,
         discovery_port=args.discovery_port,
         server_name=args.server_name,
-        network_backend="mpgameserver",
+        password=args.password,
+        region=args.region,
+        secure=not args.insecure,
+        master_servers=tuple(args.master_server),
+        network_backend="udp",
         secure_private_key_path=args.server_private_key,
         secure_public_key_path=args.server_public_key,
     )

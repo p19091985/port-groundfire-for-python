@@ -4,8 +4,9 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$SCRIPT_DIR
 VENV_PYTHON="$PROJECT_DIR/.venv/bin/python"
+VENV_GROUNDFIRE="$PROJECT_DIR/.venv/bin/groundfire"
 VERSION_CHECK='import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
-RUNTIME_CHECK='import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
+RUNTIME_CHECK='import os, sys; sys.path=[p for p in sys.path if p not in ("", os.getcwd())]; import pygame, groundfire_net; from importlib.metadata import version; version("groundfire"); raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
 
 test_interpreter() {
     interpreter=$1
@@ -26,14 +27,14 @@ find_python() {
 }
 
 ensure_venv() {
-    if [ -x "$VENV_PYTHON" ] && test_interpreter "$VENV_PYTHON" "$RUNTIME_CHECK"; then
+    if [ -x "$VENV_PYTHON" ] && [ -x "$VENV_GROUNDFIRE" ] && test_interpreter "$VENV_PYTHON" "$RUNTIME_CHECK"; then
         return 0
     fi
 
     if [ -x "$VENV_PYTHON" ]; then
-        echo "Ambiente virtual existente ausente de dependencias ou com Python incompativel. Reconfigurando..."
+        echo "Ambiente virtual existente ausente do sistema, dependencias ou com Python incompativel. Reconfigurando..."
     else
-        echo "Ambiente virtual nao encontrado. Instalando dependencias..."
+        echo "Ambiente virtual nao encontrado. Instalando o sistema..."
     fi
 
     PYTHON_BIN=$(find_python) || {
@@ -57,23 +58,23 @@ ensure_venv() {
     echo "Atualizando pip..."
     "$VENV_PYTHON" -m pip install --upgrade pip
 
-    install_requirements
+    install_project
 
-    if [ ! -x "$VENV_PYTHON" ] || ! test_interpreter "$VENV_PYTHON" "$RUNTIME_CHECK"; then
+    if [ ! -x "$VENV_PYTHON" ] || [ ! -x "$VENV_GROUNDFIRE" ] || ! test_interpreter "$VENV_PYTHON" "$RUNTIME_CHECK"; then
         echo "Falha: o ambiente virtual nao foi criado corretamente." >&2
         return 1
     fi
 }
 
-install_requirements() {
-    echo "Instalando dependencias..."
-    if "$VENV_PYTHON" -m pip install --only-binary=pygame -r "$PROJECT_DIR/requirements.txt"; then
+install_project() {
+    echo "Instalando Groundfire em modo editavel..."
+    if "$VENV_PYTHON" -m pip install --only-binary=pygame -e "$PROJECT_DIR"; then
         return 0
     fi
 
     echo "Instalacao com wheel precompilado do pygame falhou. Tentando fallback generico..."
-    "$VENV_PYTHON" -m pip install -r "$PROJECT_DIR/requirements.txt"
+    "$VENV_PYTHON" -m pip install -e "$PROJECT_DIR"
 }
 
 ensure_venv
-exec "$VENV_PYTHON" "$PROJECT_DIR/src/main.py" "$@"
+exec "$VENV_GROUNDFIRE" "$@"

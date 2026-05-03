@@ -141,6 +141,24 @@ class Interface:
             return True
         return False
 
+    def get_input_events(self):
+        event_types = [self._pygame.KEYDOWN]
+        if hasattr(self._pygame, "MOUSEWHEEL"):
+            event_types.append(self._pygame.MOUSEWHEEL)
+        return tuple(self._pygame.event.get(event_types))
+
+    def get_key_names(self):
+        return {
+            "backspace": self._pygame.K_BACKSPACE,
+            "enter": self._pygame.K_RETURN,
+            "escape": self._pygame.K_ESCAPE,
+            "tab": self._pygame.K_TAB,
+            "up": self._pygame.K_UP,
+            "down": self._pygame.K_DOWN,
+            "pageup": self._pygame.K_PAGEUP,
+            "pagedown": self._pygame.K_PAGEDOWN,
+        }
+
     def get_mouse_pos(self):
         return self._mouse_x, self._mouse_y
 
@@ -197,6 +215,9 @@ class Interface:
 
     def get_window_settings(self):
         return self._width, self._height, self._fullscreen
+
+    def set_window_caption(self, caption: str):
+        self._pygame.display.set_caption(caption)
 
     def enable_mouse(self, enable):
         self._mouse_enabled = enable

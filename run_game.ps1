@@ -2,8 +2,9 @@
 
 Push-Location $PSScriptRoot
 $script:venvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+$script:venvGroundfire = Join-Path $PSScriptRoot ".venv\Scripts\groundfire.exe"
 $script:versionCheck = "import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)"
-$script:runtimeCheck = "import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)"
+$script:runtimeCheck = "import os, sys; sys.path=[p for p in sys.path if p not in ('', os.getcwd())]; import pygame, groundfire_net; from importlib.metadata import version; version('groundfire'); raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)"
 
 function Test-Interpreter {
     param(
@@ -43,15 +44,15 @@ function Get-CompatibleInterpreter {
 }
 
 function Ensure-GameEnvironment {
-    if ((Test-Path $script:venvPython) -and (Test-Interpreter -Command $script:venvPython -Code $script:runtimeCheck)) {
+    if ((Test-Path $script:venvPython) -and (Test-Path $script:venvGroundfire) -and (Test-Interpreter -Command $script:venvPython -Code $script:runtimeCheck)) {
         return $true
     }
 
     if (Test-Path $script:venvPython) {
-        Write-Host "Ambiente virtual existente ausente de dependencias ou com Python incompativel. Reconfigurando..."
+        Write-Host "Ambiente virtual existente ausente do sistema, dependencias ou com Python incompativel. Reconfigurando..."
     }
     else {
-        Write-Host "Ambiente virtual nao encontrado. Instalando dependencias..."
+        Write-Host "Ambiente virtual nao encontrado. Instalando o sistema..."
     }
 
     $interpreter = Get-CompatibleInterpreter
@@ -81,11 +82,11 @@ function Ensure-GameEnvironment {
         return $false
     }
 
-    if (-not (Install-GameRequirements)) {
+    if (-not (Install-GameProject)) {
         return $false
     }
 
-    if (-not ((Test-Path $script:venvPython) -and (Test-Interpreter -Command $script:venvPython -Code $script:runtimeCheck))) {
+    if (-not ((Test-Path $script:venvPython) -and (Test-Path $script:venvGroundfire) -and (Test-Interpreter -Command $script:venvPython -Code $script:runtimeCheck))) {
         Write-Error "Falha: o ambiente virtual nao foi criado corretamente."
         return $false
     }
@@ -93,15 +94,15 @@ function Ensure-GameEnvironment {
     return $true
 }
 
-function Install-GameRequirements {
-    Write-Host "Instalando dependencias..."
-    & $script:venvPython -m pip install --only-binary=pygame -r (Join-Path $PSScriptRoot "requirements.txt")
+function Install-GameProject {
+    Write-Host "Instalando Groundfire em modo editavel..."
+    & $script:venvPython -m pip install --only-binary=pygame -e $PSScriptRoot
     if ($LASTEXITCODE -eq 0) {
         return $true
     }
 
     Write-Host "Instalacao com wheel precompilado do pygame falhou. Tentando fallback generico..."
-    & $script:venvPython -m pip install -r (Join-Path $PSScriptRoot "requirements.txt")
+    & $script:venvPython -m pip install -e $PSScriptRoot
     return $LASTEXITCODE -eq 0
 }
 
@@ -110,7 +111,7 @@ if (-not (Ensure-GameEnvironment)) {
     exit 1
 }
 
-& $script:venvPython (Join-Path $PSScriptRoot "src\main.py") @args
+& $script:venvGroundfire @args
 $exitCode = $LASTEXITCODE
 Pop-Location
 exit $exitCode

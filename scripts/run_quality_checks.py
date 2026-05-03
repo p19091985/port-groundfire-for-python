@@ -9,12 +9,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DIRS = tuple(path for path in ("src", "tests", "scripts", "groundfire") if (PROJECT_ROOT / path).exists())
+SOURCE_DIRS = tuple(
+    path for path in ("src", "tests", "scripts", "groundfire", "groundfire_net") if (PROJECT_ROOT / path).exists()
+)
 LINT_TARGETS = tuple(
     path
     for path in (
         "src/groundfire",
         "groundfire",
+        "groundfire_net",
         "src/main.py",
         "src/pygamebackend.py",
         "src/interface.py",
@@ -28,6 +31,7 @@ TYPECHECK_TARGETS = tuple(
     path
     for path in (
         "src/groundfire",
+        "groundfire_net",
         "src/main.py",
         "src/pygamebackend.py",
         "src/interface.py",

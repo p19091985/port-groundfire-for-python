@@ -5,7 +5,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class PortabilityFilesTests(unittest.TestCase):
-    def test_launchers_forward_arguments_and_check_msgpack(self):
+    def test_launchers_forward_arguments_and_check_native_runtime(self):
         bat = (PROJECT_ROOT / "run_game.bat").read_text(encoding="utf-8")
         ps1 = (PROJECT_ROOT / "run_game.ps1").read_text(encoding="utf-8")
         sh = (PROJECT_ROOT / "run_game.sh").read_text(encoding="utf-8")
@@ -14,9 +14,12 @@ class PortabilityFilesTests(unittest.TestCase):
         self.assertIn("@args", ps1)
         self.assertIn('"$@"', sh)
 
-        self.assertIn("msgpack", bat)
-        self.assertIn("msgpack", ps1)
-        self.assertIn("msgpack", sh)
+        self.assertIn("groundfire", bat)
+        self.assertIn("groundfire", ps1)
+        self.assertIn("groundfire", sh)
+        self.assertNotIn("msgpack", bat)
+        self.assertNotIn("msgpack", ps1)
+        self.assertNotIn("msgpack", sh)
 
     def test_pyproject_declares_installable_project_and_console_scripts(self):
         pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -24,6 +27,18 @@ class PortabilityFilesTests(unittest.TestCase):
         self.assertIn("[project]", pyproject)
         self.assertIn('groundfire = "groundfire.client:main"', pyproject)
         self.assertIn('groundfire-server = "groundfire.server:main"', pyproject)
+        self.assertIn('groundfire-master = "groundfire.master:main"', pyproject)
+        self.assertIn('"groundfire_net*"', pyproject)
+        self.assertNotIn("mpgameserver", pyproject)
+        self.assertNotIn("msgpack", pyproject)
+
+    def test_shell_launcher_installs_package_into_virtual_environment(self):
+        sh = (PROJECT_ROOT / "run_game.sh").read_text(encoding="utf-8")
+
+        self.assertIn('version("groundfire")', sh)
+        self.assertIn('pip install --only-binary=pygame -e "$PROJECT_DIR"', sh)
+        self.assertIn('pip install -e "$PROJECT_DIR"', sh)
+        self.assertIn('exec "$VENV_GROUNDFIRE" "$@"', sh)
 
     def test_ci_matrix_covers_main_desktop_operating_systems(self):
         workflow = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, is_dataclass
 from typing import Any
 
-import msgpack
+from groundfire_net.codec import JsonDataclassCodec, to_plain
 
 from ..sim.match import MatchSnapshot, ReplicatedPlayerState
 from ..sim.world import ReplicatedEntityState, TerrainPatch
@@ -25,26 +24,22 @@ from .messages import (
 )
 
 
+_CODEC = JsonDataclassCodec(lambda message_type, payload: _decode_typed_message(message_type, payload))
+
+
 def encode_message(message) -> bytes:
-    return msgpack.packb(
-        {
-            "message_type": type(message).__name__,
-            "payload": _to_plain(message),
-        },
-        use_bin_type=True,
-    )
+    return _CODEC.encode(message)
 
 
 def decode_message(payload: bytes):
-    decoded = msgpack.unpackb(payload, raw=False, strict_map_key=False)
-    return _decode_typed_message(decoded["message_type"], decoded["payload"])
+    return _CODEC.decode(payload)
 
 
 def encode_json(message) -> str:
     return json.dumps(
         {
             "message_type": type(message).__name__,
-            "payload": _to_plain(message),
+            "payload": to_plain(message),
         },
         sort_keys=True,
     )
@@ -53,18 +48,6 @@ def encode_json(message) -> str:
 def decode_json(payload: str):
     decoded = json.loads(payload)
     return _decode_typed_message(decoded["message_type"], decoded["payload"])
-
-
-def _to_plain(value):
-    if is_dataclass(value):
-        return {key: _to_plain(raw) for key, raw in asdict(value).items()}
-    if isinstance(value, tuple):
-        return [_to_plain(item) for item in value]
-    if isinstance(value, list):
-        return [_to_plain(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _to_plain(raw) for key, raw in value.items()}
-    return value
 
 
 def _decode_typed_message(message_type: str, payload: dict[str, Any]):

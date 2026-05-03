@@ -3,6 +3,8 @@ from __future__ import annotations
 import socket
 from dataclasses import dataclass
 
+from groundfire_net.discovery import DiscoveryService, ServerBrowser
+
 from ..sim.match import MatchState
 from .codec import decode_message, encode_message
 from .messages import DEFAULT_DISCOVERY_PORT, PROTOCOL_VERSION, LanServerAnnouncement
@@ -20,6 +22,7 @@ class LanDiscoveryService:
 
     def __init__(self, *, interval_seconds: float = DEFAULT_INTERVAL_SECONDS):
         self._interval_seconds = interval_seconds
+        self._service = DiscoveryService(encode=encode_message, decode=decode_message)
 
     def build_announcement(
         self,
@@ -30,6 +33,8 @@ class LanDiscoveryService:
         max_players: int,
         requires_password: bool,
         server_port: int,
+        region: str = "world",
+        secure: bool = True,
     ) -> LanServerAnnouncement:
         return LanServerAnnouncement(
             server_name=server_name,
@@ -40,23 +45,21 @@ class LanDiscoveryService:
             max_players=max_players,
             requires_password=requires_password,
             server_port=server_port,
+            region=region,
+            secure=secure,
         )
 
     def encode_announcement(self, announcement: LanServerAnnouncement) -> bytes:
-        return encode_message(announcement)
+        return self._service.encode_announcement(announcement)
 
     def decode_announcement(self, payload: bytes) -> LanServerAnnouncement:
-        message = decode_message(payload)
+        message = self._service.decode_announcement(payload)
         if not isinstance(message, LanServerAnnouncement):
             raise ValueError(f"Expected LanServerAnnouncement, got {type(message)!r}")
         return message
 
     def open_broadcast_socket(self, *, host: str = "", port: int = 0):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.bind((host, port))
-        sock.setblocking(False)
-        return sock
+        return self._service.open_broadcast_endpoint(host=host, port=port).socket
 
     def broadcast(
         self,
@@ -78,6 +81,10 @@ class LanServerBrowser:
     ):
         self._expiry_seconds = expiry_seconds
         self._expected_protocol_version = expected_protocol_version
+        self._browser = ServerBrowser(
+            expiry_seconds=expiry_seconds,
+            expected_protocol_version=expected_protocol_version,
+        )
         self._servers_by_key: dict[tuple[str, int, str], DiscoveredLanServer] = {}
 
     def record_announcement(
@@ -87,7 +94,8 @@ class LanServerBrowser:
         *,
         now: float,
     ) -> bool:
-        if announcement.protocol_version != self._expected_protocol_version:
+        recorded = self._browser.record_announcement(announcement, address, now=now)
+        if not recorded:
             return False
 
         key = (address[0], int(announcement.server_port), announcement.session_id)
@@ -95,6 +103,7 @@ class LanServerBrowser:
         return True
 
     def get_servers(self, *, now: float) -> tuple[DiscoveredLanServer, ...]:
+        self._browser.get_servers(now=now)
         expired = []
         for key, entry in self._servers_by_key.items():
             if (now - entry.last_seen) > self._expiry_seconds:

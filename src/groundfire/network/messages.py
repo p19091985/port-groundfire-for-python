@@ -9,6 +9,7 @@ from ..sim.world import TerrainPatch
 PROTOCOL_VERSION = 1
 DEFAULT_GAME_PORT = 27015
 DEFAULT_DISCOVERY_PORT = 27016
+DEFAULT_MASTER_PORT = 27017
 SIMULATION_HZ = 60
 SNAPSHOT_HZ = 20
 
@@ -32,6 +33,10 @@ class HelloAccept:
     current_round: int
     player_count: int
     max_players: int
+    map_seed: int = 1
+    requires_password: bool = False
+    region: str = "world"
+    secure: bool = True
     simulation_hz: int = SIMULATION_HZ
     snapshot_hz: int = SNAPSHOT_HZ
     protocol_version: int = PROTOCOL_VERSION
@@ -41,6 +46,7 @@ class HelloAccept:
 class JoinRequest:
     player_name: str
     requested_slot: int | None = None
+    password: str = ""
     protocol_version: int = PROTOCOL_VERSION
 
 
@@ -133,4 +139,6 @@ class LanServerAnnouncement:
     max_players: int
     requires_password: bool
     server_port: int
+    region: str = "world"
+    secure: bool = True
     protocol_version: int = PROTOCOL_VERSION

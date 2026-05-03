@@ -4,22 +4,25 @@ REM Script to run Groundfire using the project's virtual environment on Windows.
 
 pushd "%~dp0"
 set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
+set "VENV_GROUNDFIRE=%~dp0.venv\Scripts\groundfire.exe"
 
 call :ensure_venv
 if errorlevel 1 goto :fail
 
-"%VENV_PYTHON%" "%~dp0src\main.py" %*
+"%VENV_GROUNDFIRE%" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 popd
 exit /b %EXIT_CODE%
 
 :ensure_venv
 if exist "%VENV_PYTHON%" (
-    "%VENV_PYTHON%" -c "import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
-    if not errorlevel 1 exit /b 0
-    echo Ambiente virtual existente ausente de dependencias ou com Python incompativel. Reconfigurando...
+    if exist "%VENV_GROUNDFIRE%" (
+        "%VENV_PYTHON%" -c "import os, sys; sys.path=[p for p in sys.path if p not in ('', os.getcwd())]; import pygame, groundfire_net; from importlib.metadata import version; version('groundfire'); raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
+        if not errorlevel 1 exit /b 0
+    )
+    echo Ambiente virtual existente ausente do sistema, dependencias ou com Python incompativel. Reconfigurando...
 ) else (
-    echo Ambiente virtual nao encontrado. Instalando dependencias...
+    echo Ambiente virtual nao encontrado. Instalando o sistema...
 )
 
 call :find_python
@@ -53,7 +56,12 @@ if not exist "%VENV_PYTHON%" (
     exit /b 1
 )
 
-"%VENV_PYTHON%" -c "import sys, pygame, msgpack; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
+if not exist "%VENV_GROUNDFIRE%" (
+    echo Falha: o ambiente virtual nao foi criado corretamente.
+    exit /b 1
+)
+
+"%VENV_PYTHON%" -c "import os, sys; sys.path=[p for p in sys.path if p not in ('', os.getcwd())]; import pygame, groundfire_net; from importlib.metadata import version; version('groundfire'); raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)" >nul 2>&1
 if errorlevel 1 (
     echo Falha: o ambiente virtual nao foi criado corretamente.
     exit /b 1
@@ -96,12 +104,12 @@ set "PYTHON_CMD=py -%~1"
 exit /b 0
 
 :install_requirements
-echo Instalando dependencias...
-call ".venv\Scripts\python.exe" -m pip install --only-binary=pygame -r requirements.txt
+echo Instalando Groundfire em modo editavel...
+call ".venv\Scripts\python.exe" -m pip install --only-binary=pygame -e .
 if not errorlevel 1 exit /b 0
 
 echo Instalacao com wheel precompilado do pygame falhou. Tentando fallback generico...
-call ".venv\Scripts\python.exe" -m pip install -r requirements.txt
+call ".venv\Scripts\python.exe" -m pip install -e .
 exit /b %ERRORLEVEL%
 
 :fail

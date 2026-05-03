@@ -12,7 +12,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%20—%203.13-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Pygame-2.6.1-1f6f43?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiIGZpbGw9IndoaXRlIi8+PC9zdmc+" alt="Pygame">
-  <img src="https://img.shields.io/badge/rede-mpgameserver%20%7C%20msgpack-4B8BBE?style=flat-square" alt="Rede">
+  <img src="https://img.shields.io/badge/rede-UDP%20nativo%20%7C%20JSON-4B8BBE?style=flat-square" alt="Rede">
 </p>
 
 <p align="center">
@@ -129,7 +129,7 @@ As imagens abaixo foram geradas a partir de assets do próprio projeto e ajudam 
 |:---|:---|
 | 🐍 Python | 3.10, 3.11, 3.12 ou 3.13 |
 | 🖥️ Interface gráfica | Ambiente com suporte a janela Pygame |
-| 📦 Dependências principais | `pygame`, `msgpack`, `mpgameserver` |
+| 📦 Dependências principais | `pygame` |
 | 🖧 Sistema operacional | Windows, Linux, macOS ou WSL com suporte gráfico |
 | 📄 Licença | MIT |
 
@@ -140,8 +140,6 @@ As dependências estão centralizadas em [`requirements.txt`](requirements.txt) 
 | Pacote | Versão | Uso |
 |:---|:---:|:---|
 | `pygame` | `2.6.1` | Janela, entrada, renderização 2D e áudio |
-| `msgpack` | `1.1.2` | Serialização de mensagens |
-| `mpgameserver` | `0.2.4` | Infraestrutura do modo cliente/servidor |
 | `ruff` | `0.15.7` | Lint e organização de imports em desenvolvimento |
 | `mypy` | `1.19.1` | Checagem estática opcional em desenvolvimento |
 
@@ -402,7 +400,7 @@ O modo local é o caminho principal de uso atual:
 groundfire
 ```
 
-O valor `LocalMenuMode=classic` em [`conf/options.ini`](conf/options.ini) faz o jogo abrir com a apresentação clássica por padrão.
+O valor `LocalMenuMode=canonical` em [`conf/options.ini`](conf/options.ini) faz o jogo abrir com o menu moderno por padrão, incluindo o botão **Find Servers**. Use `--classic-local` ou `LocalMenuMode=classic` se quiser voltar para a apresentação clássica.
 
 ### 🖧 Servidor headless
 
@@ -448,6 +446,7 @@ port-groundfire-for-python/
 ├── 📁 media/
 │   └── 📁 img/             capturas e imagens geradas para o README
 ├── 📁 groundfire/          wrappers públicos para execução como pacote
+├── 📁 groundfire_net/      módulo de rede nativo copiável entre jogos
 ├── 📁 scripts/             ferramentas de QA, arte, assets e perfilamento
 ├── 📁 src/                 código principal do port Python
 │   └── 📁 groundfire/      runtime canônico organizado por domínio
@@ -1000,20 +999,41 @@ O projeto atual e um port funcional e valioso como preservacao, mas ainda nao e 
 ---
 
 <details>
-<summary><h3>🔐 Modo Online Seguro</h3></summary>
+<summary><h3>🌐 Modo Online Nativo</h3></summary>
 
-<a id="modo-online-seguro"></a>
+<a id="modo-online-nativo"></a>
 
-The online client/server path now uses `mpgameserver` as the secure transport layer. This keeps the existing Groundfire match logic and interface flow, but moves the network transport to an authenticated and encrypted UDP connection.
+O modo online usa somente biblioteca padrão do Python no transporte: `socket`, `selectors`, `json` e dataclasses. O pacote copiável [`groundfire_net/`](groundfire_net) concentra codec, UDP, descoberta LAN, master server, lista de servidores, favoritos/histórico e loop de servidor.
 
 #### Key Files
 
 | Arquivo | Propósito |
 |:---|:---|
-| `conf/network/server_root_private.pem` | Chave privada do servidor |
-| `conf/network/server_root_public.pem` | Chave pública do servidor |
+| [`groundfire_net/`](groundfire_net) | Módulo de rede nativo e reaproveitável |
+| [`src/groundfire/network/`](src/groundfire/network) | Adaptadores do Groundfire para mensagens, descoberta e browser |
+| [`src/groundfire/app/server.py`](src/groundfire/app/server.py) | Servidor autoritativo headless |
+| [`src/groundfire/master.py`](src/groundfire/master.py) | Master server nativo para a aba Internet |
 
-When the server starts, it creates the private/public key pair automatically if the files do not exist.
+No menu inicial do runtime canônico há um botão **Find Servers** com abas Internet, Favorites, Unique, History e Lan. O browser tem lista em colunas, ordenação por cabeçalho, rolagem, filtros de texto, senha, servidor cheio/vazio, região, secure e latência, favoritos, histórico, adição manual por `host:port`, refresh rápido/geral, connect e ping nativo por UDP. A aba Lan recebe anúncios UDP dos servidores Groundfire ativos na rede local. A aba Internet consulta um master server Groundfire nativo.
+
+#### Start The Master Server
+
+```powershell
+python -m src.groundfire.master
+```
+
+Para publicar um servidor no master server:
+
+```powershell
+python -m src.groundfire.server --master-server 127.0.0.1:27017 --server-name "Meu Groundfire"
+```
+
+Servidor protegido por senha:
+
+```powershell
+python -m src.groundfire.server --password segredo --master-server 127.0.0.1:27017
+python -m src.groundfire.client --connect 127.0.0.1:27015 --password segredo
+```
 
 #### Start The Server
 
@@ -1021,23 +1041,23 @@ When the server starts, it creates the private/public key pair automatically if 
 python -m src.groundfire.server
 ```
 
-Custom key paths are also supported:
+Custom ports are also supported:
 
 ```powershell
-python -m src.groundfire.server --server-private-key custom/private.pem --server-public-key custom/public.pem
+python -m src.groundfire.server --host 0.0.0.0 --port 27015 --discovery-port 27016
 ```
 
 #### Connect A Client
 
 ```powershell
-python -m src.groundfire.client --connect 127.0.0.1:27015 --server-public-key conf/network/server_root_public.pem
+python -m src.groundfire.client --connect 127.0.0.1:27015
 ```
 
-#### Security Notes
+#### Notes
 
-- 🔒 The server private key stays on the server.
-- 🔑 The client uses the server public key to authenticate the secure handshake.
-- ⛔ If the trusted public key file is missing, the client refuses the connection instead of falling back to insecure mode.
+- O transporte online nao usa bibliotecas externas.
+- O protocolo usa envelopes JSON nativos para facilitar depuracao e portabilidade.
+- `--server-public-key` e `--server-private-key` permanecem aceitos apenas como compatibilidade de CLI.
 
 </details>
 
@@ -1190,7 +1210,7 @@ Verifique a chave em [`conf/options.ini`](conf/options.ini):
 
 ```ini
 [Interface]
-LocalMenuMode=classic
+LocalMenuMode=canonical
 ```
 
 Você também pode forçar pela linha de comando:
@@ -1340,7 +1360,7 @@ Provide a modern, verifiable version of Groundfire for:
 | Local AI | 🟢 active | Computer-controlled players are implemented |
 | Destructible terrain | 🟢 active | Craters, terrain falling, and effects have dedicated tests |
 | Between-round shop | 🟢 active | Weapon and jump jet purchasing |
-| Network | 🟡 evolving | Client, headless server, LAN discovery, and secure transport |
+| Network | 🟡 evolving | Client, headless server, LAN discovery, native UDP transport, and server browser |
 | Historical fidelity | 🟡 evolving | Tests and recorded output help compare behavior |
 
 ---
@@ -1376,7 +1396,7 @@ The images below were generated from assets already stored in this repository.
 |:---|:---|
 | 🐍 Python | 3.10, 3.11, 3.12, or 3.13 |
 | 🖥️ Graphics | Environment capable of opening a Pygame window |
-| 📦 Main dependencies | `pygame`, `msgpack`, `mpgameserver` |
+| 📦 Main dependencies | `pygame` |
 | 🖧 Operating system | Windows, Linux, macOS, or WSL with graphics support |
 | 📄 License | MIT |
 
@@ -1387,8 +1407,6 @@ Dependencies are declared in [`requirements.txt`](requirements.txt) and [`pyproj
 | Package | Version | Purpose |
 |:---|:---:|:---|
 | `pygame` | `2.6.1` | Windowing, input, 2D rendering, and audio |
-| `msgpack` | `1.1.2` | Message serialization |
-| `mpgameserver` | `0.2.4` | Client/server transport infrastructure |
 | `ruff` | `0.15.7` | Linting and import organization during development |
 | `mypy` | `1.19.1` | Optional static typing checks during development |
 
@@ -1639,7 +1657,7 @@ Local play is the main current usage path:
 groundfire
 ```
 
-`LocalMenuMode=classic` in [`conf/options.ini`](conf/options.ini) makes the game open with the classic presentation by default.
+`LocalMenuMode=canonical` in [`conf/options.ini`](conf/options.ini) makes the game open with the modern menu by default, including the **Find Servers** button. Use `--classic-local` or `LocalMenuMode=classic` to return to the classic presentation.
 
 ### 🖧 Headless Server
 
@@ -1685,6 +1703,7 @@ port-groundfire-for-python/
 ├── 📁 media/
 │   └── 📁 img/             generated screenshots and images
 ├── 📁 groundfire/          public wrappers for package execution
+├── 📁 groundfire_net/      native networking module reusable across games
 ├── 📁 scripts/             QA, artwork, asset, and profiling tools
 ├── 📁 src/                 main Python port code
 │   └── 📁 groundfire/      canonical runtime organized by domain
@@ -1866,18 +1885,39 @@ The roadmap proposes gradual modernization while keeping the game playable after
 ---
 
 <details>
-<summary><h3>🔐 Secure Online Mode</h3></summary>
+<summary><h3>🌐 Native Online Mode</h3></summary>
 
-<a id="secure-online-mode-en"></a>
+<a id="native-online-mode-en"></a>
 
-The online client/server path uses `mpgameserver` as the secure transport layer. It keeps the existing Groundfire match logic and interface flow while moving transport to an authenticated and encrypted UDP connection.
+The online client/server path uses only Python's standard library for transport: `socket`, `selectors`, `json`, and dataclasses. The copyable [`groundfire_net/`](groundfire_net) package contains the codec, UDP endpoint, LAN discovery, master server, server list, favorites/history, and server loop.
 
 | File | Purpose |
 |:---|:---|
-| `conf/network/server_root_private.pem` | Server private key |
-| `conf/network/server_root_public.pem` | Server public key |
+| [`groundfire_net/`](groundfire_net) | Reusable native networking module |
+| [`src/groundfire/network/`](src/groundfire/network) | Groundfire-specific message, discovery, and browser adapters |
+| [`src/groundfire/app/server.py`](src/groundfire/app/server.py) | Authoritative headless server |
+| [`src/groundfire/master.py`](src/groundfire/master.py) | Native master server for the Internet tab |
 
-When the server starts, it creates the private/public key pair automatically if the files do not exist.
+The canonical start menu includes a **Find Servers** button with Internet, Favorites, Unique, History, and Lan tabs. The browser includes column lists, header sorting, scrolling, text/password/full/empty/region/secure/latency filters, favorites, history, manual `host:port` entries, quick/full refresh, connect, and native UDP ping. The Lan tab listens for UDP announcements from active Groundfire servers. The Internet tab queries a native Groundfire master server.
+
+**Start the master server:**
+
+```powershell
+python -m src.groundfire.master
+```
+
+**Publish a server to the master server:**
+
+```powershell
+python -m src.groundfire.server --master-server 127.0.0.1:27017 --server-name "My Groundfire"
+```
+
+**Use a password-protected server:**
+
+```powershell
+python -m src.groundfire.server --password secret --master-server 127.0.0.1:27017
+python -m src.groundfire.client --connect 127.0.0.1:27015 --password secret
+```
 
 **Start the server:**
 
@@ -1885,23 +1925,23 @@ When the server starts, it creates the private/public key pair automatically if 
 python -m src.groundfire.server
 ```
 
-**Use custom key paths:**
+**Use custom ports:**
 
 ```powershell
-python -m src.groundfire.server --server-private-key custom/private.pem --server-public-key custom/public.pem
+python -m src.groundfire.server --host 0.0.0.0 --port 27015 --discovery-port 27016
 ```
 
 **Connect a client:**
 
 ```powershell
-python -m src.groundfire.client --connect 127.0.0.1:27015 --server-public-key conf/network/server_root_public.pem
+python -m src.groundfire.client --connect 127.0.0.1:27015
 ```
 
-**Security notes:**
+**Notes:**
 
-- 🔒 The server private key stays on the server
-- 🔑 The client uses the server public key to authenticate the secure handshake
-- ⛔ If the trusted public key file is missing, the client refuses the connection instead of falling back to insecure mode
+- The online transport does not use external networking libraries
+- The protocol uses native JSON envelopes for easier debugging and portability
+- `--server-public-key` and `--server-private-key` are still accepted only for CLI compatibility
 
 </details>
 
@@ -2052,7 +2092,7 @@ Check [`conf/options.ini`](conf/options.ini):
 
 ```ini
 [Interface]
-LocalMenuMode=classic
+LocalMenuMode=canonical
 ```
 
 You can also force the mode from the command line:

@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "description": "Deterministic CS-like server browser data used only for visual fidelity tests.",
+  "internet": {
+    "expected_count": 124,
+    "seed_entries": [
+      {
+        "name": "#1 [TGR] tigUERes DEL Cs 1.6 ~ REVIVE ~ FREE VIP ~ DOUBLE JUMP",
+        "game": "Counter-Strike",
+        "players": [28, 32],
+        "map": "de_aztecyust2",
+        "latency": 157
+      },
+      {
+        "name": "**NESTLELEAGUECS.RO # VIP FREE 24/7 ::",
+        "game": "Counter-Strike",
+        "players": [32, 32],
+        "map": "de_inferno2se",
+        "latency": 214
+      },
+      {
+        "name": "Fatality Family | Public",
+        "game": "Counter-Strike",
+        "players": [32, 32],
+        "map": "de_dust2",
+        "latency": 215
+      },
+      {
+        "name": "CS-TERVEL.NET # Dust2 Only | REVIVE TEAMMATES",
+        "game": "Hosted by STRONG...",
+        "players": [32, 32],
+        "map": "de_dust2",
+        "latency": 210
+      },
+      {
+        "name": "NewLifeZM.LeagueCS.ro - Old CSBD Server.[ZP Outstanding]",
+        "game": "Zombie Plague 6.0",
+        "players": [25, 32],
+        "map": "zm_fox",
+        "latency": 212
+      },
+      {
+        "name": "□ CRITICAL KILL | ███",
+        "game": "Counter-Strike",
+        "players": [27, 32],
+        "map": "de_dust2",
+        "latency": 245
+      },
+      {
+        "name": "□ N E W - E R A □ | Chivas Royal Club...",
+        "game": "Counter-Strike",
+        "players": [19, 32],
+        "map": "de_dust2",
+        "latency": 230
+      },
+      {
+        "name": "ADDICTED.OLD-GAMING.RO[VIP]+18",
+        "game": "VIP FREE + REVIVE",
+        "players": [22, 32],
+        "map": "de_inferno",
+        "latency": 212
+      },
+      {
+        "name": "~ Zombie Plague GunXP 24/7 ~ Double XP 06-10PM EET",
+        "game": "Zombie Plague 24/7",
+        "players": [31, 32],
+        "map": "zm_fox",
+        "latency": 214
+      },
+      {
+        "name": "SUD.LALEAGANERO [LEGENDS NEVER DIE]",
+        "game": "Counter-Strike",
+        "players": [31, 32],
+        "map": "de_amr",
+        "latency": 212
+      },
+      {
+        "name": "--- PRO.LALEAGANERO --- VIP FREE - REVIVE MOD ---",
+        "game": "VIP FREE JOIN US",
+        "players": [19, 32],
+        "map": "de_inferno",
+        "latency": 214
+      },
+      {
+        "name": "(33:27) ANORMALII.LEAGUECS.RO # BE ANORMAL",
+        "game": "[STEAM = VIP FREE]",
+        "players": [31, 32],
+        "map": "de_alexandra",
+        "latency": 215
+      }
+    ],
+    "generated_entries": {
+      "count": 112,
+      "name_prefix": "Reference Counter-Strike Server",
+      "games": ["Counter-Strike", "Zombie Escape", "Zombie Mod", "VIP FREE", "eSports Classic"],
+      "maps": ["de_dust2", "de_inferno", "de_nuke", "fy_snow", "zm_fox", "ze_dust_escape"],
+      "latency_start": 216
+    }
+  },
+  "favorites": [
+    {"name": "146.19.215.227:27015", "game": "-", "players": "-", "map": "-", "latency": "-"},
+    {"name": "217.156.22.221:27015", "game": "-", "players": "-", "map": "-", "latency": "-"},
+    {"name": "45.136.205.56:27015", "game": "-", "players": "-", "map": "-", "latency": "-"},
+    {"name": "51.89.113.227:27015", "game": "-", "players": "-", "map": "-", "latency": "-"},
+    {"name": "46.203.233.32:27015", "game": "-", "players": "-", "map": "-", "latency": "-"}
+  ],
+  "unique": [
+    {
+      "name": "SCP Foundation | Next21.ru",
+      "description": "Horror:Light RP по мотивам вселенной SCP Foundation",
+      "game": "Counter-Strike",
+      "players": [32, 32],
+      "map": "scp_foundatio...",
+      "latency": 363
+    },
+    {
+      "name": "DreamQuake [Climbing] | Next21.ru",
+      "description": "Для тех кому хочется чего-то новенького! На DreamQuake всегда найдется чем вас уд...",
+      "game": "Counter-Strike",
+      "players": [13, 32],
+      "map": "kzra_blackpearl",
+      "latency": 363
+    },
+    {
+      "name": "Epic Fun Knife | Next21.ru",
+      "description": "",
+      "game": "Epic Fun Knife",
+      "players": [14, 21],
+      "map": "33hp_2efk",
+      "latency": 363
+    },
+    {
+      "name": "Go Hard [Ghost Fury] | Next21.ru",
+      "description": "",
+      "game": "Ghost Fury",
+      "players": [11, 21],
+      "map": "bio_mystery",
+      "latency": 363
+    }
+  ],
+  "history": [],
+  "lan": []
+}

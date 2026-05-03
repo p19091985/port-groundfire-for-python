@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from groundfire_net.browser import ServerBook, ServerListEntry
 from src.gameclock import ClockTick
 from src.gameui import GameUI
 from src.groundfire.app.client import ClientApp
@@ -218,77 +219,17 @@ class ClientServerAppTests(unittest.TestCase):
 
         self.assertEqual(client.get_client_state().join_reject_reason, "server_full")
 
-    def test_secure_client_backend_uses_transport_messages(self):
-        transport_calls = []
-
-        class SecureTransportStub:
-            disconnect_reason = None
-
-            def connect(self, host, port, *, player_name, requested_slot=None):
-                transport_calls.append(("connect", host, port, player_name, requested_slot))
-
-            def poll_messages(self):
-                return (
-                    JoinAccept(session_id="session-1", player_number=2, session_token="token-2"),
-                )
-
-            def send_message(self, message, *, reliable=False):
-                transport_calls.append(("send", type(message).__name__, reliable))
-
-            def close(self):
-                transport_calls.append(("close",))
-
+    def test_legacy_backend_name_is_normalized_to_native_udp(self):
         client = ClientApp(
             game_factory=DummyGame,
-            network_backend="mpgameserver",
+            network_backend="legacy-external",
             secure_server_public_key_path="keys/server_root_public.pem",
         )
-        client._build_secure_transport = lambda: SecureTransportStub()
         try:
-            client.connect("127.0.0.1", 27015, player_name="Alice", requested_slot=2)
-            messages = client.poll_network()
+            sent = client.connect("127.0.0.1", 27015, player_name="Alice", requested_slot=2)
 
-            self.assertEqual(transport_calls[0], ("connect", "127.0.0.1", 27015, "Alice", 2))
-            self.assertEqual(messages[0].player_number, 2)
-            self.assertEqual(client.get_client_state().session_id, "session-1")
-            self.assertEqual(client.get_client_state().player_number, 2)
-        finally:
-            client.close()
-
-    def test_secure_client_disconnect_clears_session_state(self):
-        class SecureTransportStub:
-            def __init__(self):
-                self.disconnect_reason = "connection_dropped"
-
-            def connect(self, host, port, *, player_name, requested_slot=None):
-                return None
-
-            def poll_messages(self):
-                return ()
-
-            def send_message(self, message, *, reliable=False):
-                return None
-
-            def close(self):
-                return None
-
-        client = ClientApp(
-            game_factory=DummyGame,
-            network_backend="mpgameserver",
-            secure_server_public_key_path="keys/server_root_public.pem",
-        )
-        client._build_secure_transport = lambda: SecureTransportStub()
-        try:
-            client.connect("127.0.0.1", 27015, player_name="Alice")
-            client.get_client_state().apply_join_accept(
-                JoinAccept(session_id="session-1", player_number=0, session_token="token-1")
-            )
-
-            client.poll_network()
-
-            self.assertIsNone(client.get_client_state().session_id)
-            self.assertIsNone(client.get_client_state().player_number)
-            self.assertEqual(client.get_client_state().disconnect_reason, "connection_dropped")
+            self.assertEqual([type(message).__name__ for message in sent], ["HelloRequest", "JoinRequest"])
+            self.assertEqual(client._network_backend, "udp")
         finally:
             client.close()
 
@@ -441,6 +382,48 @@ class ClientServerAppTests(unittest.TestCase):
             self.assertEqual(calls[0], ("Alice", 3, 25, 1, 3, (), 2))
         finally:
             client.close()
+
+    def test_local_menu_connect_selection_starts_connected_runtime_and_defers_history_until_accept(self):
+        with TemporaryDirectory() as temp_dir:
+            book_path = Path(temp_dir) / "servers.json"
+            entry = ServerListEntry(name="Menu Server", host="127.0.0.1", port=27015, requires_password=True)
+            calls = []
+
+            class LocalRuntimeStub:
+                def open_menu(self, _game, *, player_name, ai_players=1, max_frames=None):
+                    return LocalMenuSelection(
+                        "connect",
+                        ai_players,
+                        connect_host=entry.host,
+                        connect_port=entry.port,
+                        connect_password="secret",
+                        connect_entry=entry,
+                    )
+
+                def run(self, *_args, **_kwargs):
+                    raise AssertionError("Connected browser selection should not start local gameplay.")
+
+            class ConnectedRuntimeStub:
+                def run(self, client, _game, *, max_frames=None):
+                    calls.append((client._server_address, client._pending_history_entry, max_frames))
+                    return 55
+
+            client = ClientApp(
+                game_factory=ConnectedGameStub,
+                local_runtime=LocalRuntimeStub(),
+                server_book_path=book_path,
+            )
+            client._front_runtime = ConnectedRuntimeStub()
+            try:
+                exit_code = client.run_local(show_menu=True, max_frames=2, player_name="Alice", ai_players=1)
+
+                self.assertEqual(exit_code, 55)
+                self.assertEqual(calls[0][0], ("127.0.0.1", 27015))
+                self.assertEqual(calls[0][1].endpoint, entry.endpoint)
+                self.assertEqual(calls[0][2], 2)
+                self.assertEqual(ServerBook(book_path).get_history(), ())
+            finally:
+                client.close()
 
     def test_local_menu_multi_human_start_bootstraps_legacy_roster(self):
         with TemporaryDirectory() as temp_dir:

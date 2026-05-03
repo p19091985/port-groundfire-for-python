@@ -19,9 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--server-public-key",
         default=str(DEFAULT_SERVER_PUBLIC_KEY_PATH),
-        help="Trusted server public key PEM used by the secure online transport.",
+        help="Deprecated compatibility option; native UDP online mode does not use external key files.",
     )
     parser.add_argument("--player-name", default="Player", help="Displayed player name.")
+    parser.add_argument("--password", default="", help="Password used when connecting to a protected server.")
     parser.add_argument("--ai-players", type=int, default=1, help="Number of local AI opponents in local mode.")
     local_mode_group = parser.add_mutually_exclusive_group()
     local_mode_group.add_argument(
@@ -41,13 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     client = ClientApp(
-        network_backend="mpgameserver" if args.connect else "udp",
+        network_backend="udp",
         secure_server_public_key_path=args.server_public_key,
     )
 
     if args.connect:
         host, port = _parse_connect_target(args.connect)
-        client.connect(host, port, player_name=args.player_name)
+        client.connect(host, port, player_name=args.player_name, password=args.password)
         try:
             return client.run_connected(max_frames=1 if args.once else None)
         finally:
@@ -80,7 +81,7 @@ def _resolve_local_mode(args) -> str:
     if args.canonical_local:
         return "canonical"
     settings = ReadIniFile(str(DEFAULT_SETTINGS_PATH))
-    value = settings.get_string("Interface", "LocalMenuMode", "classic").strip().lower()
+    value = settings.get_string("Interface", "LocalMenuMode", "canonical").strip().lower()
     return "classic" if value == "classic" else "canonical"
 
 

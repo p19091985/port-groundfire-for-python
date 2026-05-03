@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import selectors
-import socket
 from pathlib import Path
 from typing import Callable
 
+from groundfire_net.browser import ServerBook, ServerListEntry
+from groundfire_net.transport import DatagramEndpoint
+
 from ..core.headless import HeadlessRuntime
 from ..core.settings import set_ini_value
+from ..network.browser import default_server_book_path
 from ..network.client_state import ClientReplicatedState
 from ..network.codec import decode_message, encode_message
 from ..network.lan import LanServerBrowser
@@ -21,10 +23,11 @@ from ..network.messages import (
     ServerEventEnvelope,
     ServerSnapshotEnvelope,
 )
-from ..network.mpgameserver_backend import MpGameServerClientTransport
 from ..render.scene import ReplicatedMatchScene, ReplicatedSceneRenderer
 from .front import ConnectedFrontRuntime
 from .local import LocalFrontRuntime
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class ClientApp:
@@ -37,19 +40,18 @@ class ClientApp:
         local_runtime: LocalFrontRuntime | None = None,
         network_backend: str = "udp",
         secure_server_public_key_path: str | Path | None = None,
+        server_book_path: str | Path | None = None,
     ):
         self._runtime = runtime or HeadlessRuntime()
         self._game_factory = game_factory or self._default_game_factory
         self._legacy_game_factory = legacy_game_factory or game_factory or self._default_legacy_game_factory
-        self._network_backend = network_backend
+        self._network_backend = "udp"
         self._secure_server_public_key_path = (
             Path(secure_server_public_key_path) if secure_server_public_key_path else None
         )
         self._game = None
         self._legacy_game = None
-        self._selector = selectors.DefaultSelector()
-        self._socket: socket.socket | None = None
-        self._secure_transport: MpGameServerClientTransport | None = None
+        self._network_endpoint: DatagramEndpoint | None = None
         self._server_address: tuple[str, int] | None = None
         self._hello_accept = None
         self._client_state = ClientReplicatedState()
@@ -58,6 +60,12 @@ class ClientApp:
         self._scene_renderer = ReplicatedSceneRenderer()
         self._front_runtime = ConnectedFrontRuntime()
         self._local_runtime = local_runtime or LocalFrontRuntime()
+        self._server_book_path = (
+            Path(server_book_path)
+            if server_book_path is not None
+            else default_server_book_path(PROJECT_ROOT)
+        )
+        self._pending_history_entry: ServerListEntry | None = None
 
     def get_game(self):
         if self._game is None:
@@ -79,15 +87,12 @@ class ClientApp:
         return self._replicated_scene
 
     def open_network(self, *, host: str = "0.0.0.0", port: int = 0):
-        if self._socket is not None:
-            return self._socket
+        if self._network_endpoint is not None:
+            return self._network_endpoint.socket
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((host, port))
-        sock.setblocking(False)
-        self._selector.register(sock, selectors.EVENT_READ)
-        self._socket = sock
-        return sock
+        endpoint = DatagramEndpoint(host=host, port=port)
+        self._network_endpoint = endpoint
+        return endpoint.socket
 
     def close(self):
         seen = set()
@@ -98,16 +103,9 @@ class ClientApp:
             close = getattr(game, "close", None)
             if callable(close):
                 close()
-        if self._secure_transport is not None:
-            self._secure_transport.close()
-            self._secure_transport = None
-        if self._socket is not None:
-            try:
-                self._selector.unregister(self._socket)
-            except Exception:
-                pass
-            self._socket.close()
-            self._socket = None
+        if self._network_endpoint is not None:
+            self._network_endpoint.close()
+            self._network_endpoint = None
 
     def close_game(self):
         self._close_game_instance("_game")
@@ -122,67 +120,31 @@ class ClientApp:
         *,
         player_name: str = "Player",
         requested_slot: int | None = None,
+        password: str = "",
+        history_entry: ServerListEntry | None = None,
     ):
-        if self._network_backend == "mpgameserver":
-            self._server_address = (host, port)
-            self._secure_transport = self._build_secure_transport()
-            self._secure_transport.connect(
-                host,
-                port,
-                player_name=player_name,
-                requested_slot=requested_slot,
-            )
-            return ()
         self.open_network()
         self._server_address = (host, port)
+        self._pending_history_entry = history_entry
         messages = (
             HelloRequest(player_name=player_name),
-            JoinRequest(player_name=player_name, requested_slot=requested_slot),
+            JoinRequest(player_name=player_name, requested_slot=requested_slot, password=password),
         )
         for message in messages:
             self.send_message(message)
         return messages
 
     def send_message(self, message):
-        if self._network_backend == "mpgameserver":
-            if self._secure_transport is None:
-                raise RuntimeError("Secure client transport is not initialized.")
-            reliable = isinstance(message, (HelloRequest, JoinRequest, DisconnectNotice))
-            self._secure_transport.send_message(message, reliable=reliable)
-            return
-        if self._socket is None or self._server_address is None:
+        if self._network_endpoint is None or self._server_address is None:
             raise RuntimeError("Client network socket or server address is not initialized.")
-        self._socket.sendto(encode_message(message), self._server_address)
+        self._network_endpoint.sendto(encode_message(message), self._server_address)
 
     def poll_network(self, *, timeout: float = 0.0) -> tuple[object, ...]:
-        if self._network_backend == "mpgameserver":
-            if self._secure_transport is None:
-                return ()
-            messages = [
-                self._handle_message(message, self._server_address or ("0.0.0.0", DEFAULT_GAME_PORT))
-                for message in self._secure_transport.poll_messages()
-            ]
-            disconnect_reason = self._secure_transport.disconnect_reason
-            if disconnect_reason and self._client_state.disconnect_reason is None:
-                self._client_state.apply_disconnect(
-                    DisconnectNotice(
-                        session_id=self._client_state.session_id or "",
-                        player_number=self._client_state.player_number or -1,
-                        session_token=self._client_state.session_token or "",
-                        reason=disconnect_reason,
-                    )
-                )
-            return tuple(message for message in messages if message is not None)
-
+        if self._network_endpoint is None:
+            return ()
         messages = []
-        for key, _mask in self._selector.select(timeout):
-            sock = key.fileobj
-            try:
-                while True:
-                    payload, address = sock.recvfrom(65535)  # type: ignore[union-attr]
-                    messages.append(self.handle_packet(payload, address))
-            except BlockingIOError:
-                continue
+        for datagram in self._network_endpoint.poll(timeout=timeout):
+            messages.append(self.handle_packet(datagram.payload, datagram.address))
         return tuple(message for message in messages if message is not None)
 
     def handle_packet(self, payload: bytes, address: tuple[str, int]):
@@ -192,8 +154,10 @@ class ClientApp:
         if isinstance(message, JoinAccept):
             self._server_address = address
             self._client_state.apply_join_accept(message)
+            self._record_pending_history()
         elif isinstance(message, JoinReject):
             self._client_state.apply_join_reject(message)
+            self._pending_history_entry = None
         elif isinstance(message, ServerSnapshotEnvelope):
             applied = self._client_state.apply_snapshot(message)
             if applied:
@@ -220,6 +184,13 @@ class ClientApp:
                 self._client_state.apply_hello_accept(message)
             self._hello_accept = message
         return message
+
+    def _record_pending_history(self):
+        entry = self._pending_history_entry
+        self._pending_history_entry = None
+        if entry is None:
+            return
+        ServerBook(self._server_book_path).record_history(entry)
 
     def build_and_send_command_envelope(self, commands: dict[str, bool], *, source: str = "client:local"):
         envelope = self._client_state.build_command_envelope(
@@ -294,6 +265,16 @@ class ClientApp:
                     player_name=player_name,
                     menu_selection=selection,
                 )
+            if selection.action == "connect":
+                self.connect(
+                    selection.connect_host,
+                    selection.connect_port,
+                    player_name=player_name,
+                    requested_slot=selection.requested_slot,
+                    password=selection.connect_password,
+                    history_entry=selection.connect_entry,
+                )
+                return self.run_connected(max_frames=max_frames)
             ai_players = selection.ai_players
             num_rounds = selection.num_rounds
             local_controller = selection.local_controller
@@ -346,11 +327,6 @@ class ClientApp:
         from src.game import Game
 
         return Game()
-
-    def _build_secure_transport(self) -> MpGameServerClientTransport:
-        if self._secure_server_public_key_path is None:
-            raise RuntimeError("Secure online mode requires a trusted server public key path.")
-        return MpGameServerClientTransport(public_key_path=self._secure_server_public_key_path)
 
     def _persist_local_menu_mode(self, game, mode: str):
         settings_path_getter = getattr(game, "get_settings_path", None)

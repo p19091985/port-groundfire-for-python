@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "coordinate_space": "source_png_pixels",
+  "notes": [
+    "Medições iniciais extraídas visualmente dos anexos.",
+    "Os testes usam estas posições como contrato de layout e permitem tolerância controlada.",
+    "A titlebar do sistema operacional pode variar; para pixel-perfect absoluto, desenhar titlebar própria."
+  ],
+  "visual_comparison": {
+    "titlebar_strategy": "crop_window_rect",
+    "actual_output_dir": ".tmp/server_browser_actual",
+    "pixel_delta_threshold": 45,
+    "major_pixel_delta_threshold": 90,
+    "states": {
+      "find_servers_button": {
+        "max_average_delta": 45.0,
+        "max_pixel_ratio_over_threshold": 0.18,
+        "max_pixel_ratio_over_major_threshold": 0.15
+      },
+      "internet_populated": {
+        "max_average_delta": 65.0,
+        "max_pixel_ratio_over_threshold": 0.28,
+        "max_pixel_ratio_over_major_threshold": 0.10
+      },
+      "favorites_populated": {
+        "max_average_delta": 38.0,
+        "max_pixel_ratio_over_threshold": 0.22,
+        "max_pixel_ratio_over_major_threshold": 0.04
+      },
+      "unique_populated": {
+        "max_average_delta": 40.0,
+        "max_pixel_ratio_over_threshold": 0.23,
+        "max_pixel_ratio_over_major_threshold": 0.04
+      },
+      "history_empty": {
+        "max_average_delta": 36.0,
+        "max_pixel_ratio_over_threshold": 0.20,
+        "max_pixel_ratio_over_major_threshold": 0.03
+      },
+      "lan_empty": {
+        "max_average_delta": 36.0,
+        "max_pixel_ratio_over_threshold": 0.20,
+        "max_pixel_ratio_over_major_threshold": 0.03
+      }
+    }
+  },
+  "references": {
+    "find_servers_button": {
+      "file": "find_servers_button.png",
+      "size": [154, 32],
+      "button_rect": [0, 0, 154, 32],
+      "text_rect": [18, 8, 111, 24],
+      "palette": {
+        "background": [25, 38, 61],
+        "text": [190, 198, 210]
+      }
+    },
+    "internet_populated": {
+      "file": "internet_populated.png",
+      "size": [1284, 754],
+      "titlebar_rect": [0, 0, 1284, 22],
+      "window_rect": [0, 22, 1284, 742],
+      "content_rect": [5, 106, 1269, 674],
+      "tabs_rect": [6, 79, 347, 106],
+      "table_header_rect": [6, 113, 1254, 132],
+      "scrollbar_rect": [1254, 114, 1271, 674],
+      "footer_rect": [6, 675, 1269, 719],
+      "link_rect": [1044, 724, 1255, 739],
+      "buttons": {
+        "change_filters": [16, 687, 122, 708],
+        "quick_refresh": [980, 686, 1085, 709],
+        "refresh_all": [1092, 686, 1186, 709],
+        "connect": [1191, 686, 1265, 709]
+      },
+      "columns": {
+        "servers": [24, 114, 939, 132],
+        "game": [939, 114, 1051, 132],
+        "players": [1051, 114, 1106, 132],
+        "map": [1106, 114, 1197, 132],
+        "latency": [1197, 114, 1254, 132]
+      },
+      "fixture_key": "internet",
+      "expected_count": 124
+    },
+    "favorites_populated": {
+      "file": "favorites_populated.png",
+      "size": [1296, 756],
+      "titlebar_rect": [0, 0, 1296, 24],
+      "window_rect": [2, 25, 1283, 745],
+      "content_rect": [11, 106, 1258, 666],
+      "tabs_rect": [11, 73, 348, 100],
+      "table_header_rect": [11, 106, 1258, 124],
+      "scrollbar_rect": [1258, 107, 1274, 667],
+      "footer_rect": [11, 667, 1274, 711],
+      "link_rect": [1049, 722, 1258, 737],
+      "buttons": {
+        "change_filters": [20, 678, 127, 701],
+        "add_current_server": [848, 677, 990, 701],
+        "add_server": [996, 677, 1092, 701],
+        "refresh": [1094, 677, 1191, 701],
+        "connect": [1196, 677, 1269, 701]
+      },
+      "columns": {
+        "servers": [29, 107, 946, 124],
+        "game": [946, 107, 1057, 124],
+        "players": [1057, 107, 1112, 124],
+        "map": [1112, 107, 1203, 124],
+        "latency": [1203, 107, 1258, 124]
+      },
+      "fixture_key": "favorites",
+      "expected_count": 5
+    },
+    "unique_populated": {
+      "file": "unique_populated.png",
+      "size": [1274, 750],
+      "titlebar_rect": [0, 0, 1274, 23],
+      "window_rect": [1, 23, 1273, 741],
+      "content_rect": [8, 101, 1255, 661],
+      "tabs_rect": [8, 69, 348, 97],
+      "table_header_rect": [8, 101, 1255, 119],
+      "scrollbar_rect": [1255, 102, 1271, 662],
+      "footer_rect": [8, 662, 1271, 707],
+      "link_rect": [1045, 720, 1255, 735],
+      "buttons": {
+        "change_filters": [17, 673, 124, 696],
+        "quick_refresh": [984, 673, 1095, 696],
+        "refresh_all": [1095, 673, 1190, 696],
+        "connect": [1193, 673, 1268, 696]
+      },
+      "columns": {
+        "servers": [27, 102, 457, 119],
+        "description": [457, 102, 938, 119],
+        "game": [938, 102, 1050, 119],
+        "players": [1050, 102, 1106, 119],
+        "map": [1106, 102, 1195, 119],
+        "latency": [1195, 102, 1255, 119]
+      },
+      "fixture_key": "unique",
+      "expected_count": 4
+    },
+    "history_empty": {
+      "file": "history_empty.png",
+      "size": [1298, 747],
+      "titlebar_rect": [0, 0, 1298, 23],
+      "window_rect": [1, 23, 1282, 733],
+      "content_rect": [9, 95, 1255, 656],
+      "tabs_rect": [9, 62, 349, 89],
+      "table_header_rect": [9, 95, 1255, 113],
+      "scrollbar_rect": [1255, 96, 1271, 656],
+      "footer_rect": [9, 656, 1272, 700],
+      "link_rect": [1047, 719, 1256, 733],
+      "buttons": {
+        "change_filters": [18, 668, 125, 692],
+        "refresh": [1094, 668, 1189, 692],
+        "connect": [1194, 668, 1269, 692]
+      },
+      "columns": {
+        "servers": [28, 96, 847, 113],
+        "game": [847, 96, 958, 113],
+        "players": [958, 96, 1014, 113],
+        "map": [1014, 96, 1104, 113],
+        "latency": [1104, 96, 1159, 113],
+        "last_played": [1159, 96, 1255, 113]
+      },
+      "empty_message": "No servers have been played recently.",
+      "fixture_key": "history",
+      "expected_count": 0
+    },
+    "lan_empty": {
+      "file": "lan_empty.png",
+      "size": [1286, 750],
+      "titlebar_rect": [0, 0, 1286, 22],
+      "window_rect": [0, 23, 1279, 741],
+      "content_rect": [6, 103, 1254, 664],
+      "tabs_rect": [6, 70, 347, 97],
+      "table_header_rect": [6, 103, 1254, 121],
+      "scrollbar_rect": [1254, 104, 1270, 664],
+      "footer_rect": [6, 664, 1270, 708],
+      "link_rect": [1044, 719, 1255, 734],
+      "buttons": {
+        "change_filters": [15, 676, 121, 699],
+        "refresh": [1090, 675, 1184, 698],
+        "connect": [1190, 675, 1265, 698]
+      },
+      "columns": {
+        "servers": [24, 104, 939, 121],
+        "game": [939, 104, 1050, 121],
+        "players": [1050, 104, 1106, 121],
+        "map": [1106, 104, 1197, 121],
+        "latency": [1197, 104, 1254, 121]
+      },
+      "empty_message": "No internet games responded to the query.",
+      "fixture_key": "lan",
+      "expected_count": 0
+    }
+  }
+}

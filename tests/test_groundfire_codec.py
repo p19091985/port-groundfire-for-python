@@ -1,13 +1,19 @@
 import unittest
 
 from src.groundfire.network.codec import decode_json, decode_message, encode_json, encode_message
-from src.groundfire.network.messages import ClientCommandEnvelope, ServerSnapshotEnvelope
+from src.groundfire.network.messages import ClientCommandEnvelope, JoinRequest, ServerSnapshotEnvelope
 from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
 from src.groundfire.sim.world import ReplicatedEntityState, TerrainPatch
 
 
 class GroundfireCodecTests(unittest.TestCase):
-    def test_client_command_round_trips_through_msgpack_and_json(self):
+    def test_join_request_round_trips_password(self):
+        request = JoinRequest(player_name="Alice", requested_slot=2, password="secret")
+
+        self.assertEqual(decode_message(encode_message(request)), request)
+        self.assertEqual(decode_json(encode_json(request)), request)
+
+    def test_client_command_round_trips_through_native_json_bytes_and_text(self):
         envelope = ClientCommandEnvelope(
             session_id="session-1",
             player_number=2,
