@@ -2,8 +2,11 @@ import unittest
 
 from src.gameui import GameUI
 from src.groundfire.network.messages import ServerSnapshotEnvelope
+from src.groundfire.render.primitives import PolygonPrimitive, RectPrimitive
 from src.groundfire.render.scene import ReplicatedMatchScene, ReplicatedSceneRenderer
+from src.groundfire.render.terrain import TerrainRenderStateBuilder
 from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
+from src.groundfire.sim.terrain import TerrainState
 from src.groundfire.sim.world import ReplicatedEntityState, TerrainPatch
 
 
@@ -132,6 +135,68 @@ class ReplicatedSceneTests(unittest.TestCase):
         self.assertEqual(frame.metadata["phase_ticks_remaining"], 60)
         self.assertEqual(frame.metadata["snapshot_kind"], "full")
         self.assertEqual(frame.metadata["baseline_snapshot_sequence"], 5)
+
+    def test_multiplayer_terrain_uses_full_game_width_and_classic_layers(self):
+        terrain = TerrainState(seed=1, width=20.0, heights=[-1.0, 0.0, -0.5])
+        primitives = TerrainRenderStateBuilder().build_primitives(terrain)
+
+        sky_primitives = [primitive for primitive in primitives if isinstance(primitive, RectPrimitive)]
+        terrain_polygons = [primitive for primitive in primitives if isinstance(primitive, PolygonPrimitive)]
+
+        self.assertEqual(len(sky_primitives), TerrainRenderStateBuilder.SKY_BANDS)
+        self.assertEqual(terrain_polygons[0].points[0][0], -10.0)
+        self.assertEqual(terrain_polygons[-1].points[2][0], 10.0)
+        self.assertIn((204, 204, 0), [primitive.colour for primitive in terrain_polygons])
+        self.assertIn((153, 153, 0), [primitive.colour for primitive in terrain_polygons])
+
+    def test_multiplayer_terrain_palette_varies_by_scenario_seed(self):
+        classic = TerrainRenderStateBuilder().build_primitives(
+            TerrainState(seed=1, width=20.0, heights=[-1.0, 0.0])
+        )
+        basin = TerrainRenderStateBuilder().build_primitives(
+            TerrainState(seed=7, width=20.0, heights=[-1.0, 0.0])
+        )
+
+        classic_colours = [primitive.colour for primitive in classic if isinstance(primitive, PolygonPrimitive)]
+        basin_colours = [primitive.colour for primitive in basin if isinstance(primitive, PolygonPrimitive)]
+
+        self.assertNotEqual(classic_colours, basin_colours)
+
+    def test_multiplayer_tank_arrow_points_along_fire_angle(self):
+        snapshot = MatchSnapshot(
+            authority="server",
+            game_phase="round_in_action",
+            current_round=1,
+            num_rounds=5,
+            simulation_tick=1,
+            players=(
+                ReplicatedPlayerState(
+                    player_number=0,
+                    name="Alice",
+                    tank_entity_id=1,
+                    colour=(200, 100, 80),
+                ),
+            ),
+            entities=(
+                ReplicatedEntityState(
+                    entity_id=1,
+                    entity_type="tank",
+                    position=(0.0, 0.0),
+                    angle=0.0,
+                    owner_player=0,
+                    payload={"health": 100.0, "fuel": 1.0, "gun_angle": 0.0, "size": 0.25, "alive": True},
+                ),
+            ),
+        )
+        scene = ReplicatedMatchScene(snapshot=snapshot)
+        renderer = ReplicatedSceneRenderer()
+
+        frame = renderer.build_frame(scene, local_player_number=0)
+        tank_state = frame.entity_states[0]
+        body, _shaft, head = tank_state.primitives[:3]
+
+        self.assertGreater(max(point[0] for point in head.points), max(point[0] for point in body.points))
+        self.assertLess(max(point[1] for point in head.points), 0.5)
 
     def test_scene_applies_incremental_terrain_patch_without_full_profile(self):
         baseline = MatchSnapshot(
@@ -267,6 +332,47 @@ class ReplicatedSceneTests(unittest.TestCase):
         self.assertTrue(any(call[2] == "Shop Phase" for call in game.font.centred_calls))
         self.assertTrue(any(call[2] == "Rolling Mines" for call in game.font.centred_calls))
         self.assertTrue(any(call[2] == "Done!" for call in game.font.centred_calls))
+
+    def test_renderer_draws_polished_lobby_overlay_with_player_roles(self):
+        snapshot = MatchSnapshot(
+            authority="server",
+            game_phase="lobby",
+            current_round=0,
+            num_rounds=5,
+            simulation_tick=12,
+            players=(
+                ReplicatedPlayerState(
+                    player_number=0,
+                    name="Alice",
+                    money=50,
+                    colour=(230, 90, 80),
+                ),
+                ReplicatedPlayerState(
+                    player_number=1,
+                    name="CPU LAN 1",
+                    money=50,
+                    colour=(80, 160, 230),
+                    is_computer=True,
+                ),
+            ),
+            entities=(),
+        )
+        scene = ReplicatedMatchScene(snapshot=snapshot, local_player_number=0)
+        renderer = ReplicatedSceneRenderer()
+        game = self.GameStub()
+
+        frame = renderer.render(game, scene, local_player_number=0)
+
+        self.assertEqual(frame.metadata["game_phase"], "lobby")
+        self.assertTrue(any(call[2] == "Waiting for Server" for call in game.font.centred_calls))
+        self.assertTrue(any(call[2] == "2 players connected" for call in game.font.centred_calls))
+        self.assertTrue(any(call[2] == "Online Lobby" for call in game.font.centred_calls))
+        self.assertTrue(any(call[2] == "Human" for call in game.font.centred_calls))
+        self.assertTrue(any(call[2] == "AI" for call in game.font.centred_calls))
+        self.assertTrue(any(call[2] == "%s" and call[3] == "Alice" for call in game.font.printf_calls))
+        self.assertTrue(any(call[2] == "%s" and call[3] == "CPU LAN 1" for call in game.font.printf_calls))
+        self.assertGreaterEqual(len(game.graphics.rects), 7)
+        self.assertTrue(any(rect[1] == (230, 90, 80, 220) for rect in game.graphics.rects))
 
     def test_renderer_draws_classic_score_overlay_headings(self):
         snapshot = MatchSnapshot(

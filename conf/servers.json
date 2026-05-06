@@ -1,5 +1,23 @@
 {
   "favorites": [],
-  "history": [],
+  "history": [
+    {
+      "description": "Round 0 / open",
+      "game": "Groundfire",
+      "host": "10.77.77.201",
+      "last_played": "2026-05-05 23:00",
+      "latency_ms": 201,
+      "map_name": "seed 1",
+      "max_players": 8,
+      "name": "Groundfire LAN",
+      "player_count": 1,
+      "port": 27015,
+      "protocol_version": 1,
+      "region": "local",
+      "requires_password": false,
+      "secure": true,
+      "source": "history"
+    }
+  ],
   "internet": []
 }

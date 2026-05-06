@@ -26,3 +26,13 @@ jobs:
         env:
           CI: "1"
         run: python scripts/run_quality_checks.py
+      - name: Install Bats
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+      - name: Run Bats launcher tests
+        if: runner.os == 'Linux'
+        env:
+          GROUNDFIRE_LAUNCHER_PYTHON: python
+        run: bats tests/shell/test_lan_launchers.bats

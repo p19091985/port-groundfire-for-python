@@ -40,6 +40,7 @@ from .quitmenu import QuitMenu
 from .winnermenu import WinnerMenu
 from .controllermenu import ControllerMenu
 from .setcontrolsmenu import SetControlsMenu
+from .serverbrowsermenu import ServerBrowserMenu
 
 if TYPE_CHECKING:
     from .entity import Entity
@@ -102,6 +103,7 @@ class Game:
         self._next_entity_id = 1
         self._entities_by_id: dict[int, "Entity"] = {}
         self._pending_network_events: list[NetworkEvent] = []
+        self._online_connect_request: dict[str, object] | None = None
         self._session_id = uuid.uuid4().hex
         self._simulation_tick = 0
         self.pygame_module = pygame
@@ -223,6 +225,29 @@ class Game:
     def queue_network_event(self, event_type: str, **payload):
         self._pending_network_events.append(NetworkEvent(event_type=event_type, payload=payload))
 
+    def request_online_connect(
+        self,
+        *,
+        host: str,
+        port: int,
+        password: str = "",
+        entry=None,
+        is_computer: bool = False,
+    ):
+        self._online_connect_request = {
+            "host": host,
+            "port": int(port),
+            "password": password,
+            "entry": entry,
+            "is_computer": bool(is_computer),
+        }
+        self.queue_network_event("online_connect_requested", host=host, port=int(port), is_computer=bool(is_computer))
+
+    def consume_online_connect_request(self):
+        request = self._online_connect_request
+        self._online_connect_request = None
+        return request
+
     def reset_entity_registry(self):
         self._next_entity_id = 1
         self._entities_by_id.clear()
@@ -341,6 +366,7 @@ class Game:
             self.GameState.CONTROLLERS_MENU: ControllerMenu,
             self.GameState.SET_CONTROLS_MENU: lambda game: SetControlsMenu(game, game.get_active_controller()),
             self.GameState.QUIT_MENU: QuitMenu,
+            self.GameState.SERVER_BROWSER_MENU: ServerBrowserMenu,
             self.GameState.SHOP_MENU: ShopMenu,
             self.GameState.ROUND_SCORE: ScoreMenu,
             self.GameState.WINNER_MENU: WinnerMenu,

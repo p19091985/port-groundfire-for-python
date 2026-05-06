@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 import uuid
-from dataclasses import replace
-from typing import cast
+from dataclasses import dataclass, replace
+from typing import Protocol, cast
 
 from ..network.messages import (
     SIMULATION_HZ,
@@ -19,7 +19,6 @@ from .constants import (
     INITIAL_MONEY,
     PLAYER_COLOURS,
     PROJECTILE_ENTITY_TYPES,
-    TANK_FUEL_STEP,
     TANK_GUN_STEP,
     TANK_MAX_FUEL,
     TANK_MAX_HEALTH,
@@ -28,6 +27,67 @@ from .constants import (
     WEAPON_ORDER,
     WEAPON_SPECS,
 )
+
+
+class SettingsReader(Protocol):
+    def get_int(self, section: str, entry: str, default: int) -> int:
+        ...
+
+    def get_string(self, section: str, entry: str, default: str) -> str:
+        ...
+
+
+@dataclass(frozen=True)
+class AIBehaviorConfig:
+    buy_special_weapons: bool = False
+    use_special_weapons: bool = False
+
+    @classmethod
+    def from_settings(cls, settings: SettingsReader | None):
+        if settings is None:
+            return cls()
+        return cls(
+            buy_special_weapons=_settings_bool(
+                settings,
+                "AI",
+                "BuySpecialWeapons",
+                False,
+                aliases=("AllowShopPurchases",),
+            ),
+            use_special_weapons=_settings_bool(
+                settings,
+                "AI",
+                "UseSpecialWeapons",
+                False,
+                aliases=("AllowSpecialWeapons",),
+            ),
+        )
+
+
+def _settings_bool(
+    settings: SettingsReader,
+    section: str,
+    entry: str,
+    default: bool,
+    *,
+    aliases: tuple[str, ...] = (),
+) -> bool:
+    sentinel = "__groundfire_default__"
+    get_string = getattr(settings, "get_string", None)
+    get_int = getattr(settings, "get_int", None)
+    for candidate in (entry, *aliases):
+        raw_value = get_string(section, candidate, sentinel) if callable(get_string) else sentinel
+        if raw_value != sentinel:
+            normalized = str(raw_value).strip().lower()
+            if normalized in {"1", "true", "yes", "on", "enabled"}:
+                return True
+            if normalized in {"0", "false", "no", "off", "disabled"}:
+                return False
+        if callable(get_int):
+            raw_int = get_int(section, candidate, -1)
+            if raw_int in {0, 1}:
+                return bool(raw_int)
+    return default
 
 
 class MatchController:
@@ -55,6 +115,7 @@ class MatchController:
         seed: int = 1,
         num_rounds: int = 10,
         max_players: int = 8,
+        ai_config: AIBehaviorConfig | None = None,
     ):
         self.simulation_hz = SIMULATION_HZ
         self.snapshot_hz = SNAPSHOT_HZ
@@ -75,6 +136,7 @@ class MatchController:
         self._last_full_snapshot_sequence = 0
         self._last_emitted_snapshot: MatchSnapshot | None = None
         self._last_emitted_snapshot_sequence = 0
+        self._ai_config = ai_config or AIBehaviorConfig()
 
     def join_player(
         self,
@@ -110,16 +172,32 @@ class MatchController:
         if address is not None:
             self._player_addresses[slot] = address
 
-        if self.match_state.current_round == 0:
-            self._start_round(1)
-        else:
+        self.match_state.queue_event("player_joined", player_number=slot, player_name=player_name)
+
+        if self.match_state.game_phase == "lobby" and len(self.match_state.player_slots) >= self.max_players:
+            self.start_match(reason="max_players_reached")
+        elif self.match_state.game_phase not in {"lobby", "winner"} and self.match_state.current_round > 0:
             self._spawn_player_tank(slot)
 
-        self.match_state.queue_event("player_joined", player_number=slot, player_name=player_name)
         joined_player = self.match_state.get_player(slot)
         if joined_player is None:
             return None
         return joined_player, token
+
+    def can_start_match(self) -> bool:
+        return self.match_state.game_phase == "lobby" and bool(self.match_state.player_slots)
+
+    def start_match(self, *, reason: str = "manual") -> bool:
+        if not self.can_start_match():
+            return False
+        self.match_state.queue_event(
+            "match_started",
+            reason=reason,
+            player_count=len(self.match_state.player_slots),
+            max_players=self.max_players,
+        )
+        self._start_round(1)
+        return True
 
     def disconnect_player(self, player_number: int, *, session_token: str | None = None) -> bool:
         token = self._player_tokens.get(player_number)
@@ -325,14 +403,11 @@ class MatchController:
         vx, vy = tank.velocity
         gun_angle = float(tank.payload.get("gun_angle", 45.0))
         fuel = max(0.0, float(tank.payload.get("fuel", self.TANK_MAX_FUEL)))
-        moved = False
 
-        if bool(tank.payload.get("alive", True)) and commands.get("tankleft") and fuel > 0.0:
+        if bool(tank.payload.get("alive", True)) and commands.get("tankleft"):
             x -= TANK_MOVE_STEP
-            moved = True
-        if bool(tank.payload.get("alive", True)) and commands.get("tankright") and fuel > 0.0:
+        if bool(tank.payload.get("alive", True)) and commands.get("tankright"):
             x += TANK_MOVE_STEP
-            moved = True
         if commands.get("gunleft") or commands.get("gunup"):
             gun_angle = min(180.0, gun_angle + TANK_GUN_STEP)
         if commands.get("gunright") or commands.get("gundown"):
@@ -340,8 +415,6 @@ class MatchController:
 
         max_x = (self.world_state.width / 2.0) - 0.25
         x = max(-max_x, min(max_x, x))
-        if moved:
-            fuel = max(0.0, fuel - TANK_FUEL_STEP)
         y = self.world_state.terrain.height_at(x)
 
         _, active_weapon = self._ensure_selected_weapon_available(envelope.player_number)
@@ -933,8 +1006,7 @@ class MatchController:
             commands["gundown"] = True
 
         dx = target.position[0] - tank.position[0]
-        fuel = float(tank.payload.get("fuel", self.TANK_MAX_FUEL))
-        if fuel > 0.15 and abs(dx) > 1.75:
+        if abs(dx) > 1.75:
             commands["tankright" if dx > 0.0 else "tankleft"] = True
 
         last_fire_tick = self._last_fire_tick_by_player.get(player.player_number, -self.AI_FIRE_INTERVAL_TICKS)
@@ -947,6 +1019,8 @@ class MatchController:
         return commands
 
     def _build_ai_shop_commands(self, player: ReplicatedPlayerState) -> dict[str, bool]:
+        if not self._ai_config.buy_special_weapons:
+            return {}
         desired_weapon = self._best_affordable_shop_weapon(player)
         if desired_weapon is None:
             return {}
@@ -1010,6 +1084,8 @@ class MatchController:
         return max(8.0, min(172.0, desired_angle))
 
     def _best_available_weapon(self, player: ReplicatedPlayerState) -> str:
+        if not self._ai_config.use_special_weapons:
+            return "shell"
         stocks = self._weapon_stock_map(player.weapon_stocks)
         for weapon in ("nuke", "mirv", "missile", "machinegun"):
             if stocks.get(weapon, 0) > 0:

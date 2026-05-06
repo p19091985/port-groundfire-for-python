@@ -8,7 +8,7 @@ from src.groundfire.sim.world import ReplicatedEntityState, TerrainPatch
 
 class GroundfireCodecTests(unittest.TestCase):
     def test_join_request_round_trips_password(self):
-        request = JoinRequest(player_name="Alice", requested_slot=2, password="secret")
+        request = JoinRequest(player_name="Alice", requested_slot=2, password="secret", is_computer=True)
 
         self.assertEqual(decode_message(encode_message(request)), request)
         self.assertEqual(decode_json(encode_json(request)), request)

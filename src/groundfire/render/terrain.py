@@ -10,6 +10,14 @@ class TerrainRenderStateBuilder:
     SCREEN_TOP = 7.5
     SCREEN_BOTTOM = -7.5
     SKY_BANDS = 24
+    TOP_LAYER_DEPTH = 1.0
+    SCENARIO_PALETTES = {
+        1: ((204, 204, 0), (153, 153, 0)),
+        7: ((198, 210, 68), (113, 139, 54)),
+        11: ((208, 190, 96), (132, 118, 45)),
+        17: ((190, 174, 86), (116, 96, 54)),
+        23: ((210, 166, 86), (148, 96, 36)),
+    }
 
     def build_primitives(self, landscape) -> tuple[PolygonPrimitive | RectPrimitive, ...]:
         if isinstance(landscape, TerrainState):
@@ -49,28 +57,34 @@ class TerrainRenderStateBuilder:
         terrain: TerrainState,
     ) -> tuple[PolygonPrimitive | RectPrimitive, ...]:
         primitives: list[PolygonPrimitive | RectPrimitive] = list(self._build_sky_gradient())
+        base_colour, top_colour = self._scenario_palette(terrain.seed)
+        base_bottom = min(self.SCREEN_BOTTOM, terrain.floor_height - self.TOP_LAYER_DEPTH)
         for vertex_index in range(terrain.chunk_count):
             x1 = terrain.vertex_world_x(vertex_index)
             x2 = terrain.vertex_world_x(vertex_index + 1)
             top_left = terrain.heights[vertex_index]
             top_right = terrain.heights[vertex_index + 1]
-            colour = self._canonical_terrain_colour(top_left, top_right, terrain.floor_height)
+            shelf_left = max(base_bottom, top_left - self.TOP_LAYER_DEPTH)
+            shelf_right = max(base_bottom, top_right - self.TOP_LAYER_DEPTH)
             primitives.append(
                 PolygonPrimitive(
-                    points=((x1, terrain.floor_height), (x1, top_left), (x2, top_right), (x2, terrain.floor_height)),
-                    colour=colour,
+                    points=((x1, base_bottom), (x1, shelf_left), (x2, shelf_right), (x2, base_bottom)),
+                    colour=base_colour,
+                )
+            )
+            primitives.append(
+                PolygonPrimitive(
+                    points=((x1, shelf_left), (x1, top_left), (x2, top_right), (x2, shelf_right)),
+                    colour=top_colour,
                 )
             )
         return tuple(primitives)
 
-    def _canonical_terrain_colour(self, top_left: float, top_right: float, floor_height: float) -> tuple[int, int, int]:
-        average_height = (top_left + top_right) / 2.0
-        normalized = (average_height - floor_height) / max(0.0001, 8.0 - floor_height)
-        normalized = max(0.0, min(1.0, normalized))
-        r = int(105 + (normalized * 70))
-        g = int(105 + (normalized * 70))
-        b = int(0 + (normalized * 20))
-        return (r, g, b)
+    def _scenario_palette(self, seed: int) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+        if seed in self.SCENARIO_PALETTES:
+            return self.SCENARIO_PALETTES[seed]
+        palette_values = tuple(self.SCENARIO_PALETTES.values())
+        return palette_values[abs(int(seed)) % len(palette_values)]
 
     def _build_sky_gradient(self) -> tuple[RectPrimitive, ...]:
         primitives = []

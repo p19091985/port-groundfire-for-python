@@ -1,6 +1,7 @@
 import unittest
 
-from src.groundfire.gameplay.match_controller import MatchController
+from src.groundfire.gameplay.constants import TANK_MOVE_SPEED, TANK_MOVE_STEP
+from src.groundfire.gameplay.match_controller import AIBehaviorConfig, MatchController
 from src.groundfire.network.messages import ClientCommandEnvelope
 
 
@@ -12,6 +13,33 @@ class MatchControllerTests(unittest.TestCase):
         self.assertEqual(first.snapshot, second.snapshot)
         self.assertEqual(first.terrain_patches, second.terrain_patches)
         self.assertEqual(first.events, second.events)
+
+    def test_joined_player_waits_in_lobby_until_match_starts(self):
+        controller = MatchController(session_id="session-1", seed=3)
+        player, _token = controller.join_player("Alice")
+
+        self.assertEqual(controller.match_state.game_phase, "lobby")
+        self.assertEqual(controller.match_state.current_round, 0)
+        self.assertIsNone(controller.match_state.get_player(player.player_number).tank_entity_id)
+
+        self.assertTrue(controller.start_match(reason="test"))
+        self.assertEqual(controller.match_state.game_phase, "round_starting")
+        self.assertEqual(controller.match_state.current_round, 1)
+        self.assertIsNotNone(controller.match_state.get_player(player.player_number).tank_entity_id)
+
+    def test_match_starts_automatically_when_lobby_reaches_max_players(self):
+        controller = MatchController(session_id="session-1", seed=3, max_players=2)
+        controller.join_player("Alice")
+
+        self.assertEqual(controller.match_state.game_phase, "lobby")
+
+        controller.join_player("Bob")
+
+        self.assertEqual(controller.match_state.game_phase, "round_starting")
+        self.assertEqual(controller.match_state.current_round, 1)
+        self.assertTrue(
+            all(player.tank_entity_id is not None for player in controller.match_state.player_slots.values())
+        )
 
     def test_fire_command_produces_snapshot_events_and_terrain_patch(self):
         controller = MatchController(session_id="session-1", seed=3)
@@ -46,12 +74,40 @@ class MatchControllerTests(unittest.TestCase):
         self.assertEqual(envelope.terrain_patches[0].operation, "explosion")
         self.assertTrue(envelope.terrain_patches[0].payload["changed_vertices"])
 
+    def test_tank_movement_uses_classic_slow_speed_without_spending_fuel(self):
+        controller = MatchController(session_id="session-1", seed=3)
+        player, token = controller.join_player("Alice")
+        self._advance_to_round_in_action(controller)
+        before_player = controller.match_state.get_player(player.player_number)
+        before_tank = controller.world_state.entity_registry.get(before_player.tank_entity_id)
+
+        controller.apply_command_envelope(
+            ClientCommandEnvelope(
+                session_id="session-1",
+                player_number=player.player_number,
+                client_sequence=1,
+                acknowledged_snapshot_sequence=None,
+                simulation_tick=controller.match_state.simulation_tick,
+                issued_at=0.0,
+                source="test",
+                commands={"tankright": True},
+                session_token=token.token,
+            )
+        )
+
+        after_tank = controller.world_state.entity_registry.get(before_player.tank_entity_id)
+
+        self.assertAlmostEqual(after_tank.position[0] - before_tank.position[0], TANK_MOVE_STEP)
+        self.assertAlmostEqual(TANK_MOVE_STEP * controller.simulation_hz, TANK_MOVE_SPEED)
+        self.assertEqual(after_tank.payload["fuel"], before_tank.payload["fuel"])
+
     def test_destroyed_tank_finishes_round_and_advances_match_state(self):
         controller = MatchController(session_id="session-1", seed=3, num_rounds=2)
         alice, _alice_token = controller.join_player("Alice")
         bob, _bob_token = controller.join_player("Bob")
         self._advance_to_round_in_action(controller)
 
+        bob = controller.match_state.get_player(bob.player_number)
         bob_tank = controller.world_state.entity_registry.get(bob.tank_entity_id)
         controller.world_state.entity_registry.create(
             "shell",
@@ -94,6 +150,7 @@ class MatchControllerTests(unittest.TestCase):
         bob, _bob_token = controller.join_player("Bob")
         self._advance_to_round_in_action(controller)
 
+        bob = controller.match_state.get_player(bob.player_number)
         bob_tank = controller.world_state.entity_registry.get(bob.tank_entity_id)
         controller.world_state.entity_registry.create(
             "shell",
@@ -121,6 +178,7 @@ class MatchControllerTests(unittest.TestCase):
         controller.match_state.update_player(bob.player_number, is_leader=True)
         self._advance_to_round_in_action(controller)
 
+        bob = controller.match_state.get_player(bob.player_number)
         bob_tank = controller.world_state.entity_registry.get(bob.tank_entity_id)
         controller.world_state.entity_registry.create(
             "shell",
@@ -212,6 +270,53 @@ class MatchControllerTests(unittest.TestCase):
 
         updated_ai = controller.match_state.get_player(ai_player.player_number)
         self.assertGreater(updated_ai.acknowledged_command_sequence, 0)
+
+    def test_computer_player_defaults_to_shells_and_skips_shop_purchases(self):
+        controller = MatchController(session_id="session-1", seed=10)
+        controller.join_player("Alice")
+        ai_player, _token = controller.join_player("CPU", is_computer=True)
+        self._advance_to_round_in_action(controller)
+        controller.match_state.update_player(
+            ai_player.player_number,
+            selected_weapon="nuke",
+            weapon_stocks=(("nuke", 1),),
+            money=100,
+        )
+
+        ai_state = controller.match_state.get_player(ai_player.player_number)
+        round_commands = controller._build_ai_round_commands(ai_state)
+
+        self.assertEqual(controller._best_available_weapon(ai_state), "shell")
+        self.assertTrue(round_commands.get("weaponup") or round_commands.get("weapondown"))
+
+        controller.match_state.game_phase = "shop"
+        shop_commands = controller._build_ai_shop_commands(ai_state)
+
+        self.assertEqual(shop_commands, {})
+
+    def test_computer_player_special_weapons_are_configurable(self):
+        controller = MatchController(
+            session_id="session-1",
+            seed=10,
+            ai_config=AIBehaviorConfig(buy_special_weapons=True, use_special_weapons=True),
+        )
+        controller.join_player("Alice")
+        ai_player, _token = controller.join_player("CPU", is_computer=True)
+        controller.match_state.update_player(
+            ai_player.player_number,
+            selected_weapon="shell",
+            weapon_stocks=(("nuke", 1),),
+            money=100,
+        )
+
+        ai_state = controller.match_state.get_player(ai_player.player_number)
+
+        self.assertEqual(controller._best_available_weapon(ai_state), "nuke")
+
+        controller.match_state.game_phase = "shop"
+        shop_commands = controller._build_ai_shop_commands(ai_state)
+
+        self.assertTrue(shop_commands.get("weaponup") or shop_commands.get("weapondown"))
 
     def test_snapshot_sequence_emits_full_then_delta_with_baseline(self):
         controller = MatchController(session_id="session-1", seed=11)
@@ -317,6 +422,8 @@ class MatchControllerTests(unittest.TestCase):
         return controller.build_snapshot_envelope()
 
     def _advance_to_round_in_action(self, controller: MatchController):
+        if controller.match_state.game_phase == "lobby":
+            controller.start_match(reason="test")
         while controller.match_state.game_phase != "round_in_action":
             controller.step()
 

@@ -37,7 +37,7 @@ class MatchSnapshot:
     round_winner_player_number: int | None = None
     winner_player_number: int | None = None
     seed: int = 0
-    world_width: float = 11.0
+    world_width: float = 20.0
     terrain_revision: int = 0
     terrain_profile: tuple[float, ...] = ()
 
@@ -82,7 +82,7 @@ class MatchState:
         entities: tuple[ReplicatedEntityState, ...],
         *,
         seed: int = 0,
-        world_width: float = 11.0,
+        world_width: float = 20.0,
         terrain_revision: int = 0,
         terrain_profile: tuple[float, ...] = (),
     ) -> MatchSnapshot:

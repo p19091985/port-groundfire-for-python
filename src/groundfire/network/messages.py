@@ -47,6 +47,7 @@ class JoinRequest:
     player_name: str
     requested_slot: int | None = None
     password: str = ""
+    is_computer: bool = False
     protocol_version: int = PROTOCOL_VERSION
 
 
@@ -78,6 +79,22 @@ class Ping:
 class Pong:
     nonce: str
     issued_at: float
+    protocol_version: int = PROTOCOL_VERSION
+
+
+@dataclass(frozen=True)
+class RconCommand:
+    command: str
+    password: str
+    request_id: str = ""
+    protocol_version: int = PROTOCOL_VERSION
+
+
+@dataclass(frozen=True)
+class RconResponse:
+    request_id: str
+    ok: bool
+    output: str
     protocol_version: int = PROTOCOL_VERSION
 
 

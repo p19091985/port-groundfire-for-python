@@ -3,7 +3,6 @@ from __future__ import annotations
 from importlib import import_module
 
 __all__ = [
-    "CanonicalLocalMenu",
     "ClientMenuRenderer",
     "GameGraphics",
     "GameUI",
@@ -18,6 +17,6 @@ def __getattr__(name: str):
         return getattr(import_module("src.groundfire.ui.graphics"), name)
     if name in {"GameUI", "TextStyle"}:
         return getattr(import_module("src.groundfire.ui.text"), name)
-    if name in {"CanonicalLocalMenu", "ClientMenuRenderer", "LocalMenuSelection", "LocalPlayerConfig"}:
+    if name in {"ClientMenuRenderer", "LocalMenuSelection", "LocalPlayerConfig"}:
         return getattr(import_module("src.groundfire.ui.menus"), name)
     raise AttributeError(name)

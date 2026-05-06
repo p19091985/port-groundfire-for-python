@@ -78,7 +78,7 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | 🔫 Arsenal variado | Shell, Missile, MIRV, Nuke e Machine Gun |
 | 🤖 IA adversária | Oponentes controlados por computador |
 | 🛒 Loja entre rodadas | Compra de armas e upgrades |
-| 🖥️ Runtime moderno | Entrada local clássica + servidor headless |
+| 🖥️ Entrada clássica | Jogo local clássico + servidor headless |
 | 🧪 Testes de regressão | Fidelidade para manter o port sob controle |
 
 ### Escopo atual
@@ -89,7 +89,7 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | Área | Estado | Observação |
 |:---|:---:|:---|
 | Jogo local | 🟢 ativo | Fluxo principal jogável pelo menu clássico |
-| Runtime canônico | 🟢 ativo | Entrada moderna usada pelos wrappers `groundfire` |
+| Entrada local clássica | 🟢 ativo | Wrappers `groundfire` abrem somente o fluxo clássico antigo |
 | IA local | 🟢 ativa | Jogadores controlados pelo computador estão implementados |
 | Terreno destrutível | 🟢 ativo | Crateras, queda de terreno e efeitos possuem testes dedicados |
 | Loja entre rodadas | 🟢 ativa | Compra de armas e jump jets |
@@ -276,9 +276,7 @@ python src/main.py
 | Modo | Comando |
 |:---|:---|
 | **Local recomendado** | `groundfire` |
-| Forçar fluxo clássico local | `python -m groundfire.client --classic-local` |
-| Forçar runtime canônico local | `python -m groundfire.client --canonical-local` |
-| Com nome de jogador e IAs | `python -m groundfire.client --player-name Jogador --ai-players 2` |
+| Com nome de jogador | `python -m groundfire.client --player-name Jogador` |
 | Smoke test (um frame) | `python -m groundfire.client --once` |
 
 ---
@@ -292,13 +290,18 @@ python src/main.py
 | [`run_game.sh`](run_game.sh) | Prepara `.venv`, instala deps e inicia o jogo | 🐧 Linux / 🍎 macOS / WSL |
 | [`run_game.bat`](run_game.bat) | Prepara `.venv`, instala deps e inicia o jogo | 🪟 Windows CMD |
 | [`run_game.ps1`](run_game.ps1) | Prepara `.venv`, instala deps e inicia o jogo | 🪟 Windows PowerShell |
+| [`iniciar-all.sh`](iniciar-all.sh) | Abre menu Ttk ou usa `-A` para iniciar 1 servidor LAN, 6 tanks IA e 6 janelas do jogo | Testes multiplayer automaticos com tela |
+| [`iniciar-server.sh`](iniciar-server.sh) | Inicia servidor LAN por `-A`, com cliente visual local por default | Depuracao de servidor e smoke visual |
+| [`iniciar-clientes.sh`](iniciar-clientes.sh) | Abre N clientes por `-n`; com `-a`, todos os IA ficam visiveis por default | Carga e testes LAN |
 | [`scripts/run_quality_checks.py`](scripts/run_quality_checks.py) | Compilação, testes, lint e tipagem | Validação antes de publicar |
 | [`scripts/profile_round_simulation.py`](scripts/profile_round_simulation.py) | Mede desempenho de simulação | Diagnóstico de performance |
 | [`scripts/generate_readme_art.py`](scripts/generate_readme_art.py) | Gera arte usada no README | Manutenção de imagens |
 | [`scripts/convert_legacy_tga_assets.py`](scripts/convert_legacy_tga_assets.py) | Auxilia conversão de assets históricos | Manutenção de assets |
 
 > [!TIP]
-> Use `run_game.*` para jogar, `scripts/run_quality_checks.py` para validar o projeto e os demais scripts quando estiver mantendo arte, assets ou desempenho.
+> Use `run_game.*` para jogar localmente, `./iniciar-all.sh -A` para subir uma partida LAN automatica de 20 rounds com uma janela por tank IA e `--sem-tela` quando o ambiente nao tiver display. Os launchers tambem aceitam chamada via `sh iniciar-all.sh`, pois reexecutam em Bash automaticamente.
+> Presets rapidos: `./iniciar-all.sh -A --preset 8` e `./iniciar-clientes.sh --preset 4 -a`. Para validar a LAN antes de abrir janelas, use `./iniciar-clientes.sh --check-only --host 127.0.0.1 --port 27015`.
+> Todos os launchers aceitam `--menu` para abrir a interface grafica Ttk e `--cli` para o modo de comando de texto.
 
 ---
 
@@ -381,10 +384,12 @@ As configurações principais ficam em [`conf/options.ini`](conf/options.ini).
 | `[Tank]` | Velocidade, tamanho, ângulo, potência, gravidade, boost e combustível |
 | `[Price]` | Preços de armas e upgrades |
 | `[Colours]` | Cores dos tanques |
-| `[Interface]` | Modo do menu local, como `classic` ou runtime canônico |
+| `[AI]` | Liberação de compra e uso de armas especiais pela AI de rede |
+| `[Interface]` | Mantido apenas para compatibilidade; o jogo local sempre usa o modo clássico |
 
 > [!TIP]
 > Para experimentar balanceamento, altere os valores em `conf/options.ini` e reinicie o jogo. Mantenha mudanças de gameplay acompanhadas por testes quando elas forem parte de uma contribuição.
+> Por padrão, `BuySpecialWeapons=0` e `UseSpecialWeapons=0`, então a AI de rede joga apenas com `shell` como no clássico.
 
 ---
 
@@ -400,7 +405,7 @@ O modo local é o caminho principal de uso atual:
 groundfire
 ```
 
-O valor `LocalMenuMode=canonical` em [`conf/options.ini`](conf/options.ini) faz o jogo abrir com o menu moderno por padrão, incluindo o botão **Find Servers**. Use `--classic-local` ou `LocalMenuMode=classic` se quiser voltar para a apresentação clássica.
+O jogo local abre sempre no fluxo clássico antigo. O menu clássico agora mantém o botão **Find Servers** e abre a lista online/LAN dentro da própria interface clássica.
 
 ### 🖧 Servidor headless
 
@@ -449,7 +454,7 @@ port-groundfire-for-python/
 ├── 📁 groundfire_net/      módulo de rede nativo copiável entre jogos
 ├── 📁 scripts/             ferramentas de QA, arte, assets e perfilamento
 ├── 📁 src/                 código principal do port Python
-│   └── 📁 groundfire/      runtime canônico organizado por domínio
+│   └── 📁 groundfire/      subsistemas de rede, renderização e servidor
 ├── 📁 tests/               testes automatizados
 ├── 🦇 run_game.bat         inicializador Windows CMD
 ├── ⚡ run_game.ps1         inicializador Windows PowerShell
@@ -1014,7 +1019,7 @@ O modo online usa somente biblioteca padrão do Python no transporte: `socket`, 
 | [`src/groundfire/app/server.py`](src/groundfire/app/server.py) | Servidor autoritativo headless |
 | [`src/groundfire/master.py`](src/groundfire/master.py) | Master server nativo para a aba Internet |
 
-No menu inicial do runtime canônico há um botão **Find Servers** com abas Internet, Favorites, Unique, History e Lan. O browser tem lista em colunas, ordenação por cabeçalho, rolagem, filtros de texto, senha, servidor cheio/vazio, região, secure e latência, favoritos, histórico, adição manual por `host:port`, refresh rápido/geral, connect e ping nativo por UDP. A aba Lan recebe anúncios UDP dos servidores Groundfire ativos na rede local. A aba Internet consulta um master server Groundfire nativo.
+O cliente de rede usa descoberta LAN e consulta ao master server para localizar servidores Groundfire. No menu clássico, **Find Servers** abre a lista de servidores com filtros de texto, senha, servidor cheio/vazio, região, secure, latência, favoritos, histórico, adição manual por `host:port`, refresh rápido/geral, connect e ping nativo por UDP.
 
 #### Start The Master Server
 
@@ -1073,7 +1078,7 @@ Use this checklist to validate the classic local menu flow on real hardware with
 #### Launch
 
 ```powershell
-python -m src.groundfire.client --canonical-local --player-name "Controller Test"
+python -m src.groundfire.client --player-name "Controller Test"
 ```
 
 #### Keyboard 2
@@ -1156,7 +1161,7 @@ python -m unittest tests.test_lan_discovery
 | Terreno e simulação | `test_landscape_fidelity`, `test_gamesimulation`, `test_fixedstep` |
 | Fluxo de jogo | `test_gameflow`, `test_gamesession`, `test_match_controller` |
 | Renderização e HUD | `test_gamerenderer`, `test_gamehudrenderer`, `test_gamegraphics` |
-| Entrada e comandos | `test_commandintents`, `test_canonical_local_menu` |
+| Entrada e comandos | `test_commandintents`, `test_client_server_apps` |
 | Rede | `test_networkprotocol`, `test_networkstate`, `test_groundfire_codec`, `test_lan_discovery` |
 | Portabilidade | `test_portability`, `test_runtime_portability` |
 
@@ -1204,20 +1209,13 @@ O inicializador tenta reparar ou recriar o ambiente quando detecta incompatibili
 </details>
 
 <details>
-<summary><b>⚙️ O jogo abre em um modo local inesperado</b></summary>
+<summary><b>⚙️ O jogo local deve abrir somente no modo clássico</b></summary>
 
-Verifique a chave em [`conf/options.ini`](conf/options.ini):
+O entrypoint local ignora seleção de modo e abre o fluxo clássico antigo. A chave abaixo pode permanecer no arquivo apenas por compatibilidade:
 
 ```ini
 [Interface]
-LocalMenuMode=canonical
-```
-
-Você também pode forçar pela linha de comando:
-
-```bash
-python -m groundfire.client --classic-local
-python -m groundfire.client --canonical-local
+LocalMenuMode=classic
 ```
 
 </details>
@@ -1345,7 +1343,7 @@ Provide a modern, verifiable version of Groundfire for:
 | 🔫 Varied arsenal | Shell, Missile, MIRV, Nuke, and Machine Gun |
 | 🤖 AI opponents | Computer-controlled players |
 | 🛒 Between-round shop | Weapon and upgrade purchasing |
-| 🖥️ Modern runtime | Classic local entry point + headless server |
+| 🖥️ Classic entry point | Classic local game + headless server |
 | 🧪 Regression tests | Fidelity checks to keep the port under control |
 
 ### Current Scope
@@ -1356,11 +1354,11 @@ Provide a modern, verifiable version of Groundfire for:
 | Area | Status | Notes |
 |:---|:---:|:---|
 | Local game | 🟢 active | Main playable flow through the classic menu |
-| Canonical runtime | 🟢 active | Modern entry point used by the `groundfire` wrappers |
+| Classic local entry point | 🟢 active | `groundfire` wrappers open only the old classic flow |
 | Local AI | 🟢 active | Computer-controlled players are implemented |
 | Destructible terrain | 🟢 active | Craters, terrain falling, and effects have dedicated tests |
 | Between-round shop | 🟢 active | Weapon and jump jet purchasing |
-| Network | 🟡 evolving | Client, headless server, LAN discovery, native UDP transport, and server browser |
+| Network | 🟡 evolving | Client, headless server, LAN discovery, native UDP transport, and server registry helpers |
 | Historical fidelity | 🟡 evolving | Tests and recorded output help compare behavior |
 
 ---
@@ -1536,9 +1534,7 @@ python src/main.py
 | Mode | Command |
 |:---|:---|
 | **Recommended local start** | `groundfire` |
-| Force classic local flow | `python -m groundfire.client --classic-local` |
-| Force canonical local runtime | `python -m groundfire.client --canonical-local` |
-| With player name and AI players | `python -m groundfire.client --player-name Player --ai-players 2` |
+| With player name | `python -m groundfire.client --player-name Player` |
 | Smoke test (single frame) | `python -m groundfire.client --once` |
 
 ---
@@ -1552,10 +1548,17 @@ python src/main.py
 | [`run_game.sh`](run_game.sh) | Prepares `.venv`, installs deps, and starts the game | 🐧 Linux / 🍎 macOS / WSL |
 | [`run_game.bat`](run_game.bat) | Prepares `.venv`, installs deps, and starts the game | 🪟 Windows CMD |
 | [`run_game.ps1`](run_game.ps1) | Prepares `.venv`, installs deps, and starts the game | 🪟 Windows PowerShell |
+| [`iniciar-all.sh`](iniciar-all.sh) | Opens a Ttk menu or uses `-A` to start 1 LAN server, 6 AI tanks, and 6 visible game windows | Automated multiplayer tests with screens |
+| [`iniciar-server.sh`](iniciar-server.sh) | Starts a LAN server via `-A`, with a visible local client by default | Server debugging and visual smoke tests |
+| [`iniciar-clientes.sh`](iniciar-clientes.sh) | Opens N clients with `-n`; with `-a`, every AI client is visible by default | LAN load testing |
 | [`scripts/run_quality_checks.py`](scripts/run_quality_checks.py) | Compile, test, lint, and type checks | Validation before publishing |
 | [`scripts/profile_round_simulation.py`](scripts/profile_round_simulation.py) | Profiles round simulation performance | Performance diagnostics |
 | [`scripts/generate_readme_art.py`](scripts/generate_readme_art.py) | Generates README artwork into `media/img/` | Documentation image maintenance |
 | [`scripts/convert_legacy_tga_assets.py`](scripts/convert_legacy_tga_assets.py) | Helps convert historical assets | Asset maintenance |
+
+> The launchers also tolerate `sh iniciar-all.sh` style calls by re-executing themselves with Bash before using Bash-only options.
+> Quick presets are available with `./iniciar-all.sh -A --preset 8` and `./iniciar-clientes.sh --preset 4 -a`; `./iniciar-all.sh -A` uses 20 rounds by default, and `--rounds` can override it. Use `./iniciar-clientes.sh --check-only --host 127.0.0.1 --port 27015` to validate UDP reachability first.
+> Every launcher accepts `--menu` for the graphical Ttk interface and `--cli` for text-command mode.
 
 ---
 
@@ -1638,10 +1641,12 @@ Main settings live in [`conf/options.ini`](conf/options.ini).
 | `[Tank]` | Speed, size, angle, power, gravity, boost, and fuel usage |
 | `[Price]` | Weapon and upgrade prices |
 | `[Colours]` | Tank colors |
-| `[Interface]` | Local menu mode, such as `classic` or the canonical runtime |
+| `[AI]` | Network AI permission to buy and use special weapons |
+| `[Interface]` | Compatibility only; local play always uses the classic flow |
 
 > [!TIP]
 > To experiment with balance, edit `conf/options.ini` and restart the game. Gameplay changes that are meant to be contributed should be backed by tests.
+> By default, `BuySpecialWeapons=0` and `UseSpecialWeapons=0`, so network AI plays with `shell` only like the classic game.
 
 ---
 
@@ -1657,7 +1662,7 @@ Local play is the main current usage path:
 groundfire
 ```
 
-`LocalMenuMode=canonical` in [`conf/options.ini`](conf/options.ini) makes the game open with the modern menu by default, including the **Find Servers** button. Use `--classic-local` or `LocalMenuMode=classic` to return to the classic presentation.
+Local play always opens the old classic flow. The classic menu now keeps the **Find Servers** button and opens the online/LAN browser inside the classic interface.
 
 ### 🖧 Headless Server
 
@@ -1706,7 +1711,7 @@ port-groundfire-for-python/
 ├── 📁 groundfire_net/      native networking module reusable across games
 ├── 📁 scripts/             QA, artwork, asset, and profiling tools
 ├── 📁 src/                 main Python port code
-│   └── 📁 groundfire/      canonical runtime organized by domain
+│   └── 📁 groundfire/      game, network, rendering, and server subsystems
 ├── 📁 tests/               automated tests
 ├── 🦇 run_game.bat         Windows CMD launcher
 ├── ⚡ run_game.ps1         Windows PowerShell launcher
@@ -1896,9 +1901,9 @@ The online client/server path uses only Python's standard library for transport:
 | [`groundfire_net/`](groundfire_net) | Reusable native networking module |
 | [`src/groundfire/network/`](src/groundfire/network) | Groundfire-specific message, discovery, and browser adapters |
 | [`src/groundfire/app/server.py`](src/groundfire/app/server.py) | Authoritative headless server |
-| [`src/groundfire/master.py`](src/groundfire/master.py) | Native master server for the Internet tab |
+| [`src/groundfire/master.py`](src/groundfire/master.py) | Native master server for server registration and lookup |
 
-The canonical start menu includes a **Find Servers** button with Internet, Favorites, Unique, History, and Lan tabs. The browser includes column lists, header sorting, scrolling, text/password/full/empty/region/secure/latency filters, favorites, history, manual `host:port` entries, quick/full refresh, connect, and native UDP ping. The Lan tab listens for UDP announcements from active Groundfire servers. The Internet tab queries a native Groundfire master server.
+Server lookup is available from the classic **Find Servers** menu through native LAN discovery and master-server helpers; the local game itself stays on the classic interface.
 
 **Start the master server:**
 
@@ -1957,7 +1962,7 @@ Use this checklist to validate the classic local menu flow on real hardware with
 **Launch:**
 
 ```powershell
-python -m src.groundfire.client --canonical-local --player-name "Controller Test"
+python -m src.groundfire.client --player-name "Controller Test"
 ```
 
 **Keyboard 2:**
@@ -2038,7 +2043,7 @@ python -m unittest tests.test_lan_discovery
 | Terrain and simulation | `test_landscape_fidelity`, `test_gamesimulation`, `test_fixedstep` |
 | Game flow | `test_gameflow`, `test_gamesession`, `test_match_controller` |
 | Rendering and HUD | `test_gamerenderer`, `test_gamehudrenderer`, `test_gamegraphics` |
-| Input and commands | `test_commandintents`, `test_canonical_local_menu` |
+| Input and commands | `test_commandintents`, `test_client_server_apps` |
 | Network | `test_networkprotocol`, `test_networkstate`, `test_groundfire_codec`, `test_lan_discovery` |
 | Portability | `test_portability`, `test_runtime_portability` |
 
@@ -2086,20 +2091,13 @@ The launcher attempts to repair or recreate the environment when it detects an i
 </details>
 
 <details>
-<summary><b>⚙️ The game opens in an unexpected local mode</b></summary>
+<summary><b>⚙️ Local play should open only in classic mode</b></summary>
 
-Check [`conf/options.ini`](conf/options.ini):
+The local entrypoint ignores mode selection and opens the old classic flow. This setting can remain only for compatibility:
 
 ```ini
 [Interface]
-LocalMenuMode=canonical
-```
-
-You can also force the mode from the command line:
-
-```bash
-python -m groundfire.client --classic-local
-python -m groundfire.client --canonical-local
+LocalMenuMode=classic
 ```
 
 </details>

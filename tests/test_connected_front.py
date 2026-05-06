@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 
 from src.gameclock import ClockTick
 from src.gameui import GameUI
@@ -16,13 +17,22 @@ class ControlsStub:
 
 
 class InterfaceStub:
-    def __init__(self, should_close=False):
+    def __init__(self, should_close=False, input_events=()):
         self._should_close = should_close
+        self.input_events = list(input_events)
         self.start_draw_calls = 0
         self.end_draw_calls = 0
 
     def should_close(self):
         return self._should_close
+
+    def get_input_events(self):
+        events = tuple(self.input_events)
+        self.input_events.clear()
+        return events
+
+    def get_key_names(self):
+        return {"escape": 27}
 
     def start_draw(self):
         self.start_draw_calls += 1
@@ -82,8 +92,8 @@ class ClockStub:
 
 
 class GameStub:
-    def __init__(self, *, command_states=None, show_fps=False):
-        self.interface = InterfaceStub()
+    def __init__(self, *, command_states=None, show_fps=False, input_events=()):
+        self.interface = InterfaceStub(input_events=input_events)
         self.controls = ControlsStub(command_states)
         self.font = FontStub()
         self.ui = GameUI(font_provider=lambda: self.font)
@@ -277,6 +287,26 @@ class ConnectedFrontTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(game.clock.tick_calls, 2)
         self.assertEqual(client.render_calls, 2)
+
+    def test_escape_returns_to_menu_from_connection_status_overlay(self):
+        runtime = ConnectedFrontRuntime()
+        game = GameStub(input_events=(SimpleNamespace(key=27),))
+        client = ClientStub(join_reject_reason="server_full_or_slot_unavailable")
+
+        exit_code = runtime.run(client, game, max_frames=2)
+
+        self.assertEqual(exit_code, ConnectedFrontRuntime.RETURN_TO_MENU)
+        self.assertEqual(client.render_calls, 0)
+
+    def test_escape_does_not_return_to_menu_during_active_remote_gameplay(self):
+        runtime = ConnectedFrontRuntime()
+        game = GameStub(input_events=(SimpleNamespace(key=27),))
+        client = ClientStub(session_id="session-1", player_number=0, latest_snapshot=object())
+
+        exit_code = runtime.run(client, game, max_frames=1)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(client.render_calls, 1)
 
 
 if __name__ == "__main__":

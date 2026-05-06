@@ -99,6 +99,16 @@ class GameFlowControllerTests(unittest.TestCase):
         self.assertEqual(game._current_menu, "quit")
         self.assertEqual(game.interface.mouse_calls, [True])
 
+    def test_enter_state_server_browser_keeps_classic_mouse_navigation(self):
+        controller = GameFlowController(menu_factories={GameState.SERVER_BROWSER_MENU: lambda _game: "browser"})
+        game = GameStub()
+
+        controller.enter_state(game, GameState.SERVER_BROWSER_MENU, GameState.MAIN_MENU)
+
+        self.assertEqual(game._current_menu, "browser")
+        self.assertEqual(game.interface.mouse_calls, [True])
+        self.assertEqual(game.interface.offset_calls, [(0, 0)])
+
     def test_enter_state_round_starting_clears_menu_and_starts_round(self):
         controller = GameFlowController(menu_factories={})
         game = GameStub()

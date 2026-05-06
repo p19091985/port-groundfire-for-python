@@ -31,6 +31,7 @@ class LocalCommandSampler:
 
 class ConnectedFrontRuntime:
     COMMAND_SEND_INTERVAL = 1.0 / 60.0
+    RETURN_TO_MENU = 3
 
     def __init__(
         self,
@@ -43,7 +44,15 @@ class ConnectedFrontRuntime:
         self._last_sent_commands: dict[str, bool] | None = None
         self._last_send_time = -1.0
 
-    def run(self, client: "ClientApp", game, *, max_frames: int | None = None, controller: int = 0) -> int:
+    def run(
+        self,
+        client: "ClientApp",
+        game,
+        *,
+        max_frames: int | None = None,
+        controller: int = 0,
+        send_local_commands: bool = True,
+    ) -> int:
         frames = 0
         while max_frames is None or frames < max_frames:
             frame = game.get_clock().tick()
@@ -51,16 +60,27 @@ class ConnectedFrontRuntime:
             if game.get_interface().should_close():
                 return 0
 
-            self.tick(client, game, frame=frame, controller=controller)
+            if self._return_to_menu_requested(client, game):
+                return self.RETURN_TO_MENU
+
+            self.tick(client, game, frame=frame, controller=controller, send_local_commands=send_local_commands)
             frames += 1
 
         return 0
 
-    def tick(self, client: "ClientApp", game, *, frame: ClockTick, controller: int = 0) -> ConnectedFrontFrame:
+    def tick(
+        self,
+        client: "ClientApp",
+        game,
+        *,
+        frame: ClockTick,
+        controller: int = 0,
+        send_local_commands: bool = True,
+    ) -> ConnectedFrontFrame:
         client.poll_network(timeout=0.0)
 
         commands = self._command_sampler.sample(game, controller=controller)
-        if self._should_send_commands(client, frame, commands):
+        if send_local_commands and self._should_send_commands(client, frame, commands):
             client.build_and_send_command_envelope(commands, source=self._command_source(controller))
             self._last_sent_commands = dict(commands)
             self._last_send_time = frame.simulation_time
@@ -126,6 +146,28 @@ class ConnectedFrontRuntime:
     def _should_show_status_overlay(self, client: "ClientApp") -> bool:
         client_state = client.get_client_state()
         return bool(client_state.disconnect_reason or client_state.join_reject_reason)
+
+    def _return_to_menu_requested(self, client: "ClientApp", game) -> bool:
+        client_state = client.get_client_state()
+        status_is_recoverable = (
+            client_state.latest_snapshot is None
+            or client_state.disconnect_reason is not None
+            or client_state.join_reject_reason is not None
+        )
+        if not status_is_recoverable:
+            return False
+
+        interface = game.get_interface()
+        get_events = getattr(interface, "get_input_events", None)
+        get_key_names = getattr(interface, "get_key_names", None)
+        if not callable(get_events) or not callable(get_key_names):
+            return False
+
+        escape_key = get_key_names().get("escape")
+        if escape_key is None:
+            return False
+
+        return any(getattr(event, "key", None) == escape_key for event in get_events())
 
     def _draw_status_overlay(self, game, text: str):
         self._menu_renderer.draw_status_overlay(game, text)

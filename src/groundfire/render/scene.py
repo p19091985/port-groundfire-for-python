@@ -174,11 +174,11 @@ class ReplicatedEntityRenderStateBuilder:
         arrow_length = size * 2.0
         shaft_points = tuple(
             self._transform_point(px, py, centre_x, centre_y, gun_angle)
-            for px, py in ((-0.05, size * 1.2), (-0.05, arrow_length), (0.05, arrow_length), (0.05, size * 1.2))
+            for px, py in ((size * 1.2, -0.05), (arrow_length, -0.05), (arrow_length, 0.05), (size * 1.2, 0.05))
         )
         head_points = tuple(
             self._transform_point(px, py, centre_x, centre_y, gun_angle)
-            for px, py in ((-0.12, arrow_length), (0.0, arrow_length + 0.18), (0.12, arrow_length))
+            for px, py in ((arrow_length, -0.12), (arrow_length + 0.18, 0.0), (arrow_length, 0.12))
         )
 
         primitives = [PolygonPrimitive(points=body_points, colour=colour)]

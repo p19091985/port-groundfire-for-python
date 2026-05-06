@@ -18,6 +18,8 @@ from .messages import (
     LanServerAnnouncement,
     Ping,
     Pong,
+    RconCommand,
+    RconResponse,
     ServerEventEnvelope,
     ServerSnapshotEnvelope,
     SessionToken,
@@ -67,6 +69,10 @@ def _decode_typed_message(message_type: str, payload: dict[str, Any]):
         return Ping(**payload)
     if message_type == "Pong":
         return Pong(**payload)
+    if message_type == "RconCommand":
+        return RconCommand(**payload)
+    if message_type == "RconResponse":
+        return RconResponse(**payload)
     if message_type == "DisconnectNotice":
         return DisconnectNotice(**payload)
     if message_type == "ClientCommandEnvelope":
@@ -125,7 +131,7 @@ def _decode_match_snapshot(payload: dict[str, Any]) -> MatchSnapshot:
         round_winner_player_number=payload.get("round_winner_player_number"),
         winner_player_number=payload.get("winner_player_number"),
         seed=int(payload.get("seed", 0)),
-        world_width=float(payload.get("world_width", 11.0)),
+        world_width=float(payload.get("world_width", 20.0)),
         terrain_revision=int(payload.get("terrain_revision", 0)),
         terrain_profile=tuple(float(height) for height in payload.get("terrain_profile", [])),
     )

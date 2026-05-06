@@ -29,7 +29,7 @@ class ReplicatedEntityState:
 @dataclass
 class WorldState:
     seed: int = 0
-    width: float = 11.0
+    width: float = 20.0
     height: float = 15.0
     entity_registry: EntityRegistry = field(default_factory=EntityRegistry)
     terrain: TerrainState = field(init=False)

@@ -1,15 +1,25 @@
-import time
-import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import time
+import unittest
 
-from groundfire_net.browser import ServerBook, ServerListEntry
 from src.gameclock import ClockTick
 from src.gameui import GameUI
 from src.groundfire.app.client import ClientApp
 from src.groundfire.app.server import ServerApp
+from src.groundfire.gameplay.constants import TANK_MOVE_STEP
 from src.groundfire.network.codec import encode_message
-from src.groundfire.network.messages import DisconnectNotice, JoinAccept, JoinReject, Ping, ServerSnapshotEnvelope
+from src.groundfire.network.messages import (
+    DisconnectNotice,
+    HelloRequest,
+    JoinAccept,
+    JoinReject,
+    JoinRequest,
+    Ping,
+    RconCommand,
+    RconResponse,
+    ServerSnapshotEnvelope,
+)
 from src.groundfire.sim.match import MatchSnapshot
 from src.groundfire.ui import LocalMenuSelection, LocalPlayerConfig
 
@@ -129,23 +139,13 @@ class ConnectedGameStub:
         return self.graphics
 
 
-class CanonicalMenuGameStub:
-    def __init__(self, settings_path: Path):
-        self._settings_path = settings_path
-        self.close_calls = 0
-
-    def get_settings_path(self):
-        return self._settings_path
-
-    def close(self):
-        self.close_calls += 1
-
-
 class LegacyGameStub:
     GameState = type(
         "GameState",
         (),
         {
+            "CURRENT_STATE": "current_state",
+            "MAIN_MENU": "main_menu",
             "CONTROLLERS_MENU": "controllers_menu",
             "ROUND_STARTING": "round_starting",
         },
@@ -153,6 +153,8 @@ class LegacyGameStub:
 
     def __init__(self):
         self.frames = 0
+        self._game_state = self.GameState.MAIN_MENU
+        self._new_state = self.GameState.MAIN_MENU
         self.changed_states = []
         self.deleted_players = 0
         self.num_rounds = None
@@ -161,6 +163,7 @@ class LegacyGameStub:
 
     def _change_state(self, new_state):
         self.changed_states.append(new_state)
+        self._game_state = new_state
 
     def delete_players(self):
         self.deleted_players += 1
@@ -173,10 +176,38 @@ class LegacyGameStub:
 
     def loop_once(self):
         self.frames += 1
+        if self._new_state != self.GameState.CURRENT_STATE and self._new_state != self._game_state:
+            self._change_state(self._new_state)
         return self.frames < 2
 
     def close(self):
         self.close_calls += 1
+
+
+class OnlineConnectLegacyGameStub(LegacyGameStub):
+    def __init__(self, request):
+        super().__init__()
+        self._request = request
+        self.interface = InterfaceStub()
+        self.mouse_calls = []
+
+    def loop_once(self):
+        self.frames += 1
+        return True
+
+    def consume_online_connect_request(self):
+        request = self._request
+        self._request = None
+        return request
+
+    def get_interface(self):
+        return self
+
+    def enable_mouse(self, enabled):
+        self.mouse_calls.append(enabled)
+
+    def should_close(self):
+        return False
 
 
 class ClientServerAppTests(unittest.TestCase):
@@ -209,6 +240,114 @@ class ClientServerAppTests(unittest.TestCase):
         hello_responses = server.handle_message(Ping(nonce="123", issued_at=1.5), ("127.0.0.1", 5000))
         self.assertEqual(hello_responses[0].nonce, "123")
 
+    def test_server_can_configure_match_round_count(self):
+        server = ServerApp(enable_discovery=False, num_rounds=20)
+
+        self.assertEqual(server.get_match_controller().match_state.num_rounds, 20)
+
+    def test_server_loads_ai_special_weapon_policy_from_options(self):
+        with TemporaryDirectory() as temp_dir:
+            settings_path = Path(temp_dir) / "options.ini"
+            settings_path.write_text(
+                "[AI]\nBuySpecialWeapons=1\nUseSpecialWeapons=1\n",
+                encoding="utf-8",
+            )
+
+            server = ServerApp(enable_discovery=False, settings_path=settings_path)
+
+        ai_config = server.get_match_controller()._ai_config
+        self.assertTrue(ai_config.buy_special_weapons)
+        self.assertTrue(ai_config.use_special_weapons)
+
+    def test_server_handles_basic_rcon_status_queries(self):
+        server = ServerApp(
+            enable_discovery=False,
+            server_name="Groundfire Dedicated",
+            map_seed=11,
+            max_players=12,
+            num_rounds=20,
+            rcon_password="admin",
+            region="sa",
+        )
+
+        responses = server.handle_packet(
+            encode_message(RconCommand(command="status", password="admin", request_id="r1")),
+            ("127.0.0.1", 5000),
+        )
+
+        self.assertIsInstance(responses[0], RconResponse)
+        self.assertTrue(responses[0].ok)
+        self.assertIn("name=Groundfire Dedicated", responses[0].output)
+        self.assertIn("players=0/12", responses[0].output)
+        self.assertIn("phase=lobby", responses[0].output)
+        self.assertIn("map=seed 11", responses[0].output)
+        self.assertIn("round=0/20", responses[0].output)
+
+        rejected = server.handle_message(
+            RconCommand(command="status", password="wrong", request_id="r2"),
+            ("127.0.0.1", 5000),
+        )
+        self.assertFalse(rejected[0].ok)
+        self.assertEqual(rejected[0].output, "bad_rcon_password")
+
+    def test_server_event_logger_records_join_rcon_and_match_events(self):
+        events = []
+        server = ServerApp(enable_discovery=False, rcon_password="admin", event_logger=events.append)
+
+        server.handle_message(HelloRequest(player_name="Alice"), ("127.0.0.1", 5001))
+        server.handle_message(JoinRequest(player_name="Alice"), ("127.0.0.1", 5001))
+        server.handle_message(RconCommand(command="status", password="wrong", request_id="bad"), ("127.0.0.1", 5000))
+        server.handle_message(
+            RconCommand(command="iniciar_partida", password="admin", request_id="start"),
+            ("127.0.0.1", 5000),
+        )
+        for _ in range(server.get_match_controller().snapshot_interval_ticks + 1):
+            server.step()
+
+        self.assertTrue(any(event.startswith("server_config") for event in events))
+        self.assertTrue(any(event.startswith("hello_request") for event in events))
+        self.assertTrue(any(event.startswith("join_request") for event in events))
+        self.assertTrue(any(event.startswith("join_accept") for event in events))
+        self.assertTrue(any("reason=bad_rcon_password" in event for event in events))
+        self.assertTrue(any(event.startswith("rcon_start accepted") for event in events))
+        self.assertTrue(any("match_event event_type=player_joined" in event for event in events))
+        self.assertTrue(any("match_event event_type=match_started" in event for event in events))
+        self.assertTrue(any("match_event event_type=round_started" in event for event in events))
+
+    def test_server_rcon_can_start_lobby_match(self):
+        server = ServerApp(enable_discovery=False, rcon_password="admin")
+        server.handle_message(JoinRequest(player_name="Alice"), ("127.0.0.1", 5001))
+
+        response = server.handle_message(
+            RconCommand(command="iniciar_partida", password="admin", request_id="start-1"),
+            ("127.0.0.1", 5000),
+        )[0]
+
+        self.assertTrue(response.ok)
+        self.assertIn("match_started", response.output)
+        self.assertEqual(server.get_match_controller().match_state.game_phase, "round_starting")
+
+    def test_server_accepts_computer_join_request_and_runs_ai(self):
+        server = ServerApp(enable_discovery=False)
+        controller = server.get_match_controller()
+
+        responses = server.handle_message(
+            JoinRequest(player_name="CPU LAN 1", is_computer=True),
+            ("127.0.0.1", 5001),
+        )
+        server.handle_message(JoinRequest(player_name="Alice"), ("127.0.0.1", 5002))
+        controller.start_match(reason="test")
+
+        self.assertIsInstance(responses[0], JoinAccept)
+        cpu_player = controller.match_state.get_player(responses[0].player_number)
+        self.assertTrue(cpu_player.is_computer)
+
+        for _ in range(controller.ROUND_STARTING_TICKS + 12):
+            server.step()
+
+        updated_cpu = controller.match_state.get_player(responses[0].player_number)
+        self.assertGreater(updated_cpu.acknowledged_command_sequence, 0)
+
     def test_client_tracks_join_reject_reason(self):
         client = ClientApp(game_factory=DummyGame)
 
@@ -233,6 +372,37 @@ class ClientServerAppTests(unittest.TestCase):
         finally:
             client.close()
 
+    def test_computer_client_join_request_marks_network_join(self):
+        client = ClientApp(game_factory=DummyGame)
+        try:
+            sent = client.connect("127.0.0.1", 27015, player_name="CPU LAN 1", is_computer=True)
+
+            self.assertEqual(type(sent[1]).__name__, "JoinRequest")
+            self.assertTrue(sent[1].is_computer)
+        finally:
+            client.close()
+
+    def test_headless_connected_mode_finishes_after_join_without_creating_game_window(self):
+        events = []
+
+        def fail_game_factory():
+            raise AssertionError("Headless client should not create a Pygame game shell.")
+
+        client = ClientApp(game_factory=fail_game_factory, event_logger=events.append)
+        try:
+            client.handle_packet(
+                encode_message(JoinAccept(session_id="session-1", player_number=2, session_token="token-2")),
+                ("127.0.0.1", 27015),
+            )
+
+            result = client.run_headless_connected(join_timeout=0.01)
+
+            self.assertEqual(result, 0)
+            self.assertTrue(any(event.startswith("join_accept") for event in events))
+            self.assertIn("headless_complete", events)
+        finally:
+            client.close()
+
     def test_loopback_smoke_server_and_client_exchange_join_and_snapshot(self):
         server = ServerApp(host="127.0.0.1", port=0, discovery_port=0, enable_discovery=False)
         client = ClientApp(game_factory=DummyGame)
@@ -251,232 +421,105 @@ class ClientServerAppTests(unittest.TestCase):
 
             self.assertEqual(client.get_client_state().player_number, 0)
             self.assertGreater(client.get_client_state().latest_snapshot_sequence, 0)
+            self.assertEqual(client.get_client_state().latest_snapshot.game_phase, "lobby")
             frame = client.build_remote_render_frame()
             self.assertTrue(frame.terrain_primitives)
-            self.assertTrue(frame.entity_states)
-            self.assertTrue(frame.hud_primitives)
+            self.assertFalse(frame.entity_states)
+            self.assertFalse(frame.hud_primitives)
             self.assertEqual(frame.metadata["local_player_number"], 0)
         finally:
             client.close()
             server.close()
 
-    def test_local_mode_runs_canonical_loopback_path(self):
-        client = ClientApp(game_factory=ConnectedGameStub)
+    def test_local_mode_delegates_to_classic_legacy_path(self):
+        events = []
+        client = ClientApp(game_factory=DummyGame, event_logger=events.append)
 
         try:
-            exit_code = client.run_local(max_frames=2, player_name="Alice", ai_players=1)
+            exit_code = client.run_local(
+                show_menu=True,
+                max_frames=2,
+                player_name="Alice",
+                ai_players=8,
+                num_rounds=25,
+            )
 
             self.assertEqual(exit_code, 0)
-            self.assertEqual(client.get_client_state().player_number, 0)
-            self.assertGreater(client.get_client_state().latest_snapshot_sequence, 0)
-            self.assertEqual(client.get_client_state().latest_snapshot.players[0].name, "Alice")
+            self.assertEqual(client.get_legacy_game().frames, 2)
+            self.assertTrue(any("local_classic_only" in event for event in events))
+            self.assertTrue(any("legacy_local_start" in event for event in events))
+            self.assertEqual(client.get_client_state().latest_snapshot_sequence, 0)
         finally:
             client.close()
 
-    def test_local_menu_can_switch_to_classic_and_persist_preference(self):
-        with TemporaryDirectory() as temp_dir:
-            settings_path = Path(temp_dir) / "options.ini"
-            settings_path.write_text("[Graphics]\nShowFPS=0\n", encoding="utf-8")
-            canonical_game = CanonicalMenuGameStub(settings_path)
-
-            class LocalRuntimeStub:
-                def open_menu(self, _game, *, player_name, ai_players=1, max_frames=None):
-                    return LocalMenuSelection("classic", ai_players + 1)
-
-                def run(self, *_args, **_kwargs):
-                    raise AssertionError("Canonical local runtime should not start after selecting classic menus.")
-
-            client = ClientApp(
-                game_factory=lambda: canonical_game,
-                legacy_game_factory=DummyGame,
-                local_runtime=LocalRuntimeStub(),
-            )
-            try:
-                exit_code = client.run_local(show_menu=True, max_frames=2, player_name="Alice", ai_players=1)
-
-                self.assertEqual(exit_code, 0)
-                self.assertEqual(canonical_game.close_calls, 1)
-                self.assertEqual(client.get_legacy_game().frames, 2)
-                settings_text = settings_path.read_text(encoding="utf-8")
-                self.assertIn("[Interface]", settings_text)
-                self.assertIn("LocalMenuMode=classic", settings_text)
-            finally:
-                client.close()
-
-    def test_local_menu_set_controls_opens_legacy_controller_menu_without_persisting_preference(self):
-        with TemporaryDirectory() as temp_dir:
-            settings_path = Path(temp_dir) / "options.ini"
-            settings_path.write_text("[Graphics]\nShowFPS=0\n", encoding="utf-8")
-            canonical_game = CanonicalMenuGameStub(settings_path)
-            legacy_game = LegacyGameStub()
-
-            class LocalRuntimeStub:
-                def open_menu(self, _game, *, player_name, ai_players=1, max_frames=None):
-                    return LocalMenuSelection(
-                        "classic",
-                        ai_players,
-                        players=(),
-                        launch_target="controllers",
-                        persist_mode=False,
-                    )
-
-                def run(self, *_args, **_kwargs):
-                    raise AssertionError(
-                        "Canonical local runtime should not start after Set Controls routes to legacy."
-                    )
-
-            client = ClientApp(
-                game_factory=lambda: canonical_game,
-                legacy_game_factory=lambda: legacy_game,
-                local_runtime=LocalRuntimeStub(),
-            )
-            try:
-                exit_code = client.run_local(show_menu=True, max_frames=2, player_name="Alice", ai_players=1)
-
-                self.assertEqual(exit_code, 0)
-                self.assertEqual(canonical_game.close_calls, 1)
-                self.assertEqual(legacy_game.changed_states, [legacy_game.GameState.CONTROLLERS_MENU])
-                settings_text = settings_path.read_text(encoding="utf-8")
-                self.assertNotIn("LocalMenuMode=classic", settings_text)
-            finally:
-                client.close()
-
-    def test_local_menu_start_passes_ai_players_and_num_rounds_to_modern_runtime(self):
-        calls = []
-
-        class LocalRuntimeStub:
-            def open_menu(self, _game, *, player_name, ai_players=1, max_frames=None):
-                return LocalMenuSelection("start", ai_players + 2, 25, local_controller=1, requested_slot=3)
-
-            def run(
-                self,
-                _client,
-                _game,
-                *,
-                player_name,
-                ai_players=1,
-                num_rounds=10,
-                local_controller=0,
-                requested_slot=0,
-                player_configs=(),
-                max_frames=None,
-            ):
-                calls.append(
-                    (
-                        player_name,
-                        ai_players,
-                        num_rounds,
-                        local_controller,
-                        requested_slot,
-                        player_configs,
-                        max_frames,
-                    )
-                )
-                return 44
-
-        client = ClientApp(game_factory=DummyGame, local_runtime=LocalRuntimeStub())
+    def test_legacy_local_can_open_controller_menu_from_classic_selection(self):
+        legacy_game = LegacyGameStub()
+        selection = LocalMenuSelection(
+            "classic",
+            ai_players=1,
+            players=(),
+            launch_target="controllers",
+            persist_mode=False,
+        )
+        client = ClientApp(legacy_game_factory=lambda: legacy_game)
         try:
-            exit_code = client.run_local(show_menu=True, max_frames=2, player_name="Alice", ai_players=1)
+            exit_code = client.run_legacy_local(
+                max_frames=2,
+                player_name="Alice",
+                menu_selection=selection,
+            )
 
-            self.assertEqual(exit_code, 44)
-            self.assertEqual(calls[0], ("Alice", 3, 25, 1, 3, (), 2))
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(legacy_game.changed_states, [legacy_game.GameState.CONTROLLERS_MENU])
         finally:
             client.close()
 
-    def test_local_menu_connect_selection_starts_connected_runtime_and_defers_history_until_accept(self):
-        with TemporaryDirectory() as temp_dir:
-            book_path = Path(temp_dir) / "servers.json"
-            entry = ServerListEntry(name="Menu Server", host="127.0.0.1", port=27015, requires_password=True)
-            calls = []
+    def test_legacy_local_multi_human_start_bootstraps_classic_roster(self):
+        legacy_game = LegacyGameStub()
+        events = []
+        players = (
+            LocalPlayerConfig(slot=0, name="Player 1", is_human=True, controller=1, colour=(10, 20, 30)),
+            LocalPlayerConfig(slot=1, name="Player 2", is_human=True, controller=2, colour=(40, 50, 60)),
+            LocalPlayerConfig(slot=2, name="CPU 1", is_human=False, controller=7, colour=(70, 80, 90)),
+        )
+        selection = LocalMenuSelection(
+            "classic",
+            ai_players=1,
+            num_rounds=25,
+            players=players,
+            launch_target="configured_start",
+            persist_mode=False,
+        )
 
-            class LocalRuntimeStub:
-                def open_menu(self, _game, *, player_name, ai_players=1, max_frames=None):
-                    return LocalMenuSelection(
-                        "connect",
-                        ai_players,
-                        connect_host=entry.host,
-                        connect_port=entry.port,
-                        connect_password="secret",
-                        connect_entry=entry,
-                    )
-
-                def run(self, *_args, **_kwargs):
-                    raise AssertionError("Connected browser selection should not start local gameplay.")
-
-            class ConnectedRuntimeStub:
-                def run(self, client, _game, *, max_frames=None):
-                    calls.append((client._server_address, client._pending_history_entry, max_frames))
-                    return 55
-
-            client = ClientApp(
-                game_factory=ConnectedGameStub,
-                local_runtime=LocalRuntimeStub(),
-                server_book_path=book_path,
-            )
-            client._front_runtime = ConnectedRuntimeStub()
-            try:
-                exit_code = client.run_local(show_menu=True, max_frames=2, player_name="Alice", ai_players=1)
-
-                self.assertEqual(exit_code, 55)
-                self.assertEqual(calls[0][0], ("127.0.0.1", 27015))
-                self.assertEqual(calls[0][1].endpoint, entry.endpoint)
-                self.assertEqual(calls[0][2], 2)
-                self.assertEqual(ServerBook(book_path).get_history(), ())
-            finally:
-                client.close()
-
-    def test_local_menu_multi_human_start_bootstraps_legacy_roster(self):
-        with TemporaryDirectory() as temp_dir:
-            settings_path = Path(temp_dir) / "options.ini"
-            settings_path.write_text("[Graphics]\nShowFPS=0\n", encoding="utf-8")
-            canonical_game = CanonicalMenuGameStub(settings_path)
-            legacy_game = LegacyGameStub()
-
-            players = (
-                LocalPlayerConfig(slot=0, name="Player 1", is_human=True, controller=1, colour=(10, 20, 30)),
-                LocalPlayerConfig(slot=1, name="Player 2", is_human=True, controller=2, colour=(40, 50, 60)),
-                LocalPlayerConfig(slot=2, name="CPU 1", is_human=False, controller=7, colour=(70, 80, 90)),
+        client = ClientApp(
+            legacy_game_factory=lambda: legacy_game,
+            event_logger=events.append,
+        )
+        try:
+            exit_code = client.run_legacy_local(
+                max_frames=2,
+                player_name="Alice",
+                menu_selection=selection,
             )
 
-            class LocalRuntimeStub:
-                def open_menu(self, _game, *, player_name, ai_players=1, max_frames=None):
-                    return LocalMenuSelection(
-                        "classic",
-                        ai_players=1,
-                        num_rounds=25,
-                        players=players,
-                        launch_target="configured_start",
-                        persist_mode=False,
-                    )
-
-                def run(self, *_args, **_kwargs):
-                    raise AssertionError("Canonical local runtime should not start after multi-human legacy handoff.")
-
-            client = ClientApp(
-                game_factory=lambda: canonical_game,
-                legacy_game_factory=lambda: legacy_game,
-                local_runtime=LocalRuntimeStub(),
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(legacy_game.deleted_players, 1)
+            self.assertEqual(legacy_game.num_rounds, 25)
+            self.assertEqual(
+                legacy_game.added_players,
+                [
+                    (1, "Alice", (10, 20, 30)),
+                    (2, "Player 2", (40, 50, 60)),
+                    (-1, "CPU 1", (70, 80, 90)),
+                ],
             )
-            try:
-                exit_code = client.run_local(show_menu=True, max_frames=2, player_name="Alice", ai_players=1)
-
-                self.assertEqual(exit_code, 0)
-                self.assertEqual(canonical_game.close_calls, 1)
-                self.assertEqual(legacy_game.deleted_players, 1)
-                self.assertEqual(legacy_game.num_rounds, 25)
-                self.assertEqual(
-                    legacy_game.added_players,
-                    [
-                        (1, "Alice", (10, 20, 30)),
-                        (2, "Player 2", (40, 50, 60)),
-                        (-1, "CPU 1", (70, 80, 90)),
-                    ],
-                )
-                self.assertEqual(legacy_game.changed_states, [legacy_game.GameState.ROUND_STARTING])
-                settings_text = settings_path.read_text(encoding="utf-8")
-                self.assertNotIn("LocalMenuMode=classic", settings_text)
-            finally:
-                client.close()
+            self.assertEqual(legacy_game.changed_states, [legacy_game.GameState.ROUND_STARTING])
+            self.assertEqual(legacy_game._game_state, legacy_game.GameState.ROUND_STARTING)
+            self.assertEqual(legacy_game._new_state, legacy_game.GameState.ROUND_STARTING)
+            self.assertTrue(any("legacy_config target=configured_start" in event for event in events))
+            self.assertTrue(any("legacy_state_change" in event for event in events))
+        finally:
+            client.close()
 
     def test_legacy_local_mode_keeps_classic_loop_path_available(self):
         client = ClientApp(game_factory=DummyGame)
@@ -485,6 +528,45 @@ class ClientServerAppTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(client.get_legacy_game().frames, 2)
+        finally:
+            client.close()
+
+    def test_legacy_local_server_browser_connects_with_classic_game_window(self):
+        events = []
+        request = {
+            "host": "127.0.0.1",
+            "port": 27015,
+            "password": "secret",
+            "entry": None,
+            "is_computer": True,
+        }
+        legacy_game = OnlineConnectLegacyGameStub(request)
+        client = ClientApp(
+            legacy_game_factory=lambda: legacy_game,
+            event_logger=events.append,
+        )
+        calls = []
+
+        class FrontRuntimeStub:
+            def run(self, app, game, *, max_frames=None, **kwargs):
+                calls.append((app, game, max_frames, kwargs))
+                return 0
+
+        client._front_runtime = FrontRuntimeStub()
+        try:
+            exit_code = client.run_legacy_local(max_frames=3, player_name="Alice")
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(legacy_game.frames, 1)
+            self.assertEqual(legacy_game.mouse_calls, [False])
+            self.assertEqual(client._server_address, ("127.0.0.1", 27015))
+            self.assertIs(calls[0][1], legacy_game)
+            self.assertEqual(calls[0][2], 2)
+            self.assertFalse(calls[0][3]["send_local_commands"])
+            self.assertTrue(client._connected_computer_player)
+            self.assertTrue(
+                any("legacy_local_connect host=127.0.0.1 port=27015 computer=true" in event for event in events)
+            )
         finally:
             client.close()
 
@@ -517,6 +599,62 @@ class ClientServerAppTests(unittest.TestCase):
         finally:
             alice.close()
             bob.close()
+            server.close()
+
+    def test_loopback_smoke_with_six_headless_computer_clients(self):
+        server = ServerApp(host="127.0.0.1", port=0, discovery_port=0, enable_discovery=False)
+        clients = [ClientApp(game_factory=DummyGame) for _ in range(6)]
+        try:
+            server.open()
+            port = server.get_bound_port()
+            for index, client in enumerate(clients, start=1):
+                client.connect("127.0.0.1", port, player_name=f"CPU Auto {index}", is_computer=True)
+
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                server.poll_network(timeout=0.01)
+                server.step()
+                for client in clients:
+                    client.poll_network(timeout=0.0)
+                if all(client.get_client_state().session_id for client in clients):
+                    break
+
+            self.assertEqual(len(server.get_match_controller().match_state.player_slots), 6)
+            self.assertTrue(
+                all(player.is_computer for player in server.get_match_controller().match_state.player_slots.values())
+            )
+        finally:
+            for client in clients:
+                client.close()
+            server.close()
+
+    def test_client_close_sends_disconnect_notice_and_frees_server_slot(self):
+        server = ServerApp(host="127.0.0.1", port=0, discovery_port=0, enable_discovery=False)
+        client = ClientApp(game_factory=DummyGame)
+        try:
+            server.open()
+            client.connect("127.0.0.1", server.get_bound_port(), player_name="Alice")
+
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                server.poll_network(timeout=0.01)
+                client.poll_network(timeout=0.01)
+                if client.get_client_state().session_id is not None:
+                    break
+
+            self.assertEqual(len(server.get_match_controller().match_state.player_slots), 1)
+
+            client.close()
+
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                server.poll_network(timeout=0.01)
+                if not server.get_match_controller().match_state.player_slots:
+                    break
+
+            self.assertEqual(server.get_match_controller().match_state.player_slots, {})
+        finally:
+            client.close()
             server.close()
 
     def test_client_prediction_reconciles_local_tank_after_delta_snapshot(self):
@@ -587,7 +725,7 @@ class ClientServerAppTests(unittest.TestCase):
                     ),
                 ),
                 entities=(
-                    self._tank_state(entity_id=10, x=0.15, y=1.0, gun_angle=48.0, selected_weapon="shell"),
+                    self._tank_state(entity_id=10, x=TANK_MOVE_STEP, y=1.0, gun_angle=48.0, selected_weapon="shell"),
                 ),
             ),
             snapshot_kind="delta",
@@ -596,7 +734,7 @@ class ClientServerAppTests(unittest.TestCase):
         self.assertTrue(client.apply_snapshot_envelope(delta))
         self.assertEqual(client.get_client_state().get_pending_commands(), ())
         reconciled = client.get_client_state().get_render_snapshot()
-        self.assertEqual(reconciled.entities[0].position[0], 0.15)
+        self.assertEqual(reconciled.entities[0].position[0], TANK_MOVE_STEP)
         self.assertEqual(reconciled.players[0].selected_weapon, "shell")
 
     def test_connected_run_uses_front_runtime_and_render_path(self):
@@ -616,6 +754,25 @@ class ClientServerAppTests(unittest.TestCase):
         self.assertEqual(result, 77)
         self.assertIs(called[0][0], client)
         self.assertEqual(called[0][2], 3)
+
+    def test_connected_computer_client_suppresses_local_keyboard_commands(self):
+        client = ClientApp(game_factory=DummyGame)
+        client._connected_computer_player = True
+        called = []
+
+        class FrontRuntimeStub:
+            def run(self, app, game, *, max_frames=None, send_local_commands=True):
+                called.append((app, game, max_frames, send_local_commands))
+                return 78
+
+        client._front_runtime = FrontRuntimeStub()
+
+        result = client.run_connected(max_frames=3)
+
+        self.assertEqual(result, 78)
+        self.assertIs(called[0][0], client)
+        self.assertEqual(called[0][2], 3)
+        self.assertFalse(called[0][3])
 
     def test_apply_disconnect_clears_client_session_identifiers(self):
         client = ClientApp(game_factory=DummyGame)

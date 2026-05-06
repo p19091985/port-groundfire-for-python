@@ -1,3 +1,3 @@
-from .match_controller import MatchController
+from .match_controller import AIBehaviorConfig, MatchController
 
-__all__ = ["MatchController"]
+__all__ = ["AIBehaviorConfig", "MatchController"]

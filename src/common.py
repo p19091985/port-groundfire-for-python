@@ -19,6 +19,7 @@ class GameState:
     SHOP_MENU = 12
     WINNER_MENU = 13
     EXITED = 14
+    SERVER_BROWSER_MENU = 15
 
 def sqr(x: float) -> float:
     """

@@ -49,6 +49,12 @@ class GameFlowController:
             game.get_interface().enable_mouse(True)
             return
 
+        if new_state == GameState.SERVER_BROWSER_MENU:
+            game._current_menu = self._create_menu(game, GameState.SERVER_BROWSER_MENU)
+            game.get_interface().enable_mouse(True)
+            game.get_interface().offset_viewport(0, 0)
+            return
+
         if new_state == GameState.SHOP_MENU:
             game._current_menu = self._create_menu(game, GameState.SHOP_MENU)
             game.get_interface().enable_mouse(False)

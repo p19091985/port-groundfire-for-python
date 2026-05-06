@@ -48,12 +48,8 @@ class Interface:
         self._closed = False
 
         self._pygame.init()
-        flags = self._pygame.RESIZABLE
-        if fullscreen:
-            flags |= self._pygame.FULLSCREEN
-
         try:
-            self._window = self._pygame.display.set_mode((width, height), flags)
+            self._window = self._pygame.display.set_mode((width, height), self._display_flags(fullscreen))
             self._pygame.display.set_caption("Groundfire")
         except self._pygame.error as exc:
             raise InterfaceError() from exc
@@ -124,28 +120,120 @@ class Interface:
     def start_draw(self):
         from .graphics import get_interface_graphics
 
+        self._sync_window_size_from_surface()
         get_interface_graphics(self).clear((0, 0, 0))
 
     def end_draw(self):
+        self._sync_window_size_from_surface()
         if self._mouse_enabled:
             self.draw_mouse()
         self._pygame.display.flip()
         self._pygame.event.pump()
+        self._sync_window_size_from_surface()
         if self._mouse_enabled:
             mx, my = self._pygame.mouse.get_pos()
             self._mouse_x = -10.0 + (mx / self._width) * 20.0
             self._mouse_y = 7.5 - (my / self._height) * 15.0
 
     def should_close(self):
-        for _event in self._pygame.event.get(self._pygame.QUIT):
-            return True
+        for event in self._pygame.event.get(self._window_event_types(include_quit=True)):
+            if getattr(event, "type", None) == self._pygame.QUIT:
+                return True
+            self._handle_window_event(event)
         return False
+
+    def _window_event_types(self, *, include_quit: bool = False):
+        event_types = []
+        if include_quit:
+            event_types.append(self._pygame.QUIT)
+        for name in ("VIDEORESIZE", "WINDOWRESIZED", "WINDOWSIZECHANGED"):
+            event_type = getattr(self._pygame, name, None)
+            if event_type is not None:
+                event_types.append(event_type)
+        return event_types
+
+    def _is_resize_event(self, event) -> bool:
+        return getattr(event, "type", None) in set(self._window_event_types())
+
+    def _handle_window_event(self, event):
+        if not self._is_resize_event(event):
+            return
+        size = getattr(event, "size", None)
+        if size is not None and len(size) >= 2:
+            width, height = int(size[0]), int(size[1])
+        elif hasattr(event, "w") and hasattr(event, "h"):
+            width = int(event.w)
+            height = int(event.h)
+        elif hasattr(event, "x") and hasattr(event, "y"):
+            width = int(event.x)
+            height = int(event.y)
+        else:
+            width, height = self._current_display_size()
+        self._resize_window(width, height, self._fullscreen)
+
+    def _current_display_size(self):
+        get_window_size = getattr(self._pygame.display, "get_window_size", None)
+        if callable(get_window_size):
+            width, height = get_window_size()
+            return int(width), int(height)
+
+        get_surface = getattr(self._pygame.display, "get_surface", None)
+        if callable(get_surface):
+            surface = get_surface()
+            get_size = getattr(surface, "get_size", None)
+            if callable(get_size):
+                width, height = get_size()
+                return int(width), int(height)
+
+        return self._width, self._height
+
+    def _sync_window_size_from_surface(self):
+        get_size = getattr(self._window, "get_size", None)
+        if not callable(get_size):
+            return
+        width, height = get_size()
+        width = int(width)
+        height = int(height)
+        if width <= 0 or height <= 0:
+            return
+        if width == self._width and height == self._height:
+            return
+        self._width = width
+        self._height = height
+        self._update_line_width()
+
+    def _display_flags(self, fullscreen: bool):
+        flags = self._pygame.RESIZABLE
+        if fullscreen:
+            flags |= self._pygame.FULLSCREEN
+        return flags
+
+    def _resize_window(self, width: int, height: int, fullscreen: bool):
+        width = max(320, int(width))
+        height = max(240, int(height))
+        if self._width == width and self._height == height and self._fullscreen == fullscreen:
+            return
+        self._width = width
+        self._height = height
+        self._fullscreen = fullscreen
+        try:
+            self._window = self._pygame.display.set_mode((width, height), self._display_flags(fullscreen))
+        except self._pygame.error as exc:
+            raise InterfaceError() from exc
+        self._update_line_width()
 
     def get_input_events(self):
         event_types = [self._pygame.KEYDOWN]
         if hasattr(self._pygame, "MOUSEWHEEL"):
             event_types.append(self._pygame.MOUSEWHEEL)
-        return tuple(self._pygame.event.get(event_types))
+        event_types.extend(self._window_event_types())
+        input_events = []
+        for event in self._pygame.event.get(event_types):
+            if self._is_resize_event(event):
+                self._handle_window_event(event)
+            else:
+                input_events.append(event)
+        return tuple(input_events)
 
     def get_key_names(self):
         return {
@@ -224,19 +312,7 @@ class Interface:
         self._pygame.mouse.set_visible(not enable)
 
     def change_window(self, width, height, fullscreen):
-        if self._width == width and self._height == height and self._fullscreen == fullscreen:
-            return
-        self._width = width
-        self._height = height
-        self._fullscreen = fullscreen
-        flags = self._pygame.RESIZABLE
-        if fullscreen:
-            flags |= self._pygame.FULLSCREEN
-        try:
-            self._window = self._pygame.display.set_mode((width, height), flags)
-        except self._pygame.error as exc:
-            raise InterfaceError() from exc
-        self._update_line_width()
+        self._resize_window(width, height, fullscreen)
 
     def num_of_controllers(self):
         return self._num_controllers

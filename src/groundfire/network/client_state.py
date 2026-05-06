@@ -4,7 +4,6 @@ from dataclasses import dataclass, field, replace
 from typing import Any, cast
 
 from ..gameplay.constants import (
-    TANK_FUEL_STEP,
     TANK_GUN_STEP,
     TANK_MAX_FUEL,
     TANK_MOVE_STEP,
@@ -279,14 +278,11 @@ class ClientReplicatedState:
         gun_angle = float(payload.get("gun_angle", tank.angle))
         fuel = max(0.0, float(payload.get("fuel", TANK_MAX_FUEL)))
         alive = bool(payload.get("alive", True))
-        moved = False
 
-        if alive and commands.get("tankleft") and fuel > 0.0:
+        if alive and commands.get("tankleft"):
             x -= TANK_MOVE_STEP
-            moved = True
-        if alive and commands.get("tankright") and fuel > 0.0:
+        if alive and commands.get("tankright"):
             x += TANK_MOVE_STEP
-            moved = True
         if commands.get("gunleft") or commands.get("gunup"):
             gun_angle = min(180.0, gun_angle + TANK_GUN_STEP)
         if commands.get("gunright") or commands.get("gundown"):
@@ -294,8 +290,6 @@ class ClientReplicatedState:
 
         x_limit = (snapshot.world_width / 2.0) - 0.25
         x = max(-x_limit, min(x_limit, x))
-        if moved:
-            fuel = max(0.0, fuel - TANK_FUEL_STEP)
 
         player = self._predict_weapon_fire(player, commands)
         tank = replace(
