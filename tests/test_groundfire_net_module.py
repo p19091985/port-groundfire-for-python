@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from groundfire_net import JsonDataclassCodec, ServerBook, ServerListEntry
+from groundfire_net.websocket_gateway import GatewaySimulation, WebSocketGatewaySession
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,52 @@ class GroundfireNetModuleTests(unittest.TestCase):
             self.assertEqual(reloaded.get_internet()[0].region, "sa")
             self.assertFalse(reloaded.get_internet()[0].secure)
             self.assertEqual(reloaded.entries_for_tab("internet")[0].endpoint, "203.0.113.1:27015")
+
+    def test_websocket_gateway_session_speaks_godot_message_contract(self):
+        session = WebSocketGatewaySession()
+
+        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')
+        joined = session.handle_text('{"type":"join","player_name":"GodotPlayer","password":""}')
+        input_response = session.handle_text(
+            '{"type":"input","sequence":7,"command":{"fire":true,"aim_left":false}}'
+        )
+        pong = session.handle_text('{"type":"ping","sequence":8,"client_time_msec":1234}')
+
+        self.assertEqual(hello[0]["type"], "hello")
+        self.assertEqual(joined[0]["type"], "snapshot")
+        self.assertEqual(joined[0]["state"]["player_name"], "GodotPlayer")
+        self.assertEqual(joined[0]["state"]["match_snapshot"]["players"][0]["name"], "GodotPlayer")
+        self.assertEqual(joined[0]["state"]["match_snapshot"]["entities"][0]["entity_type"], "tank")
+        self.assertEqual(input_response[0]["sequence"], 7)
+        self.assertEqual(input_response[0]["state"]["last_input"]["fire"], True)
+        self.assertEqual(input_response[0]["state"]["match_snapshot"]["simulation_tick"], 1)
+        self.assertEqual(pong[0]["type"], "pong")
+        self.assertEqual(pong[0]["client_time_msec"], 1234)
+
+    def test_gateway_simulation_replicates_tank_and_terrain_state(self):
+        simulation = GatewaySimulation()
+
+        simulation.join("Player One")
+        initial = simulation.snapshot(status="joined")
+        simulation.apply_input(1, {"move_right": True, "aim_left": True})
+        moved = simulation.snapshot(status="input")
+        simulation.apply_input(2, {"fire": True})
+        fired = simulation.snapshot(status="input")
+
+        initial_tank = initial["state"]["match_snapshot"]["entities"][0]
+        moved_tank = moved["state"]["match_snapshot"]["entities"][0]
+        fired_entities = fired["state"]["match_snapshot"]["entities"]
+        self.assertGreater(moved_tank["position"][0], initial_tank["position"][0])
+        self.assertGreater(moved_tank["angle"], initial_tank["angle"])
+        self.assertTrue(any(entity["entity_type"] == "projectile" for entity in fired_entities))
+        self.assertGreaterEqual(fired["state"]["match_snapshot"]["terrain_revision"], 1)
+        self.assertEqual(fired["state"]["events"][0]["event_type"], "terrain_explosion")
+
+    def test_websocket_gateway_session_reports_bad_messages(self):
+        session = WebSocketGatewaySession()
+
+        self.assertEqual(session.handle_text("not-json")[0]["message"], "invalid_json")
+        self.assertEqual(session.handle_text('{"type":"wat"}')[0]["received_type"], "wat")
 
 
 if __name__ == "__main__":

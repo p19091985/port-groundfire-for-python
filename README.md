@@ -94,7 +94,22 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | Terreno destrutível | 🟢 ativo | Crateras, queda de terreno e efeitos possuem testes dedicados |
 | Loja entre rodadas | 🟢 ativa | Compra de armas e jump jets |
 | Rede | 🟡 em evolução | Cliente, servidor headless, descoberta LAN e transporte seguro |
+| Cliente Godot desktop/web | 🟡 iniciado | Scaffold em [`godot/`](godot/) com capacidades separadas para desktop e web |
 | Fidelidade histórica | 🟡 em evolução | Testes e registros ajudam a comparar comportamento |
+
+### Migração desktop/web
+
+O projeto iniciou uma migração gradual para um cliente **Godot 4 + GDScript**, mantendo o Python/Pygame atual funcionando durante a transição. A regra de produto para web e simples: recursos que dependem de comportamento nativo do sistema operacional ou rede local nao aparecem no navegador.
+
+| Recurso | Desktop | Web |
+|:---|:---:|:---:|
+| Partida local contra IA | sim | sim |
+| Browser online | sim | sim |
+| LAN discovery | sim | nao |
+| UDP nativo | sim | nao |
+| Ferramentas de servidor dedicado local | sim | nao |
+
+O plano de migracao esta em [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md).
 
 ---
 

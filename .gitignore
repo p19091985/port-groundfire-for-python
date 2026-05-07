@@ -195,6 +195,10 @@ cython_debug/
 .ruff_cache/
 .tmp/
 
+# Local Godot editor/runtime installs and project import cache
+tools/godot/
+godot/.godot/
+
 # PyPI configuration file
 .pypirc
 

@@ -18,6 +18,7 @@ from .master import (
 )
 from .server import NativeServerLoop, ServerLoopConfig
 from .transport import Datagram, DatagramEndpoint
+from .websocket_gateway import GatewaySimulation, WebSocketGateway, WebSocketGatewaySession
 
 __all__ = [
     "DEFAULT_MASTER_PORT",
@@ -26,6 +27,7 @@ __all__ = [
     "DiscoveredServer",
     "DiscoveryService",
     "JsonDataclassCodec",
+    "GatewaySimulation",
     "MasterQuery",
     "MasterServerAddress",
     "MasterServerApp",
@@ -36,6 +38,8 @@ __all__ = [
     "ServerBrowser",
     "ServerListEntry",
     "ServerLoopConfig",
+    "WebSocketGateway",
+    "WebSocketGatewaySession",
     "decode_envelope",
     "encode_envelope",
     "parse_master_server_address",

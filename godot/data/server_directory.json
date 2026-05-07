@@ -1,0 +1,31 @@
+{
+  "servers": [
+    {
+      "name": "Groundfire Online Test",
+      "game": "Groundfire",
+      "players": "2/8",
+      "map": "classic",
+      "latency": "42",
+      "source": "online",
+      "endpoint": "wss://play.groundfire.local/servers/test"
+    },
+    {
+      "name": "Groundfire SA Lobby",
+      "game": "Groundfire",
+      "players": "0/12",
+      "map": "mesa",
+      "latency": "88",
+      "source": "online",
+      "endpoint": "wss://play.groundfire.local/servers/sa"
+    },
+    {
+      "name": "Groundfire LAN",
+      "game": "Groundfire",
+      "players": "0/8",
+      "map": "classic",
+      "latency": "LAN",
+      "source": "lan",
+      "endpoint": "127.0.0.1:27015"
+    }
+  ]
+}

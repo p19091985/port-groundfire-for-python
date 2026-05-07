@@ -18,6 +18,7 @@ dependencies = [
 groundfire = "groundfire.client:main"
 groundfire-server = "groundfire.server:main"
 groundfire-master = "groundfire.master:main"
+groundfire-web-gateway = "groundfire_net.websocket_gateway:main"
 
 [tool.setuptools]
 include-package-data = true
