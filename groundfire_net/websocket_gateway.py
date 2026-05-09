@@ -5,8 +5,10 @@ import asyncio
 import base64
 import hashlib
 import json
+import os
 import struct
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -16,6 +18,43 @@ from src.groundfire.sim.world import WorldState
 
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 PROTOCOL_VERSION = 1
+MIN_PROTOCOL_VERSION = 1
+MAX_PROTOCOL_VERSION = PROTOCOL_VERSION
+SUPPORTED_PROTOCOL_VERSIONS = tuple(range(MIN_PROTOCOL_VERSION, MAX_PROTOCOL_VERSION + 1))
+MATCH_SNAPSHOT_SCHEMA_VERSION = 1
+EVENT_SCHEMA_VERSION = 1
+INPUT_COMMAND_FIELDS = frozenset(
+    {
+        "aim_left",
+        "aim_right",
+        "power_up",
+        "power_down",
+        "move_left",
+        "move_right",
+        "jump",
+        "fire",
+        "weapon_next",
+        "weapon_prev",
+    }
+)
+
+
+@dataclass
+class GatewayJoinRegistry:
+    max_players: int = 0
+    active_players: int = 0
+
+    def acquire_slot(self) -> bool:
+        if self.max_players > 0 and self.active_players >= self.max_players:
+            return False
+        self.active_players += 1
+        return True
+
+    def release_slot(self) -> None:
+        self.active_players = max(0, self.active_players - 1)
+
+    def metadata(self) -> dict[str, int]:
+        return {"max_players": self.max_players, "players_connected": self.active_players}
 
 
 @dataclass
@@ -125,6 +164,7 @@ class GatewaySimulation:
         )
         return {
             "type": "snapshot",
+            "protocol": PROTOCOL_VERSION,
             "sequence": self.sequence,
             "state": {
                 "status": status,
@@ -132,9 +172,11 @@ class GatewaySimulation:
                 "joined": self.tank_entity_id is not None,
                 "last_input": self.last_input,
                 "server_time_msec": int(time.time() * 1000),
+                "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
+                "event_schema": EVENT_SCHEMA_VERSION,
                 "match_snapshot": to_plain(snapshot),
                 "terrain_patches": [to_plain(patch) for patch in self.world.drain_terrain_patches()],
-                "events": list(self.match.drain_events()),
+                "events": [_version_event(event) for event in self.match.drain_events()],
             },
         }
 
@@ -142,6 +184,12 @@ class GatewaySimulation:
 @dataclass
 class WebSocketGatewaySession:
     simulation: GatewaySimulation = field(default_factory=GatewaySimulation)
+    required_password: str = ""
+    required_auth_token: str = ""
+    join_registry: GatewayJoinRegistry = field(default_factory=GatewayJoinRegistry)
+    joins_closed: bool = False
+    banned_players: frozenset[str] = field(default_factory=frozenset)
+    _joined: bool = False
 
     def handle_text(self, payload: str) -> list[dict[str, Any]]:
         try:
@@ -150,18 +198,48 @@ class WebSocketGatewaySession:
             return [_error("invalid_json")]
         if not isinstance(message, dict):
             return [_error("invalid_message")]
+        protocol_error = _validate_protocol(message)
+        if protocol_error is not None:
+            return [protocol_error]
 
         message_type = str(message.get("type", ""))
+        shape_error = _validate_message_shape(message_type, message)
+        if shape_error is not None:
+            return [shape_error]
+
         if message_type == "hello":
             return [
                 {
                     "type": "hello",
                     "protocol": PROTOCOL_VERSION,
+                    "min_protocol": MIN_PROTOCOL_VERSION,
+                    "max_protocol": MAX_PROTOCOL_VERSION,
+                    "supported_protocols": list(SUPPORTED_PROTOCOL_VERSIONS),
+                    "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
+                    "event_schema": EVENT_SCHEMA_VERSION,
+                    "password_required": bool(self.required_password),
+                    "auth_required": bool(self.required_auth_token),
+                    "joins_open": not self.joins_closed,
+                    "ban_enforced": bool(self.banned_players),
+                    **self.join_registry.metadata(),
                     "server": "python-websocket-gateway",
                 }
             ]
         if message_type == "join":
-            self.simulation.join(str(message.get("player_name", self.simulation.player_name)))
+            if self.joins_closed:
+                return [_error("server_closed")]
+            player_name = str(message.get("player_name", self.simulation.player_name))
+            if _normalized_player_name(player_name) in self.banned_players:
+                return [_error("banned")]
+            if self.required_auth_token and str(message.get("auth_token", "")) != self.required_auth_token:
+                return [_error("authentication_failed")]
+            if self.required_password and str(message.get("password", "")) != self.required_password:
+                return [_error("invalid_password")]
+            if not self._joined:
+                if not self.join_registry.acquire_slot():
+                    return [_error("server_full", **self.join_registry.metadata())]
+                self._joined = True
+            self.simulation.join(player_name)
             return [self.simulation.snapshot(status="joined")]
         if message_type == "input":
             sequence = int(message.get("sequence", self.simulation.sequence + 1))
@@ -172,20 +250,49 @@ class WebSocketGatewaySession:
             return [
                 {
                     "type": "pong",
+                    "protocol": PROTOCOL_VERSION,
                     "sequence": int(message.get("sequence", 0)),
                     "client_time_msec": int(message.get("client_time_msec", 0)),
                     "server_time_msec": int(time.time() * 1000),
                 }
             ]
         if message_type == "disconnect":
-            return [{"type": "disconnect", "reason": str(message.get("reason", "client_disconnect"))}]
+            self.close()
+            return [
+                {
+                    "type": "disconnect",
+                    "protocol": PROTOCOL_VERSION,
+                    "reason": str(message.get("reason", "client_disconnect")),
+                }
+            ]
         return [_error("unknown_type", received_type=message_type)]
+
+    def close(self) -> None:
+        if not self._joined:
+            return
+        self.join_registry.release_slot()
+        self._joined = False
 
 
 class WebSocketGateway:
-    def __init__(self, host: str = "127.0.0.1", port: int = 27080):
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 27080,
+        *,
+        password: str = "",
+        auth_token: str = "",
+        max_players: int = 0,
+        closed: bool = False,
+        banned_players: Iterable[str] = (),
+    ):
         self.host = host
         self.port = port
+        self.password = password
+        self.auth_token = auth_token
+        self.closed = closed
+        self.banned_players = _normalized_player_names(banned_players)
+        self.join_registry = GatewayJoinRegistry(max_players=max(0, max_players))
 
     async def serve_forever(self) -> None:
         server = await asyncio.start_server(self._handle_client, self.host, self.port)
@@ -193,7 +300,13 @@ class WebSocketGateway:
             await server.serve_forever()
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        session = WebSocketGatewaySession()
+        session = WebSocketGatewaySession(
+            required_password=self.password,
+            required_auth_token=self.auth_token,
+            join_registry=self.join_registry,
+            joins_closed=self.closed,
+            banned_players=self.banned_players,
+        )
         try:
             await _accept_handshake(reader, writer)
             connected_snapshot = session.simulation.snapshot(status="connected")
@@ -207,6 +320,7 @@ class WebSocketGateway:
                     if response.get("type") == "disconnect":
                         return
         finally:
+            session.close()
             writer.close()
             await writer.wait_closed()
 
@@ -278,22 +392,191 @@ async def _write_text(writer: asyncio.StreamWriter, payload: str) -> None:
 
 
 def _error(message: str, **extra: Any) -> dict[str, Any]:
-    payload = {"type": "error", "message": message}
+    payload = {"type": "error", "protocol": PROTOCOL_VERSION, "message": message}
     payload.update(extra)
     return payload
+
+
+def _validate_protocol(message: dict[str, Any]) -> dict[str, Any] | None:
+    if "protocol" not in message:
+        return _protocol_error("missing_protocol")
+    raw_protocol = message["protocol"]
+    if not isinstance(raw_protocol, int) or isinstance(raw_protocol, bool):
+        return _protocol_error("invalid_protocol", received_protocol=raw_protocol)
+    if raw_protocol not in SUPPORTED_PROTOCOL_VERSIONS:
+        return _protocol_error("protocol_mismatch", received_protocol=raw_protocol)
+    return None
+
+
+def _protocol_error(message: str, **extra: Any) -> dict[str, Any]:
+    return _error(
+        message,
+        expected_protocol=PROTOCOL_VERSION,
+        min_protocol=MIN_PROTOCOL_VERSION,
+        max_protocol=MAX_PROTOCOL_VERSION,
+        supported_protocols=list(SUPPORTED_PROTOCOL_VERSIONS),
+        **extra,
+    )
+
+
+def _validate_message_shape(message_type: str, message: dict[str, Any]) -> dict[str, Any] | None:
+    if message_type == "hello":
+        return _optional_string_field(message, "client")
+    if message_type == "join":
+        return (
+            _required_string_field(message, "player_name")
+            or _optional_string_field(message, "password")
+            or _optional_string_field(message, "auth_token")
+        )
+    if message_type == "input":
+        shape_error = _required_integer_field(message, "sequence") or _required_dict_field(message, "command")
+        if shape_error is not None:
+            return shape_error
+        return _validate_input_command(message["command"])
+    if message_type == "ping":
+        return _required_integer_field(message, "sequence") or _required_integer_field(message, "client_time_msec")
+    if message_type == "disconnect":
+        return _optional_string_field(message, "reason")
+    return None
+
+
+def _required_string_field(message: dict[str, Any], field_name: str) -> dict[str, Any] | None:
+    if field_name not in message:
+        return _error("missing_field", field=field_name)
+    return _optional_string_field(message, field_name)
+
+
+def _optional_string_field(message: dict[str, Any], field_name: str) -> dict[str, Any] | None:
+    if field_name in message and not isinstance(message[field_name], str):
+        return _error("invalid_field", field=field_name, expected="string")
+    return None
+
+
+def _required_integer_field(message: dict[str, Any], field_name: str) -> dict[str, Any] | None:
+    if field_name not in message:
+        return _error("missing_field", field=field_name)
+    if not isinstance(message[field_name], int) or isinstance(message[field_name], bool):
+        return _error("invalid_field", field=field_name, expected="integer")
+    return None
+
+
+def _required_dict_field(message: dict[str, Any], field_name: str) -> dict[str, Any] | None:
+    if field_name not in message:
+        return _error("missing_field", field=field_name)
+    if not isinstance(message[field_name], dict):
+        return _error("invalid_field", field=field_name, expected="object")
+    return None
+
+
+def _validate_input_command(command: dict[str, Any]) -> dict[str, Any] | None:
+    for field_name, value in command.items():
+        if field_name not in INPUT_COMMAND_FIELDS:
+            return _error("unknown_command", command=field_name)
+        if not isinstance(value, bool):
+            return _error("invalid_command", command=field_name, expected="boolean")
+    return None
+
+
+def _version_event(event: dict[str, Any]) -> dict[str, Any]:
+    versioned = dict(event)
+    versioned.setdefault("schema", EVENT_SCHEMA_VERSION)
+    return versioned
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the Groundfire browser-safe WebSocket gateway.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=27080)
+    parser.add_argument(
+        "--password",
+        default=os.environ.get("GROUNDFIRE_WEB_GATEWAY_PASSWORD", ""),
+        help="Optional join password. Also configurable through GROUNDFIRE_WEB_GATEWAY_PASSWORD.",
+    )
+    parser.add_argument(
+        "--auth-token",
+        default=os.environ.get("GROUNDFIRE_WEB_GATEWAY_AUTH_TOKEN", ""),
+        help="Optional join auth token. Also configurable through GROUNDFIRE_WEB_GATEWAY_AUTH_TOKEN.",
+    )
+    parser.add_argument(
+        "--max-players",
+        type=_non_negative_int,
+        default=_environment_int("GROUNDFIRE_WEB_GATEWAY_MAX_PLAYERS", 0),
+        help=(
+            "Optional active player limit. Use 0 for no limit. "
+            "Also configurable through GROUNDFIRE_WEB_GATEWAY_MAX_PLAYERS."
+        ),
+    )
+    parser.add_argument(
+        "--closed",
+        action="store_true",
+        default=_environment_bool("GROUNDFIRE_WEB_GATEWAY_CLOSED", False),
+        help="Reject new joins with server_closed. Also configurable through GROUNDFIRE_WEB_GATEWAY_CLOSED.",
+    )
+    parser.add_argument(
+        "--ban-player",
+        action="append",
+        default=_environment_list("GROUNDFIRE_WEB_GATEWAY_BANNED_PLAYERS"),
+        metavar="NAME",
+        help=(
+            "Reject joins from this player name with banned. May be repeated. "
+            "Also configurable through comma-separated GROUNDFIRE_WEB_GATEWAY_BANNED_PLAYERS."
+        ),
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    asyncio.run(WebSocketGateway(args.host, args.port).serve_forever())
+    gateway = WebSocketGateway(
+        args.host,
+        args.port,
+        password=args.password,
+        auth_token=args.auth_token,
+        max_players=args.max_players,
+        closed=args.closed,
+        banned_players=args.ban_player,
+    )
+    asyncio.run(gateway.serve_forever())
     return 0
+
+
+def _environment_list(name: str) -> list[str]:
+    return [item.strip() for item in os.environ.get(name, "").split(",") if item.strip()]
+
+
+def _environment_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "closed"}
+
+
+def _environment_int(name: str, default: int) -> int:
+    try:
+        return max(0, int(os.environ.get(name, str(default))))
+    except ValueError:
+        return default
+
+
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be greater than or equal to 0")
+    return parsed
+
+
+def _normalized_player_names(values: Iterable[str]) -> frozenset[str]:
+    names: set[str] = set()
+    for value in values:
+        for item in str(value).split(","):
+            normalized = _normalized_player_name(item)
+            if normalized:
+                names.add(normalized)
+    return frozenset(names)
+
+
+def _normalized_player_name(value: str) -> str:
+    return value.strip().casefold()
 
 
 if __name__ == "__main__":

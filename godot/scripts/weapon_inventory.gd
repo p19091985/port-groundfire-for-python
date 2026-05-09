@@ -5,13 +5,20 @@ const MACHINE_GUN := "Machine Gun"
 const MIRV := "MIRV"
 const MISSILE := "Missile"
 const NUKE := "Nuke"
+const DEFAULT_AMMO_SPEND := 1
+const MACHINE_GUN_ROUND_AMMO := 50
+const MACHINE_GUN_VOLLEY := 5
+const MACHINE_GUN_COOLDOWN := 0.1
+const MIRV_ROUND_AMMO := 3
+const MIRV_FRAGMENTS := 5
+const MIRV_SPREAD := 0.2
 
 const WEAPONS := [
 	{"name": SHELL, "damage": 40, "blast": 48.0, "ammo": -1, "speed": 4.2, "cost": 0, "kind": "shell"},
-	{"name": MACHINE_GUN, "damage": 6, "blast": 16.0, "ammo": 50, "speed": 5.8, "cost": 50, "kind": "machine_gun", "volley": 5},
-	{"name": MIRV, "damage": 22, "blast": 34.0, "ammo": 3, "speed": 4.0, "cost": 50, "kind": "mirv"},
-	{"name": MISSILE, "damage": 40, "blast": 46.0, "ammo": 4, "speed": 4.8, "cost": 50, "kind": "missile"},
-	{"name": NUKE, "damage": 90, "blast": 96.0, "ammo": 1, "speed": 3.6, "cost": 50, "kind": "nuke"},
+	{"name": MACHINE_GUN, "damage": 2, "blast": 0.0, "ammo": MACHINE_GUN_ROUND_AMMO, "speed": 5.8, "cost": 50, "kind": "machine_gun", "volley": MACHINE_GUN_VOLLEY, "cooldown": MACHINE_GUN_COOLDOWN, "direct_damage": true},
+	{"name": MIRV, "damage": 22, "blast": 34.0, "ammo": MIRV_ROUND_AMMO, "speed": 4.0, "cost": 50, "kind": "mirv", "fragments": MIRV_FRAGMENTS, "spread": MIRV_SPREAD},
+	{"name": MISSILE, "damage": 40, "blast": 46.0, "ammo": 4, "speed": 4.8, "cost": 50, "kind": "missile", "fuel": 3.0, "steer_sensitivity": 300.0},
+	{"name": NUKE, "damage": 90, "blast": 96.0, "ammo": 1, "speed": 3.6, "cost": 50, "kind": "nuke", "white_out": true},
 ]
 
 var _selected_index := 0
@@ -94,7 +101,7 @@ func consume_current() -> bool:
 		return true
 	if ammo <= 0:
 		return false
-	var spend: int = max(1, int(current().get("volley", 1)))
+	var spend: int = max(DEFAULT_AMMO_SPEND, int(current().get("volley", DEFAULT_AMMO_SPEND)))
 	_ammo[current_name()] = max(0, ammo - min(spend, ammo))
 	if int(_ammo[current_name()]) == 0:
 		cycle(1)

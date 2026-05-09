@@ -36,8 +36,8 @@ func disconnect_from_endpoint(reason := "client_disconnect") -> void:
 	status_changed.emit("websocket_disconnected")
 
 
-func join(player_name: String, password := "") -> void:
-	send_message(NetworkAdapter.join_message(player_name, password))
+func join(player_name: String, password := "", auth_token := "") -> void:
+	send_message(NetworkAdapter.join_message(player_name, password, auth_token))
 
 
 func send_input(command: Dictionary) -> int:

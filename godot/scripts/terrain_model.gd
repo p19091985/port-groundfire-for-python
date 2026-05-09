@@ -4,6 +4,8 @@ const CLASSIC_SURFACE_TOP := Color(0.40, 0.40, 0.00)
 const CLASSIC_SURFACE_BOTTOM := Color(0.80, 0.80, 0.00)
 const CLASSIC_BASE := Color(0.80, 0.80, 0.00)
 const MIN_CHUNK_THICKNESS := 0.5
+const CLASSIC_MIN_LAND_HEIGHT := -7.0
+const TANK_EDGE_MARGIN := 30.0
 
 var _width := 1024.0
 var _height := 768.0
@@ -144,7 +146,11 @@ func _chunk_height_at(x: float) -> float:
 
 
 func tank_position(x: float) -> Vector2:
-	return Vector2(clamp(x, 30.0, _width - 30.0), height_at(x))
+	return Vector2(clamp(x, TANK_EDGE_MARGIN, _width - TANK_EDGE_MARGIN), height_at(x))
+
+
+func playable_bounds() -> Vector2:
+	return Vector2(TANK_EDGE_MARGIN, _width - TANK_EDGE_MARGIN)
 
 
 func slope_angle_at(x: float) -> float:
@@ -187,6 +193,28 @@ func apply_crater(center: Vector2, radius: float) -> void:
 	var max_slice: int = clamp(int(ceil((center.x + safe_radius) / _step)), 0, _chunks.size() - 1)
 	for slice_index in range(min_slice, max_slice + 1):
 		_clip_slice(slice_index, center, safe_radius)
+	_update_samples_from_chunks()
+
+
+func drop_terrain(amount: float) -> void:
+	if amount <= 0.0:
+		return
+	if _samples.is_empty():
+		rebuild(_width, _height)
+	if _chunks.is_empty():
+		_rebuild_chunks_from_samples()
+	var floor_y := _world_height_to_screen(CLASSIC_MIN_LAND_HEIGHT)
+	for slice_index in range(_chunks.size()):
+		var slice_chunks: Array = _chunks[slice_index]
+		for chunk_index in range(slice_chunks.size()):
+			var chunk: Dictionary = slice_chunks[chunk_index]
+			chunk["top_left"] = min(floor_y, float(chunk["top_left"]) + amount)
+			chunk["top_right"] = min(floor_y, float(chunk["top_right"]) + amount)
+			if float(chunk["top_left"]) < floor_y:
+				chunk["bottom_left"] = min(_height, float(chunk["bottom_left"]) + amount)
+				chunk["bottom_right"] = min(_height, float(chunk["bottom_right"]) + amount)
+			slice_chunks[chunk_index] = chunk
+		_chunks[slice_index] = slice_chunks
 	_update_samples_from_chunks()
 
 

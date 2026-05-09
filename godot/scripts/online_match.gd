@@ -9,6 +9,9 @@ const PING_INTERVAL := 1.5
 const RECONNECT_BASE_DELAY := 0.75
 const RECONNECT_MAX_DELAY := 6.0
 const RECONNECT_MAX_ATTEMPTS := 5
+const HELLO_TIMEOUT := 5.0
+const SNAPSHOT_STALE_TIMEOUT := 10.0
+const PENDING_COMMAND_TIMEOUT_MSEC := 5000
 const PREDICTION_MOVE_STEP := 0.08
 const PREDICTION_ANGLE_STEP := 1.5
 
@@ -16,6 +19,7 @@ var _websocket_client: Node
 var _entry: Dictionary = {}
 var _endpoint := ""
 var _password := ""
+var _auth_token := ""
 var _status := "Preparing online match."
 var _snapshot: Dictionary = {}
 var _match_snapshot: Dictionary = {}
@@ -30,17 +34,28 @@ var _last_latency_ms := -1
 var _last_ack_sequence := 0
 var _last_snapshot_tick := 0
 var _last_terrain_revision := 0
+var _snapshot_age := 0.0
+var _handshake_age := 0.0
+var _server_protocol_ready := false
+var _server_protocol_status := "Protocol handshake pending."
+var _join_sent := false
+var _protocol_failure := false
+var _fatal_server_failure := false
 var _pending_commands: Dictionary = {}
+var _manual_reconnect_button: Button
+var _back_button: Button
 
 
 func setup(entry: Dictionary) -> void:
 	_entry = entry.duplicate()
 	_endpoint = str(_entry.get("endpoint", ""))
 	_password = str(_entry.get("password", ""))
+	_auth_token = str(_entry.get("auth_token", ""))
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_build_overlay_controls()
 	_websocket_client = WebSocketClient.new()
 	_websocket_client.status_changed.connect(_on_websocket_status_changed)
 	_websocket_client.message_received.connect(_on_websocket_message_received)
@@ -55,6 +70,24 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_update_reconnect(delta)
 	if not _websocket_client.is_websocket_connected():
+		_update_interpolation(delta)
+		_update_effects(delta)
+		queue_redraw()
+		return
+	if not _server_protocol_ready:
+		_handshake_age += delta
+		if _handshake_age >= HELLO_TIMEOUT:
+			_force_reconnect("hello_timeout")
+		_update_interpolation(delta)
+		_update_effects(delta)
+		queue_redraw()
+		return
+	if not _join_sent:
+		_send_join_after_hello()
+	_snapshot_age += delta
+	_prune_stale_pending_commands()
+	if _snapshot_age >= SNAPSHOT_STALE_TIMEOUT:
+		_force_reconnect("snapshot_timeout")
 		_update_interpolation(delta)
 		_update_effects(delta)
 		queue_redraw()
@@ -74,9 +107,7 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("gf_pause"):
-		_manual_disconnect = true
-		_websocket_client.disconnect_from_endpoint("back_to_server_browser")
-		get_parent().get_parent()._show_main_menu()
+		_return_to_main_menu()
 
 
 func _send_input_snapshot() -> void:
@@ -97,19 +128,27 @@ func _send_input_snapshot() -> void:
 		"weapon_prev": Input.is_action_just_pressed("gf_weapon_prev"),
 	}
 	var sequence: int = _websocket_client.send_input(command)
-	_pending_commands[sequence] = command
+	_pending_commands[sequence] = {
+		"command": command,
+		"sent_msec": Time.get_ticks_msec(),
+	}
 	_apply_local_prediction(command)
 
 
 func _on_websocket_status_changed(status: String) -> void:
+	if (_protocol_failure or _fatal_server_failure) and (status == "websocket_closed" or status == "websocket_disconnected"):
+		return
 	if status == "websocket_connected":
 		_reconnect_attempt = 0
 		_reconnect_timer = 0.0
+		_snapshot_age = 0.0
+		_handshake_age = 0.0
+		_server_protocol_ready = false
+		_server_protocol_status = "Protocol handshake pending."
+		_join_sent = false
 		_input_tick = 0.0
 		_ping_tick = 0.0
-		_websocket_client.join(NetworkAdapter.PLAYER_NAME_DEFAULT, _password)
-		_websocket_client.ping()
-		_status = "Connected. Waiting for snapshot."
+		_status = "Connected. Waiting for protocol hello."
 	elif status == "websocket_connecting":
 		_status = "Opening WebSocket."
 	elif status == "websocket_closed" or status == "websocket_connect_failed":
@@ -122,11 +161,17 @@ func _on_websocket_status_changed(status: String) -> void:
 
 func _on_websocket_message_received(message: Dictionary) -> void:
 	var message_type := str(message.get("type", "unknown"))
-	if message_type == NetworkAdapter.MESSAGE_SNAPSHOT:
+	if message_type == NetworkAdapter.MESSAGE_HELLO:
+		_handle_protocol_hello(message)
+	elif message_type == NetworkAdapter.MESSAGE_SNAPSHOT:
+		if not _server_protocol_ready:
+			_status = "Snapshot ignored before protocol hello."
+			return
 		_snapshot = Dictionary(message.get("state", {}))
 		_match_snapshot = Dictionary(_snapshot.get("match_snapshot", {}))
 		_last_snapshot_tick = int(_match_snapshot.get("simulation_tick", _last_snapshot_tick))
 		_last_terrain_revision = int(_match_snapshot.get("terrain_revision", _last_terrain_revision))
+		_snapshot_age = 0.0
 		_ingest_acknowledgements()
 		_ingest_replicated_entities()
 		_ingest_events()
@@ -135,7 +180,14 @@ func _on_websocket_message_received(message: Dictionary) -> void:
 		_last_latency_ms = max(0, Time.get_ticks_msec() - int(message.get("client_time_msec", Time.get_ticks_msec())))
 		_status = "Pong received: %d ms." % _last_latency_ms
 	elif message_type == NetworkAdapter.MESSAGE_ERROR:
-		_status = "Error: %s." % message.get("message", "unknown")
+		var error_name := str(message.get("message", "unknown"))
+		if not _server_protocol_ready and _is_protocol_error(error_name):
+			_fail_protocol_handshake("Protocol handshake failed: %s." % error_name, error_name)
+			return
+		if NetworkAdapter.is_fatal_server_error(error_name):
+			_fail_server_error(NetworkAdapter.server_error_status_message(message), error_name)
+			return
+		_status = NetworkAdapter.server_error_status_message(message)
 	elif message_type == NetworkAdapter.MESSAGE_DISCONNECT:
 		_status = "Server disconnected: %s." % message.get("reason", "unknown")
 		_schedule_reconnect("server_disconnect")
@@ -143,13 +195,75 @@ func _on_websocket_message_received(message: Dictionary) -> void:
 		_status = "Message: %s." % message_type
 
 
+func _handle_protocol_hello(message: Dictionary) -> void:
+	_server_protocol_status = NetworkAdapter.protocol_status_message(message)
+	if not NetworkAdapter.server_supports_client_protocol(message):
+		_fail_protocol_handshake(_server_protocol_status, "protocol_mismatch")
+		return
+	_server_protocol_ready = true
+	_handshake_age = 0.0
+	_status = _server_protocol_status
+	_send_join_after_hello()
+
+
+func _is_protocol_error(error_name: String) -> bool:
+	return error_name == "missing_protocol" or error_name == "invalid_protocol" or error_name == "protocol_mismatch"
+
+
+func _fail_protocol_handshake(status_text: String, reason: String) -> void:
+	_server_protocol_status = status_text
+	_protocol_failure = true
+	_manual_disconnect = true
+	_status = status_text
+	if _websocket_client != null:
+		_websocket_client.disconnect_from_endpoint(reason)
+
+
+func _fail_server_error(status_text: String, reason: String) -> void:
+	_fatal_server_failure = true
+	_manual_disconnect = true
+	_reconnect_timer = 0.0
+	_status = status_text
+	if _websocket_client != null:
+		_websocket_client.disconnect_from_endpoint(reason)
+
+
+func _send_join_after_hello() -> void:
+	if _join_sent:
+		return
+	if not _server_protocol_ready:
+		return
+	if not _websocket_client.is_websocket_connected():
+		return
+	_join_sent = true
+	_snapshot_age = 0.0
+	_input_tick = 0.0
+	_ping_tick = 0.0
+	_websocket_client.join(NetworkAdapter.PLAYER_NAME_DEFAULT, _password, _auth_token)
+	_websocket_client.ping()
+	_status = "%s Join sent." % _server_protocol_status
+
+
 func _connect_now(message: String) -> void:
 	_manual_disconnect = false
+	_protocol_failure = false
+	_fatal_server_failure = false
+	_server_protocol_ready = false
+	_server_protocol_status = "Protocol handshake pending."
+	_join_sent = false
+	_handshake_age = 0.0
 	_status = message
+	_snapshot_age = 0.0
+	_pending_commands.clear()
 	_websocket_client.connect_to_endpoint(_endpoint)
 
 
 func _schedule_reconnect(reason: String) -> void:
+	if _protocol_failure:
+		_status = _server_protocol_status
+		return
+	if _fatal_server_failure:
+		return
 	if _manual_disconnect:
 		_status = "Disconnected."
 		return
@@ -177,11 +291,67 @@ func _update_reconnect(delta: float) -> void:
 		_connect_now("Reconnecting to %s." % _endpoint)
 
 
+func _force_reconnect(reason: String) -> void:
+	if _manual_disconnect or _endpoint.is_empty():
+		return
+	_websocket_client.disconnect_from_endpoint(reason)
+	_schedule_reconnect(reason)
+
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), GroundfireTheme.COLOR_BG)
 	_draw_header()
 	_draw_replicated_world()
 	_draw_snapshot_panel()
+
+
+func _build_overlay_controls() -> void:
+	var actions := HBoxContainer.new()
+	actions.anchor_left = 1.0
+	actions.anchor_right = 1.0
+	actions.offset_left = -276.0
+	actions.offset_top = 24.0
+	actions.offset_right = -28.0
+	actions.offset_bottom = 68.0
+	actions.alignment = BoxContainer.ALIGNMENT_END
+	actions.add_theme_constant_override("separation", 10)
+	add_child(actions)
+	_manual_reconnect_button = _header_button("Reconnect", _manual_reconnect)
+	actions.add_child(_manual_reconnect_button)
+	_back_button = _header_button("Back", _return_to_main_menu)
+	actions.add_child(_back_button)
+	_manual_reconnect_button.focus_neighbor_right = _back_button.get_path()
+	_back_button.focus_neighbor_left = _manual_reconnect_button.get_path()
+
+
+func _header_button(text: String, callback: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(116.0, 38.0)
+	button.focus_mode = Control.FOCUS_ALL
+	GroundfireTheme.apply_button(button)
+	button.pressed.connect(callback)
+	return button
+
+
+func _manual_reconnect() -> void:
+	if _endpoint.is_empty():
+		_status = "Cannot reconnect: missing endpoint."
+		return
+	_manual_disconnect = true
+	_websocket_client.disconnect_from_endpoint("manual_reconnect")
+	_manual_disconnect = false
+	_reconnect_attempt = 0
+	_reconnect_timer = 0.0
+	_last_latency_ms = -1
+	_connect_now("Manual reconnect to %s." % _endpoint)
+
+
+func _return_to_main_menu() -> void:
+	_manual_disconnect = true
+	if _websocket_client != null:
+		_websocket_client.disconnect_from_endpoint("back_to_main_menu")
+	get_parent().get_parent()._show_main_menu()
 
 
 func _draw_header() -> void:
@@ -191,7 +361,7 @@ func _draw_header() -> void:
 
 
 func _draw_replicated_world() -> void:
-	var world_rect := Rect2(28.0, 124.0, max(320.0, size.x - 56.0), max(260.0, size.y - 300.0))
+	var world_rect := Rect2(28.0, 124.0, max(320.0, size.x - 56.0), max(260.0, size.y - 324.0))
 	draw_rect(world_rect, Color("#07131ecc"))
 	draw_rect(world_rect, GroundfireTheme.COLOR_LINE, false, 2.0)
 	if _match_snapshot.is_empty():
@@ -280,7 +450,7 @@ func _draw_players(world_rect: Rect2) -> void:
 
 
 func _draw_snapshot_panel() -> void:
-	var panel := Rect2(28.0, max(400.0, size.y - 172.0), min(size.x - 56.0, 900.0), 140.0)
+	var panel := Rect2(28.0, max(400.0, size.y - 196.0), min(size.x - 56.0, 900.0), 164.0)
 	draw_rect(panel, Color("#0b1722cc"))
 	draw_rect(panel, GroundfireTheme.COLOR_LINE, false, 2.0)
 	if _snapshot.is_empty():
@@ -305,9 +475,11 @@ func _draw_snapshot_panel() -> void:
 func _draw_network_diagnostics(origin: Vector2) -> void:
 	var latency_text := "n/a" if _last_latency_ms < 0 else "%d ms" % _last_latency_ms
 	var lines := PackedStringArray([
+		"protocol: %s" % _server_protocol_status,
 		"latency: %s" % latency_text,
 		"ack: %d  pending: %d" % [_last_ack_sequence, _pending_commands.size()],
 		"tick: %d  terrain: %d" % [_last_snapshot_tick, _last_terrain_revision],
+		"snapshot age: %.1fs  stale cmd: %d" % [_snapshot_age, _stale_pending_count()],
 	])
 	for index in range(lines.size()):
 		draw_string(
@@ -375,6 +547,24 @@ func _ingest_acknowledgements() -> void:
 	for sequence in _pending_commands.keys():
 		if int(sequence) <= _last_ack_sequence:
 			_pending_commands.erase(sequence)
+
+
+func _prune_stale_pending_commands() -> void:
+	var now := Time.get_ticks_msec()
+	for sequence in _pending_commands.keys():
+		var pending := Dictionary(_pending_commands[sequence])
+		if now - int(pending.get("sent_msec", now)) > PENDING_COMMAND_TIMEOUT_MSEC:
+			_pending_commands.erase(sequence)
+
+
+func _stale_pending_count() -> int:
+	var now := Time.get_ticks_msec()
+	var count := 0
+	for sequence in _pending_commands.keys():
+		var pending := Dictionary(_pending_commands[sequence])
+		if now - int(pending.get("sent_msec", now)) > PENDING_COMMAND_TIMEOUT_MSEC:
+			count += 1
+	return count
 
 
 func _apply_local_prediction(command: Dictionary) -> void:

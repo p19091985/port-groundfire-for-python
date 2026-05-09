@@ -4,6 +4,7 @@ mypy==1.19.1
 mypy_extensions==1.1.0
 packaging==26.2
 pathspec==1.1.1
+Pillow>=10,<13
 pluggy==1.6.0
 pygame==2.6.1
 pygame_gui>=0.6.14,<0.7
@@ -11,4 +12,6 @@ pygame-menu>=4.4,<5
 Pygments==2.20.0
 pytest==9.0.2
 ruff==0.15.7
+tomli>=2,<3
 typing_extensions==4.15.0
+websocket-client>=1.8,<2

@@ -15,24 +15,36 @@ func is_desktop() -> bool:
 
 
 func supports(feature_name: String) -> bool:
+	return supports_for_platform(feature_name, is_web())
+
+
+static func supports_for_platform(feature_name: String, web_build: bool) -> bool:
 	match feature_name:
 		FEATURE_BROWSER_SAFE_ONLINE:
 			return true
 		FEATURE_LAN_DISCOVERY, FEATURE_UDP_TRANSPORT, FEATURE_DEDICATED_SERVER_TOOLS:
-			return is_desktop()
+			return not web_build
 		_:
 			return false
 
 
 func visible_server_browser_tabs() -> PackedStringArray:
+	return visible_server_browser_tabs_for(is_web())
+
+
+static func visible_server_browser_tabs_for(web_build: bool) -> PackedStringArray:
 	var tabs := PackedStringArray(["Internet", "Favorites", "History"])
-	if supports(FEATURE_LAN_DISCOVERY):
+	if supports_for_platform(FEATURE_LAN_DISCOVERY, web_build):
 		tabs.append("LAN")
 	return tabs
 
 
 func hidden_web_features() -> PackedStringArray:
-	if is_desktop():
+	return hidden_features_for_platform(is_web())
+
+
+static func hidden_features_for_platform(web_build: bool) -> PackedStringArray:
+	if not web_build:
 		return PackedStringArray()
 	return PackedStringArray([
 		FEATURE_LAN_DISCOVERY,

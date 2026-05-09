@@ -6,6 +6,7 @@ const LocalMatchShop := preload("res://scripts/local_match_shop.gd")
 const TankState := preload("res://scripts/tank_state.gd")
 const TerrainModel := preload("res://scripts/terrain_model.gd")
 const WeaponInventory := preload("res://scripts/weapon_inventory.gd")
+const QUAKE_SOUND := preload("res://assets/quake.wav")
 
 const OPTIONS_PATH := "user://groundfire_options.cfg"
 const PHASE_AIM := "aim"
@@ -14,6 +15,28 @@ const PHASE_ROUND_OVER := "round_over"
 const PHASE_SHOP := "shop"
 const TURN_PLAYER := "Player"
 const TURN_ENEMY := "Enemy"
+const AI_DIFFICULTY_EASY := "easy"
+const AI_DIFFICULTY_NORMAL := "normal"
+const AI_DIFFICULTY_HARD := "hard"
+const PROJECTILE_GRAVITY := 190.0
+const MIRV_MIN_SPLIT_AGE := 0.25
+const MISSILE_ANGLE_CHANGE_LIMIT := 500.0
+const MISSILE_RECENTER_MULTIPLIER := 3.0
+const MISSILE_AI_STEER_ANGLE_SCALE := 18.0
+const MISSILE_MIN_SPEED := 1.0
+const SPLASH_OCCLUSION_MULTIPLIER := 0.45
+const WIND_MIN := -9.0
+const WIND_MAX := 9.0
+const WIND_TURN_SHIFT := 3.0
+const WIND_GUST_MAX := 2.0
+const WIND_GUST_SCALE := 0.35
+const WIND_GUST_FREQUENCY := 2.7
+const QUAKE_DURATION := 5.0
+const QUAKE_DROP_RATE := 7.0
+const QUAKE_TIME_TILL_FIRST := 90.0
+const QUAKE_TIME_BETWEEN := 30.0
+const QUAKE_CAMERA_SHAKE := 14.0
+const NUKE_WHITEOUT_FADE_RATE := 0.6
 
 var _hud: Node
 var _terrain := TerrainModel.new()
@@ -29,6 +52,7 @@ var _camera_shake_rng := RandomNumberGenerator.new()
 var _screen_shake_enabled := true
 var _camera_smoothing := 1.0
 var _mouse_aim_enabled := true
+var _ai_difficulty := AI_DIFFICULTY_NORMAL
 var _mouse_world_position := Vector2.ZERO
 var _player := TankState.new()
 var _enemy := TankState.new()
@@ -38,6 +62,10 @@ var _round := 1
 var _phase := PHASE_AIM
 var _turn_owner := TURN_PLAYER
 var _wind := -6.0
+var _wind_gust := 0.0
+var _wind_rng := RandomNumberGenerator.new()
+var _quake_active := false
+var _quake_countdown := QUAKE_TIME_TILL_FIRST
 var _score := 0
 var _credits := 0
 var _player_wins := 0
@@ -53,11 +81,13 @@ var _is_paused := false
 var _shop_overlay: Control
 var _shop_title := ""
 var _shop_reward := 0
+var _quake_audio: AudioStreamPlayer
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_camera_shake_rng.seed = 4319
+	_wind_rng.seed = 2783
 	_load_gameplay_options()
 	_ensure_input_actions()
 	_rebuild_terrain_if_needed(true)
@@ -65,6 +95,7 @@ func _ready() -> void:
 	_hud.anchor_right = 1.0
 	_hud.anchor_bottom = 1.0
 	add_child(_hud)
+	_build_quake_audio()
 	_build_pause_overlay()
 	_build_shop_overlay()
 	set_process(true)
@@ -86,6 +117,7 @@ func _process(delta: float) -> void:
 			_start_next_turn_or_round()
 	_update_projectiles(delta)
 	_update_explosions(delta)
+	_update_quake(delta)
 	_terrain.update(delta)
 	_player.settle_on_terrain(_terrain, delta)
 	_enemy.settle_on_terrain(_terrain, delta)
@@ -130,12 +162,15 @@ func _handle_player_input(delta: float) -> void:
 	if Input.is_action_pressed("gf_power_down"):
 		power_direction -= 1.0
 	_player.update_gun(delta, aim_direction, power_direction)
+	var move_direction := 0.0
 	if Input.is_action_pressed("gf_move_left"):
-		_player.move_on_terrain(-1.0, delta, _terrain)
+		move_direction -= 1.0
 	if Input.is_action_pressed("gf_move_right"):
-		_player.move_on_terrain(1.0, delta, _terrain)
+		move_direction += 1.0
 	if Input.is_action_pressed("gf_jump"):
-		_player.boost(delta)
+		_player.boost(delta, move_direction)
+	elif move_direction != 0.0:
+		_player.move_on_terrain(move_direction, delta, _terrain)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -229,6 +264,16 @@ func _build_shop_overlay() -> void:
 	add_child(_shop_overlay)
 
 
+func _build_quake_audio() -> void:
+	_quake_audio = AudioStreamPlayer.new()
+	_quake_audio.name = "QuakeAudio"
+	var quake_stream := QUAKE_SOUND.duplicate()
+	if quake_stream is AudioStreamWAV:
+		quake_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	_quake_audio.stream = quake_stream
+	add_child(_quake_audio)
+
+
 func _pause_button(text: String, callback: Callable, accent := false) -> Button:
 	var button := Button.new()
 	button.text = text
@@ -247,6 +292,10 @@ func _set_paused(value: bool) -> void:
 		_resume_button.grab_focus.call_deferred()
 	if not value:
 		_load_gameplay_options()
+	if _quake_audio != null:
+		_quake_audio.stream_paused = value
+		if not value and _quake_active:
+			_play_quake_audio()
 	_message = "Paused." if value else "Match resumed."
 	_update_hud()
 
@@ -254,6 +303,7 @@ func _set_paused(value: bool) -> void:
 func _restart_round() -> void:
 	_set_paused(false)
 	_hide_shop_overlay()
+	_reset_quake_cycle()
 	_projectiles.clear()
 	_explosions.clear()
 	_ai_timer = 0.0
@@ -282,13 +332,16 @@ func _fire_player() -> void:
 	if not _inventory.consume_current():
 		_message = "No ammo for %s." % _inventory.current_name()
 		return
-	_fire_weapon(_player.launch_origin(), _player.gun_angle, _player.gun_power, true, _inventory.current())
+	var weapon := _inventory.current()
+	var speed_multiplier := float(weapon.get("speed", 4.2))
+	_fire_weapon(_player.launch_origin(), _player.gun_angle, _player.gun_power, true, weapon, _player.airborne_velocity, _player.launch_velocity(_player.gun_power, speed_multiplier))
 	_phase = PHASE_PROJECTILE
 	_message = "%s fired." % _inventory.current_name()
 
 
 func _fire_ai() -> void:
 	_turn_owner = TURN_ENEMY
+	_shift_wind_for_turn()
 	var shot := _choose_ai_shot()
 	var weapon := _choose_ai_weapon(shot)
 	if str(weapon.get("kind", "shell")) == "missile" or str(weapon.get("kind", "shell")) == "machine_gun":
@@ -297,7 +350,8 @@ func _fire_ai() -> void:
 	_enemy.gun_power = float(shot["power"])
 	_enemy_inventory.select_by_name(str(weapon.get("name", WeaponInventory.SHELL)))
 	_enemy_inventory.consume_current()
-	_fire_weapon(_enemy.launch_origin(), _enemy.gun_angle, _enemy.gun_power, false, weapon)
+	var speed_multiplier := float(weapon.get("speed", 4.2))
+	_fire_weapon(_enemy.launch_origin(), _enemy.gun_angle, _enemy.gun_power, false, weapon, _enemy.airborne_velocity, _enemy.launch_velocity(_enemy.gun_power, speed_multiplier))
 	_phase = PHASE_PROJECTILE
 	_message = "Enemy fires %s." % str(weapon.get("name", "Shell"))
 
@@ -309,16 +363,18 @@ func _choose_ai_shot() -> Dictionary:
 	var best_angle := 135.0
 	var best_power := 55.0
 	var best_miss := INF
-	for angle in range(100, 171, 5):
-		for power in range(32, 91, 4):
+	for angle in range(100, 171, _ai_angle_step()):
+		for power in range(32, 91, _ai_power_step()):
 			var miss := _simulate_ai_shell_miss(origin, float(angle), float(power), target, shell)
 			if miss < best_miss:
 				best_miss = miss
 				best_angle = float(angle)
 				best_power = float(power)
+	var angle_error := _ai_angle_error()
+	var power_error := _ai_power_error()
 	return {
-		"angle": clamp(best_angle + randf_range(-2.0, 2.0), 95.0, 175.0),
-		"power": clamp(best_power + randf_range(-3.0, 3.0), 28.0, 95.0),
+		"angle": clamp(best_angle + randf_range(-angle_error, angle_error), 95.0, 175.0),
+		"power": clamp(best_power + randf_range(-power_error, power_error), 28.0, 95.0),
 		"miss": best_miss,
 	}
 
@@ -329,10 +385,12 @@ func _simulate_ai_shell_miss(origin: Vector2, angle_degrees: float, power: float
 	var position := origin
 	var closest := origin.distance_to(target)
 	var step := 1.0 / 30.0
+	var age := 0.0
 	for _index in range(120):
 		var previous_position := position
-		velocity.x += _wind * step
-		velocity.y += 190.0 * step
+		age += step
+		velocity.x += _wind_acceleration(age) * step
+		velocity.y += PROJECTILE_GRAVITY * step
 		position += velocity * step
 		closest = min(closest, _distance_to_segment(target, previous_position, position))
 		if _terrain_hits_segment(previous_position, position) or position.x < 0.0 or position.x > _world_size.x:
@@ -345,6 +403,19 @@ func _choose_ai_weapon(shot: Dictionary) -> Dictionary:
 	var distance: float = abs(_enemy.position.x - _player.position.x)
 	var miss := float(shot.get("miss", INF))
 	var direct_line: bool = _has_direct_line_to_player()
+	if _ai_difficulty == AI_DIFFICULTY_EASY:
+		if direct_line and distance < 240.0 and _player.health <= 35 and _enemy_inventory.has_ammo(WeaponInventory.MACHINE_GUN):
+			return _enemy_inventory.weapon_by_name(WeaponInventory.MACHINE_GUN)
+		return shell
+	if _ai_difficulty == AI_DIFFICULTY_HARD:
+		if _enemy_inventory.has_ammo(WeaponInventory.NUKE) and (_player.health <= 70 or (distance > 320.0 and miss < 56.0)):
+			return _enemy_inventory.weapon_by_name(WeaponInventory.NUKE)
+		if _enemy_inventory.has_ammo(WeaponInventory.MISSILE) and (direct_line or miss > 52.0):
+			return _enemy_inventory.weapon_by_name(WeaponInventory.MISSILE)
+		if distance > 340.0 and _enemy_inventory.has_ammo(WeaponInventory.MIRV):
+			return _enemy_inventory.weapon_by_name(WeaponInventory.MIRV)
+		if direct_line and distance < 380.0 and _enemy_inventory.has_ammo(WeaponInventory.MACHINE_GUN):
+			return _enemy_inventory.weapon_by_name(WeaponInventory.MACHINE_GUN)
 	if _enemy_inventory.has_ammo(WeaponInventory.NUKE) and (_player.health <= 55 or (distance > 360.0 and miss < 46.0)):
 		return _enemy_inventory.weapon_by_name(WeaponInventory.NUKE)
 	if direct_line and distance < 320.0 and _enemy_inventory.has_ammo(WeaponInventory.MACHINE_GUN):
@@ -374,20 +445,32 @@ func _has_direct_line_to_player() -> bool:
 	return not bool(_terrain_collision(origin, target)["hit"])
 
 
-func _fire_weapon(origin: Vector2, angle_degrees: float, power: float, player_owned: bool, weapon: Dictionary) -> void:
+func _fire_weapon(origin: Vector2, angle_degrees: float, power: float, player_owned: bool, weapon: Dictionary, inherited_velocity := Vector2.ZERO, velocity_override: Variant = null) -> void:
 	var kind := str(weapon.get("kind", "shell"))
 	if kind == "machine_gun":
-		for index in range(5):
-			_fire_from(origin, angle_degrees + randf_range(-3.5, 3.5), power + float(index) * 1.4, player_owned, weapon)
+		var volley: int = max(1, int(weapon.get("volley", WeaponInventory.MACHINE_GUN_VOLLEY)))
+		var cooldown: float = max(0.0, float(weapon.get("cooldown", WeaponInventory.MACHINE_GUN_COOLDOWN)))
+		for index in range(volley):
+			_fire_from(origin, angle_degrees, power, player_owned, weapon, inherited_velocity, velocity_override)
+			if not _projectiles.is_empty():
+				_projectiles[_projectiles.size() - 1]["delay"] = float(index) * cooldown
 		return
-	_fire_from(origin, angle_degrees, power, player_owned, weapon)
+	_fire_from(origin, angle_degrees, power, player_owned, weapon, inherited_velocity, velocity_override)
 
 
-func _fire_from(origin: Vector2, angle_degrees: float, power: float, player_owned: bool, weapon: Dictionary) -> void:
+func _fire_from(origin: Vector2, angle_degrees: float, power: float, player_owned: bool, weapon: Dictionary, inherited_velocity := Vector2.ZERO, velocity_override: Variant = null) -> void:
 	var radians := deg_to_rad(angle_degrees)
 	var speed_multiplier := float(weapon.get("speed", 4.2))
-	var velocity := Vector2(cos(radians), -sin(radians)) * power * speed_multiplier
+	var velocity := Vector2(cos(radians), -sin(radians)) * power * speed_multiplier + inherited_velocity
+	if velocity_override is Vector2:
+		velocity = Vector2(velocity_override)
 	var kind := str(weapon.get("kind", "shell"))
+	var split_age := INF
+	if kind == "mirv":
+		split_age = max(MIRV_MIN_SPLIT_AGE, -velocity.y / PROJECTILE_GRAVITY)
+	var missile_fuel := -1.0
+	if kind == "missile":
+		missile_fuel = float(weapon.get("fuel", 3.0))
 	_last_shot_player_owned = player_owned
 	_projectiles.append({
 		"position": origin,
@@ -397,6 +480,12 @@ func _fire_from(origin: Vector2, angle_degrees: float, power: float, player_owne
 		"weapon": weapon,
 		"kind": kind,
 		"age": 0.0,
+		"angle": angle_degrees,
+		"angle_change": 0.0,
+		"fuel": missile_fuel,
+		"steer_sensitivity": float(weapon.get("steer_sensitivity", 300.0)),
+		"back_position": origin,
+		"split_age": split_age,
 		"split": false,
 	})
 
@@ -406,16 +495,25 @@ func _update_projectiles(delta: float) -> void:
 		var previous_position := Vector2(projectile["position"])
 		var velocity: Vector2 = projectile["velocity"]
 		var kind := str(projectile.get("kind", "shell"))
+		if kind == "machine_gun":
+			if _machine_gun_projectile_waits(projectile, delta):
+				continue
+			projectile["age"] = float(projectile.get("age", 0.0)) + delta
+			_update_machine_gun_projectile(projectile, previous_position, velocity, delta)
+			continue
 		projectile["age"] = float(projectile.get("age", 0.0)) + delta
+		var apply_ballistic_acceleration := true
 		if kind == "missile":
-			var target_position: Vector2 = _enemy.position if bool(projectile["player_owned"]) else _player.position
-			var desired: Vector2 = (target_position + Vector2(0.0, -20.0) - previous_position).normalized() * velocity.length()
-			velocity = velocity.lerp(desired, 0.75 * delta)
-		if kind == "mirv" and not bool(projectile.get("split", false)) and float(projectile["age"]) > 0.8:
+			velocity = _update_missile_projectile(projectile, velocity, previous_position, delta)
+			apply_ballistic_acceleration = float(projectile.get("fuel", -1.0)) < 0.0
+		if kind == "mirv" and not bool(projectile.get("split", false)) and float(projectile["age"]) >= float(projectile.get("split_age", 0.8)):
 			projectile["split"] = true
 			_spawn_mirv_children(previous_position, velocity, bool(projectile["player_owned"]), Dictionary(projectile["weapon"]))
-		velocity.x += _wind * delta
-		velocity.y += 190.0 * delta
+			projectile["expired"] = true
+			continue
+		if apply_ballistic_acceleration:
+			velocity.x += _wind_acceleration(float(projectile["age"])) * delta
+			velocity.y += PROJECTILE_GRAVITY * delta
 		var position := previous_position + velocity * delta
 		projectile["previous_position"] = previous_position
 		projectile["velocity"] = velocity
@@ -431,14 +529,138 @@ func _update_projectiles(delta: float) -> void:
 		if position.x < 0.0 or position.x > _world_size.x:
 			_apply_explosion(Vector2(clamp(position.x, 0.0, _world_size.x), min(position.y, _terrain.height_at(position.x))), projectile)
 			return
+	_finish_machine_gun_volley_if_needed()
+
+
+func _machine_gun_projectile_waits(projectile: Dictionary, delta: float) -> bool:
+	var delay := float(projectile.get("delay", 0.0))
+	if delay <= 0.0:
+		return false
+	delay -= delta
+	projectile["delay"] = delay
+	if delay <= 0.0:
+		projectile["delay"] = 0.0
+		projectile["back_position"] = Vector2(projectile.get("position", Vector2.ZERO))
+		return false
+	return true
+
+
+func _update_machine_gun_projectile(projectile: Dictionary, previous_position: Vector2, velocity: Vector2, delta: float) -> void:
+	velocity.y += PROJECTILE_GRAVITY * delta
+	var position := previous_position + velocity * delta
+	projectile["back_position"] = previous_position
+	projectile["previous_position"] = previous_position
+	projectile["velocity"] = velocity
+	projectile["position"] = position
+	if _segment_hits_tank(previous_position, position, _enemy.position):
+		_apply_machine_gun_damage(projectile, true)
+		projectile["expired"] = true
+		return
+	if _segment_hits_tank(previous_position, position, _player.position):
+		_apply_machine_gun_damage(projectile, false)
+		projectile["expired"] = true
+		return
+	var terrain_collision := _terrain_collision(previous_position, position)
+	if bool(terrain_collision["hit"]):
+		projectile["position"] = Vector2(terrain_collision["position"])
+		projectile["expired"] = true
+		return
+	if position.x < 0.0 or position.x > _world_size.x or position.y > _world_size.y + 160.0:
+		projectile["expired"] = true
+
+
+func _apply_machine_gun_damage(projectile: Dictionary, target_is_enemy: bool) -> void:
+	var target: RefCounted = _enemy
+	if not target_is_enemy:
+		target = _player
+	if target.state != TankState.STATE_ALIVE:
+		return
+	var weapon: Dictionary = projectile.get("weapon", {})
+	var damage: int = max(0, int(weapon.get("damage", 2)))
+	if damage <= 0:
+		return
+	target.apply_damage(damage)
+	if target_is_enemy:
+		_score += damage
+		_credits += damage
+	if bool(projectile.get("player_owned", true)):
+		var target_label := "enemy" if target_is_enemy else "player"
+		_message = "Machine Gun dealt %d %s damage." % [damage, target_label]
+	else:
+		_message = "Enemy Machine Gun dealt %d player damage." % damage
+
+
+func _finish_machine_gun_volley_if_needed() -> void:
+	var had_machine_gun := false
+	var remaining: Array[Dictionary] = []
+	for projectile in _projectiles:
+		if str(projectile.get("kind", "shell")) == "machine_gun":
+			had_machine_gun = true
+		if not bool(projectile.get("expired", false)):
+			remaining.append(projectile)
+	if remaining.size() == _projectiles.size():
+		return
+	_projectiles = remaining
+	if had_machine_gun and not _has_projectile_kind("machine_gun"):
+		_after_explosion()
+
+
+func _has_projectile_kind(kind: String) -> bool:
+	for projectile in _projectiles:
+		if str(projectile.get("kind", "shell")) == kind:
+			return true
+	return false
+
+
+func _update_missile_projectile(projectile: Dictionary, velocity: Vector2, position: Vector2, delta: float) -> Vector2:
+	if float(projectile.get("fuel", -1.0)) < 0.0:
+		return velocity
+	var steer := _missile_steer_direction(projectile, position)
+	var steer_sensitivity := float(projectile.get("steer_sensitivity", 300.0))
+	var angle_change := float(projectile.get("angle_change", 0.0))
+	if steer > 0.0:
+		angle_change = min(MISSILE_ANGLE_CHANGE_LIMIT, angle_change + steer_sensitivity * delta)
+	elif steer < 0.0:
+		angle_change = max(-MISSILE_ANGLE_CHANGE_LIMIT, angle_change - steer_sensitivity * delta)
+	else:
+		angle_change = move_toward(angle_change, 0.0, MISSILE_RECENTER_MULTIPLIER * steer_sensitivity * delta)
+	var angle := float(projectile.get("angle", rad_to_deg(atan2(-velocity.y, velocity.x))))
+	angle += angle_change * delta
+	var speed: float = max(MISSILE_MIN_SPEED, velocity.length())
+	var radians: float = deg_to_rad(angle)
+	projectile["angle"] = angle
+	projectile["angle_change"] = angle_change
+	projectile["fuel"] = float(projectile.get("fuel", 0.0)) - delta
+	return Vector2(cos(radians), -sin(radians)) * speed
+
+
+func _missile_steer_direction(projectile: Dictionary, position: Vector2) -> float:
+	if bool(projectile.get("player_owned", false)):
+		var steer := 0.0
+		if Input.is_action_pressed("gf_aim_left"):
+			steer += 1.0
+		if Input.is_action_pressed("gf_aim_right"):
+			steer -= 1.0
+		return steer
+	var target := _player.position + Vector2(0.0, -20.0)
+	var desired_angle := rad_to_deg(atan2(-(target - position).y, (target - position).x))
+	var delta_angle := _short_angle_delta(float(projectile.get("angle", 135.0)), desired_angle)
+	return clamp(delta_angle / MISSILE_AI_STEER_ANGLE_SCALE, -1.0, 1.0)
+
+
+func _short_angle_delta(from_degrees: float, to_degrees: float) -> float:
+	return fposmod(to_degrees - from_degrees + 180.0, 360.0) - 180.0
 
 
 func _spawn_mirv_children(origin: Vector2, velocity: Vector2, player_owned: bool, weapon: Dictionary) -> void:
-	for offset in [-0.45, 0.0, 0.45]:
+	var fragments: int = max(1, int(weapon.get("fragments", WeaponInventory.MIRV_FRAGMENTS)))
+	var spread: float = float(weapon.get("spread", WeaponInventory.MIRV_SPREAD))
+	for index in range(fragments):
+		var offset: float = float(index) - (float(fragments - 1) * 0.5)
 		var child_weapon := weapon.duplicate()
 		child_weapon["kind"] = "shell"
 		child_weapon["name"] = "MIRV Fragment"
-		var child_velocity: Vector2 = velocity.rotated(offset) * 0.72
+		var child_velocity := Vector2(velocity.x + (velocity.x * spread * offset), 0.0)
 		_projectiles.append({
 			"position": origin,
 			"previous_position": origin,
@@ -485,7 +707,7 @@ func _apply_explosion(position: Vector2, projectile: Dictionary) -> void:
 	var weapon: Dictionary = projectile["weapon"]
 	var damage := int(weapon.get("damage", 40))
 	var blast_radius := float(weapon.get("blast", 48.0))
-	_spawn_explosion(position, blast_radius)
+	_spawn_explosion(position, blast_radius, _weapon_white_out(weapon))
 	var enemy_damage := _splash_damage(position, _enemy.position + Vector2(0.0, -20.0), damage, blast_radius)
 	var player_damage := _splash_damage(position, _player.position + Vector2(0.0, -20.0), damage, blast_radius)
 	if enemy_damage > 0:
@@ -502,17 +724,22 @@ func _apply_explosion(position: Vector2, projectile: Dictionary) -> void:
 	_after_explosion()
 
 
+func _weapon_white_out(weapon: Dictionary) -> bool:
+	return bool(weapon.get("white_out", str(weapon.get("kind", "")) == "nuke"))
+
+
 func _after_explosion() -> void:
-	if _enemy.health <= 0:
+	if _enemy.state == TankState.STATE_DEAD:
 		_player_wins += 1
 		_open_post_round_shop("Round Won", 100)
-	elif _player.health <= 0:
+	elif _player.state == TankState.STATE_DEAD:
 		_enemy_wins += 1
 		_open_post_round_shop("Round Lost", 0)
 	elif _last_shot_player_owned:
 		_phase = PHASE_ROUND_OVER
 		_ai_timer = 0.75
 	else:
+		_shift_wind_for_turn()
 		_turn_owner = TURN_PLAYER
 		_phase = PHASE_AIM
 
@@ -528,6 +755,7 @@ func _open_post_round_shop(title: String, reward: int) -> void:
 	_credits += reward
 	_phase = PHASE_SHOP
 	_ai_timer = 0.0
+	_stop_quake_audio()
 	_message = "%s. Spend credits or continue." % title
 	_refresh_shop_overlay()
 
@@ -574,30 +802,46 @@ func _buy_shop_weapon(weapon_name: String) -> void:
 func _continue_from_shop() -> void:
 	_hide_shop_overlay()
 	_round += 1
-	_wind = randf_range(-9.0, 9.0)
+	_roll_round_wind()
 	_terrain_seed += 17
+	_reset_quake_cycle()
 	_projectiles.clear()
 	_explosions.clear()
 	_enemy_inventory.reset_round_ammo()
 	_rebuild_terrain_if_needed(true)
 	_turn_owner = TURN_PLAYER
 	_phase = PHASE_AIM
-	_message = "Round %d ready." % _round
+	_message = "Round %d ready. %s." % [_round, _wind_status()]
 	_update_hud()
 
 
-func _spawn_explosion(position: Vector2, crater_radius: float) -> void:
+func _spawn_explosion(position: Vector2, crater_radius: float, white_out := false) -> void:
 	_terrain.apply_crater(position, crater_radius)
 	_player.settle_on_terrain(_terrain)
 	_enemy.settle_on_terrain(_terrain)
 	_add_camera_shake(crater_radius)
-	_explosions.append({"position": position, "radius": 8.0, "life": 0.55, "crater_radius": crater_radius})
+	var life := 0.55
+	if white_out:
+		life = max(life, 1.0 / NUKE_WHITEOUT_FADE_RATE)
+	_explosions.append({
+		"position": position,
+		"radius": 8.0,
+		"life": life,
+		"crater_radius": crater_radius,
+		"white_out": white_out,
+		"white_out_level": 1.0 if white_out else 0.0,
+	})
 
 
 func _update_explosions(delta: float) -> void:
 	for explosion in _explosions:
 		explosion["life"] = float(explosion["life"]) - delta
 		explosion["radius"] = float(explosion["radius"]) + 120.0 * delta
+		if bool(explosion.get("white_out", false)):
+			var whiteout_level: float = max(0.0, float(explosion.get("white_out_level", 0.0)) - delta * NUKE_WHITEOUT_FADE_RATE)
+			explosion["white_out_level"] = whiteout_level
+			if whiteout_level <= 0.0:
+				explosion["white_out"] = false
 	_explosions = _explosions.filter(func(explosion: Dictionary) -> bool: return float(explosion["life"]) > 0.0)
 
 
@@ -611,13 +855,39 @@ func _draw() -> void:
 	_draw_aim()
 	_draw_mouse_reticle()
 	for projectile in _projectiles:
-		draw_circle(Vector2(projectile["position"]), 5.0, GroundfireTheme.COLOR_WARN)
+		var projectile_position := Vector2(projectile["position"])
+		if str(projectile.get("kind", "shell")) == "machine_gun":
+			if float(projectile.get("delay", 0.0)) > 0.0:
+				continue
+			var back_position := Vector2(projectile.get("back_position", projectile.get("previous_position", projectile_position)))
+			draw_line(back_position, projectile_position, Color.WHITE, 2.0)
+		else:
+			draw_circle(projectile_position, 5.0, GroundfireTheme.COLOR_WARN)
 	for explosion in _explosions:
-		draw_circle(Vector2(explosion["position"]), float(explosion["radius"]), Color("#f59e0b66"))
+		var explosion_color := Color("#f59e0b66")
+		if bool(explosion.get("white_out", false)):
+			explosion_color = Color("#ffffff99")
+		draw_circle(Vector2(explosion["position"]), float(explosion["radius"]), explosion_color)
 	_draw_map_bounds()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_draw_whiteout_overlay()
 	if _phase == PHASE_ROUND_OVER and (_enemy.health <= 0 or _player.health <= 0):
 		_draw_round_banner()
+
+
+func _draw_whiteout_overlay() -> void:
+	var alpha := _whiteout_alpha()
+	if alpha <= 0.0:
+		return
+	draw_rect(Rect2(Vector2.ZERO, size), Color(1.0, 1.0, 1.0, clamp(alpha, 0.0, 1.0)))
+
+
+func _whiteout_alpha() -> float:
+	var alpha := 0.0
+	for explosion in _explosions:
+		if bool(explosion.get("white_out", false)):
+			alpha = max(alpha, float(explosion.get("white_out_level", 0.0)))
+	return alpha
 
 
 func _draw_terrain() -> void:
@@ -708,7 +978,10 @@ func _update_hud() -> void:
 		"player_fuel": int(_player.fuel * 100.0),
 		"angle": int(_player.gun_angle),
 		"power": int(_player.gun_power),
-		"wind": int(_wind),
+		"wind": int(round(_wind)),
+		"wind_effect": _wind_acceleration(0.0),
+		"quake_active": _quake_active,
+		"quake_countdown": _quake_countdown,
 		"weapon": _inventory.current_name(),
 		"ammo": _inventory.current_ammo(),
 		"inventory": _inventory.inventory_snapshot(),
@@ -727,10 +1000,86 @@ func _cycle_weapon(direction := 1) -> void:
 
 
 func _splash_damage(explosion_position: Vector2, target_position: Vector2, max_damage: int, radius: float) -> int:
-	var distance := explosion_position.distance_to(target_position)
-	if distance > radius:
+	var distance_squared := explosion_position.distance_squared_to(target_position)
+	var radius_squared := radius * radius
+	if distance_squared > radius_squared:
 		return 0
-	return int(round(float(max_damage) * (1.0 - distance / radius)))
+	var damage_multiplier := 1.0 - (distance_squared / radius_squared)
+	if _terrain_blocks_splash(explosion_position, target_position):
+		damage_multiplier *= SPLASH_OCCLUSION_MULTIPLIER
+	return int(round(float(max_damage) * clamp(damage_multiplier, 0.0, 1.0)))
+
+
+func _terrain_blocks_splash(explosion_position: Vector2, target_position: Vector2) -> bool:
+	var distance := explosion_position.distance_to(target_position)
+	if distance <= 1.0:
+		return false
+	var start := explosion_position.lerp(target_position, min(0.25, 12.0 / distance))
+	return _terrain_hits_segment(start, target_position)
+
+
+func _wind_acceleration(age := 0.0) -> float:
+	var gust: float = sin(float(age) * WIND_GUST_FREQUENCY + _wind_gust) * abs(_wind_gust) * WIND_GUST_SCALE
+	return clamp(_wind + gust, WIND_MIN, WIND_MAX)
+
+
+func _wind_status() -> String:
+	var magnitude: int = int(abs(round(_wind)))
+	if magnitude == 0:
+		return "Wind calm"
+	if _wind > 0.0:
+		return "Wind -> %d" % magnitude
+	return "Wind <- %d" % magnitude
+
+
+func _shift_wind_for_turn() -> void:
+	_wind = clamp(_wind + _wind_rng.randf_range(-WIND_TURN_SHIFT, WIND_TURN_SHIFT), WIND_MIN, WIND_MAX)
+	_wind_gust = _wind_rng.randf_range(-WIND_GUST_MAX, WIND_GUST_MAX)
+
+
+func _roll_round_wind() -> void:
+	_wind = _wind_rng.randf_range(WIND_MIN, WIND_MAX)
+	_wind_gust = _wind_rng.randf_range(-WIND_GUST_MAX, WIND_GUST_MAX)
+
+
+func _update_quake(delta: float) -> void:
+	if _phase == PHASE_SHOP or _phase == PHASE_ROUND_OVER:
+		_stop_quake_audio()
+		return
+	_quake_countdown -= delta
+	if _quake_active:
+		_play_quake_audio()
+		_terrain.drop_terrain(delta * QUAKE_DROP_RATE)
+		_add_camera_shake(QUAKE_CAMERA_SHAKE)
+		_message = "Quake! Terrain dropping."
+		if _quake_countdown < 0.0:
+			_quake_active = false
+			_quake_countdown = QUAKE_TIME_BETWEEN
+			_stop_quake_audio()
+			_message = "Quake settled. %s." % _wind_status()
+	elif _quake_countdown < 0.0:
+		_quake_active = true
+		_quake_countdown = QUAKE_DURATION
+		_play_quake_audio()
+		_message = "Quake! Terrain dropping."
+
+
+func _play_quake_audio() -> void:
+	if _quake_audio == null or _is_paused:
+		return
+	if not _quake_audio.playing:
+		_quake_audio.play()
+
+
+func _stop_quake_audio() -> void:
+	if _quake_audio != null and _quake_audio.playing:
+		_quake_audio.stop()
+
+
+func _reset_quake_cycle(countdown := QUAKE_TIME_TILL_FIRST) -> void:
+	_quake_active = false
+	_quake_countdown = countdown
+	_stop_quake_audio()
 
 
 func _update_camera(delta: float) -> void:
@@ -840,6 +1189,46 @@ func _load_gameplay_options() -> void:
 	_screen_shake_enabled = bool(config.get_value("gameplay", "screen_shake", _screen_shake_enabled))
 	_camera_smoothing = clamp(float(config.get_value("gameplay", "camera_smoothing", _camera_smoothing)), 0.25, 1.75)
 	_mouse_aim_enabled = bool(config.get_value("gameplay", "mouse_aim", _mouse_aim_enabled))
+	_ai_difficulty = _normalized_ai_difficulty(str(config.get_value("gameplay", "ai_difficulty", _ai_difficulty)))
+
+
+func _normalized_ai_difficulty(value: String) -> String:
+	var normalized := value.to_lower()
+	if normalized == AI_DIFFICULTY_EASY or normalized == AI_DIFFICULTY_HARD:
+		return normalized
+	return AI_DIFFICULTY_NORMAL
+
+
+func _ai_angle_step() -> int:
+	if _ai_difficulty == AI_DIFFICULTY_EASY:
+		return 10
+	if _ai_difficulty == AI_DIFFICULTY_HARD:
+		return 3
+	return 5
+
+
+func _ai_power_step() -> int:
+	if _ai_difficulty == AI_DIFFICULTY_EASY:
+		return 8
+	if _ai_difficulty == AI_DIFFICULTY_HARD:
+		return 2
+	return 4
+
+
+func _ai_angle_error() -> float:
+	if _ai_difficulty == AI_DIFFICULTY_EASY:
+		return 7.0
+	if _ai_difficulty == AI_DIFFICULTY_HARD:
+		return 0.75
+	return 2.0
+
+
+func _ai_power_error() -> float:
+	if _ai_difficulty == AI_DIFFICULTY_EASY:
+		return 9.0
+	if _ai_difficulty == AI_DIFFICULTY_HARD:
+		return 1.25
+	return 3.0
 
 
 func _wire_vertical_focus(buttons: Array[Button]) -> void:

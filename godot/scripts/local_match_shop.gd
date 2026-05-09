@@ -11,6 +11,7 @@ var _credits_label: Label
 var _message_label: Label
 var _weapon_list: VBoxContainer
 var _continue_button: Button
+var _focus_buttons: Array[Button] = []
 var _state := {}
 
 
@@ -89,6 +90,7 @@ func _build() -> void:
 func _rebuild_weapon_rows() -> void:
 	for child in _weapon_list.get_children():
 		child.queue_free()
+	_focus_buttons.clear()
 	var inventory: Array = _state.get("inventory", [])
 	var credits := int(_state.get("credits", 0))
 	for weapon in inventory:
@@ -115,6 +117,10 @@ func _rebuild_weapon_rows() -> void:
 		var captured_name := weapon_name
 		buy_button.pressed.connect(func() -> void: buy_requested.emit(captured_name))
 		row.add_child(buy_button)
+		if not buy_button.disabled:
+			_focus_buttons.append(buy_button)
+	_focus_buttons.append(_continue_button)
+	_wire_vertical_focus(_focus_buttons)
 
 
 func _shop_button(text: String, accent := false) -> Button:
@@ -130,3 +136,18 @@ func _format_ammo(value: int) -> String:
 	if value < 0:
 		return "inf"
 	return str(value)
+
+
+func _wire_vertical_focus(buttons: Array[Button]) -> void:
+	if buttons.is_empty():
+		return
+	if buttons.size() == 1:
+		buttons[0].focus_neighbor_top = buttons[0].get_path()
+		buttons[0].focus_neighbor_bottom = buttons[0].get_path()
+		return
+	for index in range(buttons.size()):
+		var button := buttons[index]
+		var previous := buttons[wrapi(index - 1, 0, buttons.size())]
+		var next := buttons[wrapi(index + 1, 0, buttons.size())]
+		button.focus_neighbor_top = previous.get_path()
+		button.focus_neighbor_bottom = next.get_path()

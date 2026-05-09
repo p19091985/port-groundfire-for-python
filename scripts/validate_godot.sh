@@ -29,6 +29,9 @@ fi
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/browser_store_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/server_directory_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/terrain_collision_check.gd
+"$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/local_match_fidelity_check.gd
+"$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/online_reliability_check.gd
+"$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/runtime_smoke_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --scene res://scenes/main.tscn --quit-after 3
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --scene res://scenes/local_match.tscn --quit-after 3
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --scene res://scenes/online_match.tscn --quit-after 3

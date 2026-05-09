@@ -9,6 +9,10 @@ config/name="Groundfire"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4")
 config/server_directory_url=""
+config/server_directory_environment="dev"
+config/server_directory_url_dev=""
+config/server_directory_url_staging=""
+config/server_directory_url_production=""
 
 [autoload]
 
