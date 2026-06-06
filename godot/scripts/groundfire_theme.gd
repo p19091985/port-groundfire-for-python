@@ -18,6 +18,11 @@ const BUTTON_BG_HOVER := Color("#be5f00d7")
 const BUTTON_BG_DISABLED := Color("#23232396")
 const BUTTON_FONT_DISABLED := Color("#4c4c4c")
 const BUTTON_BORDER := Color("#994c00")
+const CLASSIC_TEXT_SHADOW_COLOR := Color("#00000096")
+const CLASSIC_TEXT_OUTLINE_COLOR := Color("#00000078")
+const CLASSIC_TEXT_SHADOW_OFFSET_X := 3
+const CLASSIC_TEXT_SHADOW_OFFSET_Y := 3
+const CLASSIC_TEXT_OUTLINE_SIZE := 1
 
 
 static func panel_style(soft := false) -> StyleBoxFlat:
@@ -116,12 +121,24 @@ static func apply_classic_button(button: Button, font_size := 16) -> void:
 	button.add_theme_stylebox_override("pressed", button_style(true, true))
 	button.add_theme_stylebox_override("disabled", button_style(true, false, true))
 	button.add_theme_color_override("font_color", COLOR_TEXT)
-	button.add_theme_color_override("font_hover_color", COLOR_TEXT)
-	button.add_theme_color_override("font_pressed_color", COLOR_TEXT)
+	button.add_theme_color_override("font_hover_color", COLOR_WARN)
+	button.add_theme_color_override("font_pressed_color", COLOR_WARN)
+	button.add_theme_color_override("font_hover_pressed_color", COLOR_WARN)
 	button.add_theme_color_override("font_disabled_color", BUTTON_FONT_DISABLED)
 	button.add_theme_font_size_override("font_size", font_size)
+	apply_classic_text_effect(button)
 
 
-static func apply_label(label: Label, size := 16, color := COLOR_TEXT) -> void:
+static func apply_label(label: Label, size := 16, color := COLOR_TEXT, classic_shadow := false) -> void:
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
+	if classic_shadow:
+		apply_classic_text_effect(label)
+
+
+static func apply_classic_text_effect(control: Control) -> void:
+	control.add_theme_color_override("font_shadow_color", CLASSIC_TEXT_SHADOW_COLOR)
+	control.add_theme_color_override("font_outline_color", CLASSIC_TEXT_OUTLINE_COLOR)
+	control.add_theme_constant_override("shadow_offset_x", CLASSIC_TEXT_SHADOW_OFFSET_X)
+	control.add_theme_constant_override("shadow_offset_y", CLASSIC_TEXT_SHADOW_OFFSET_Y)
+	control.add_theme_constant_override("outline_size", CLASSIC_TEXT_OUTLINE_SIZE)

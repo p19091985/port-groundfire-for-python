@@ -6,6 +6,7 @@ const OnlineMatchScene := preload("res://scenes/online_match.tscn")
 const ServerBrowserScene := preload("res://scenes/server_browser.tscn")
 const PlatformCapabilities := preload("res://scripts/platform_capabilities.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
+const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
 const SHUTDOWN_DRAIN_FRAMES := 8
 
 
@@ -89,9 +90,11 @@ func _check_main_menu_and_options() -> void:
 	var start_local := _find_control_with_text(main, "Button", "Start Game") as Button
 	var find_servers := _find_control_with_text(main, "Button", "Find Servers") as Button
 	var quit_button := _find_control_with_text(main, "Button", "Quit") as Button
+	var version_label := _find_control_with_text(main, "Label", "0.25 (Python Port)") as Label
 	assert(start_local != null)
 	assert(find_servers != null)
 	assert(quit_button != null)
+	assert(version_label != null)
 	var logo := _find_first(main, "TextureRect") as TextureRect
 	assert(logo != null)
 	assert(logo.custom_minimum_size.x >= 547.0)
@@ -107,6 +110,9 @@ func _check_main_menu_and_options() -> void:
 	assert(start_local.focus_neighbor_right == start_local.get_path())
 	assert(find_servers.focus_neighbor_left == find_servers.get_path())
 	assert(find_servers.focus_neighbor_right == find_servers.get_path())
+	_assert_classic_text_effect(start_local)
+	_assert_classic_text_effect(version_label)
+	assert(start_local.get_theme_color("font_hover_color") == GroundfireTheme.COLOR_WARN)
 	if not OS.has_feature("web"):
 		assert(_has_button(main, "Dedicated Server"))
 		main.set("_dedicated_gateway_host", "0.0.0.0")
@@ -306,6 +312,7 @@ func _check_main_menu_and_options() -> void:
 	var classic_resolution := _find_option_button_with_items(main, PackedStringArray(["640 x 480", "800 x 600", "1024 x 768", "1280 x 960", "1280 x 1024", "1600 x 1200"]))
 	var screen_mode := _find_option_button_with_items(main, PackedStringArray(["Fullscreen", "Windowed"]))
 	var set_controls := _find_control_with_text(main, "Button", "Set Controls") as Button
+	var resolution_label := _find_control_with_text(main, "Label", "Resolution:") as Label
 	var show_fps := _find_control_with_text(main, "CheckButton", "Show FPS") as CheckButton
 	var fullscreen := _find_control_with_text(main, "CheckButton", "Fullscreen") as CheckButton
 	var audio_enabled := _find_control_with_text(main, "CheckButton", "Audio Enabled") as CheckButton
@@ -314,6 +321,7 @@ func _check_main_menu_and_options() -> void:
 	assert(classic_resolution != null)
 	assert(screen_mode != null)
 	assert(set_controls != null)
+	assert(resolution_label != null)
 	assert(show_fps != null)
 	assert(fullscreen != null)
 	assert(audio_enabled != null)
@@ -321,6 +329,10 @@ func _check_main_menu_and_options() -> void:
 	assert(options_back != null)
 	assert(classic_resolution.custom_minimum_size.x >= 220.0)
 	assert(screen_mode.custom_minimum_size.y >= 29.0)
+	_assert_classic_text_effect(classic_resolution)
+	_assert_classic_text_effect(set_controls)
+	_assert_classic_text_effect(resolution_label)
+	assert(set_controls.get_theme_color("font_hover_color") == GroundfireTheme.COLOR_WARN)
 	assert(classic_resolution.focus_neighbor_bottom == screen_mode.get_path())
 	assert(screen_mode.focus_neighbor_top == classic_resolution.get_path())
 	assert(screen_mode.focus_neighbor_bottom == set_controls.get_path())
@@ -664,3 +676,11 @@ func _assert_arg_pair(args: PackedStringArray, arg_name: String, expected_value:
 	assert(index >= 0)
 	assert(index + 1 < args.size())
 	assert(str(args[index + 1]) == expected_value)
+
+
+func _assert_classic_text_effect(control: Control) -> void:
+	assert(control.get_theme_color("font_shadow_color") == GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR)
+	assert(control.get_theme_color("font_outline_color") == GroundfireTheme.CLASSIC_TEXT_OUTLINE_COLOR)
+	assert(control.get_theme_constant("shadow_offset_x") == GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_X)
+	assert(control.get_theme_constant("shadow_offset_y") == GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_Y)
+	assert(control.get_theme_constant("outline_size") == GroundfireTheme.CLASSIC_TEXT_OUTLINE_SIZE)

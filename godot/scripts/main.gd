@@ -657,7 +657,7 @@ func _add_center_label(text: String, font_size := 18, color := GroundfireTheme.C
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	GroundfireTheme.apply_label(label, int(round(float(font_size) * _menu_scale())), color)
+	GroundfireTheme.apply_label(label, int(round(float(font_size) * _menu_scale())), color, true)
 	_stack.add_child(label)
 	return label
 
@@ -667,7 +667,7 @@ func _add_title(text: String) -> void:
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	GroundfireTheme.apply_label(label, 34, GroundfireTheme.COLOR_TEXT)
+	GroundfireTheme.apply_label(label, 34, GroundfireTheme.COLOR_TEXT, true)
 	_stack.add_child(label)
 
 
@@ -1831,7 +1831,7 @@ func _add_classic_option_row(parent: Container, label_text: String, control: Con
 	)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	GroundfireTheme.apply_label(label, int(round(float(OPTIONS_CLASSIC_ROW_FONT_SIZE) * _menu_scale())), GroundfireTheme.COLOR_CYAN)
+	GroundfireTheme.apply_label(label, int(round(float(OPTIONS_CLASSIC_ROW_FONT_SIZE) * _menu_scale())), GroundfireTheme.COLOR_CYAN, true)
 	row.add_child(label)
 
 	control.custom_minimum_size = Vector2(

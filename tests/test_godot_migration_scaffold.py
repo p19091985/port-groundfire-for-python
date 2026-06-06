@@ -48,11 +48,20 @@ def test_groundfire_theme_defines_shared_visual_language():
     assert "BUTTON_BG_DISABLED" in script
     assert "BUTTON_FONT_DISABLED" in script
     assert "BUTTON_BORDER" in script
+    assert "CLASSIC_TEXT_SHADOW_COLOR" in script
+    assert "CLASSIC_TEXT_OUTLINE_COLOR" in script
+    assert "CLASSIC_TEXT_SHADOW_OFFSET_X := 3" in script
+    assert "CLASSIC_TEXT_SHADOW_OFFSET_Y := 3" in script
     assert 'button.add_theme_stylebox_override("focus", button_style(true, true))' in script
+    assert 'button.add_theme_color_override("font_hover_color", COLOR_WARN)' in script
+    assert 'button.add_theme_color_override("font_hover_pressed_color", COLOR_WARN)' in script
     assert "static func panel_style" in script
     assert "static func classic_panel_style" in script
     assert "static func apply_button" in script
     assert "static func apply_classic_button" in script
+    assert "static func apply_classic_text_effect" in script
+    assert 'control.add_theme_color_override("font_shadow_color", CLASSIC_TEXT_SHADOW_COLOR)' in script
+    assert 'control.add_theme_constant_override("shadow_offset_x", CLASSIC_TEXT_SHADOW_OFFSET_X)' in script
     assert "static func row_style" in script
     assert "static func modal_backdrop_style" in script
 
@@ -111,6 +120,8 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "MENU_CONTENT_MAX_WIDTH := 920.0" in script
     assert "func _classic_logo_size" in script
     assert "func _classic_button_size" in script
+    assert "GroundfireTheme.apply_label(label, int(round(float(font_size) * _menu_scale())), color, true)" in script
+    assert "GroundfireTheme.apply_label(label, 34, GroundfireTheme.COLOR_TEXT, true)" in script
     assert "MENU_CLASSIC_PANEL_SIZE" in script
     assert "MENU_CLASSIC_BUTTON_SIZE" in script
     assert "func _add_classic_button_to" in script
@@ -159,6 +170,10 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert '"Screen Mode:"' in script
     assert '"Set Controls"' in script
     assert '"Apply"' in script
+    assert (
+        "GroundfireTheme.apply_label(label, int(round(float(OPTIONS_CLASSIC_ROW_FONT_SIZE) * _menu_scale())), "
+        "GroundfireTheme.COLOR_CYAN, true)"
+    ) in script
     assert "scroll.ensure_control_visible(controls_section)" in script
     assert "_focus_first_button(controls_section)" in script
     assert "_add_server_directory_options(online_section, false)" in script
