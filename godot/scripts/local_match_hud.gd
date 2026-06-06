@@ -18,23 +18,49 @@ const INVENTORY_CHIP_WIDTH := 142.0
 const INVENTORY_CHIP_HEIGHT := 28.0
 const INVENTORY_ROW_HEIGHT := 34.0
 const INVENTORY_GAP := 8.0
-const ANGLE_MIN := 0.0
-const ANGLE_MAX := 180.0
-const POWER_MIN := 0.0
-const POWER_MAX := 100.0
+const ANGLE_MIN := -75.0
+const ANGLE_MAX := 75.0
+const POWER_MIN := 1.0
+const POWER_MAX := 20.0
 const WEAPON_ICON_COLUMNS := 4
 const WEAPON_ICON_ROWS := 4
+const CLASSIC_WORLD_LEFT := -10.0
+const CLASSIC_WORLD_BOTTOM := -7.5
+const CLASSIC_WORLD_WIDTH := 20.0
+const CLASSIC_WORLD_HEIGHT := 15.0
+const CLASSIC_HUD_SPACING := 2.5
+const CLASSIC_HUD_LEFT_OFFSET := 0.1
+const CLASSIC_HUD_WIDTH := 2.3
+const CLASSIC_HUD_TOP := 7.4
+const CLASSIC_HUD_BOTTOM := 6.6
+const CLASSIC_HUD_BAR_LEFT_PAD := 0.1
+const CLASSIC_HUD_BAR_WIDTH := 2.1
+const CLASSIC_HUD_HEALTH_TOP := 7.4
+const CLASSIC_HUD_HEALTH_BOTTOM := 7.3
+const CLASSIC_HUD_FUEL_TOP := 7.2
+const CLASSIC_HUD_FUEL_BOTTOM := 7.1
+const CLASSIC_HUD_TANK_ICON_TOP := 7.0
+const CLASSIC_HUD_TANK_ICON_BOTTOM := 6.7
+const CLASSIC_HUD_WEAPON_LEFT_PAD := 0.7
+const CLASSIC_HUD_WEAPON_WIDTH := 0.3
+const CLASSIC_HUD_WEAPON_TOP := 7.0
+const CLASSIC_HUD_WEAPON_BOTTOM := 6.7
+const CLASSIC_PANEL_COLOR := Color8(128, 230, 153, 76)
 
 var _snapshot := {
 	"round": 1,
 	"phase": "aim",
 	"player_name": "Player",
 	"enemy_name": "Enemy",
+	"target_name": "Enemy",
 	"player_hp": 100,
 	"enemy_hp": 100,
+	"target_hp": 100,
 	"player_fuel": 100,
-	"angle": 45,
-	"power": 55,
+	"player_fuel_max": 100,
+	"player_fuel_reserve": 100,
+	"angle": 0,
+	"power": 10,
 	"wind": 0,
 	"wind_effect": 0.0,
 	"quake_active": false,
@@ -46,6 +72,11 @@ var _snapshot := {
 	"credits": 0,
 	"player_wins": 0,
 	"enemy_wins": 0,
+	"target_wins": 0,
+	"participant_summary": "",
+	"participants": [],
+	"active_index": 0,
+	"target_index": 1,
 	"inventory": [],
 	"message": "",
 }
@@ -57,32 +88,158 @@ func set_snapshot(snapshot: Dictionary) -> void:
 
 
 func _draw() -> void:
-	var inventory: Array = _snapshot.get("inventory", [])
-	var panel_width := _panel_width()
-	var panel := Rect2(HUD_MARGIN, HUD_TOP, panel_width, _panel_height(panel_width, inventory.size()))
-	_draw_panel_background(panel)
+	_draw_classic_tank_hud(_classic_participants())
 
-	var cursor_y := panel.position.y + HUD_PADDING
-	cursor_y = _draw_turn_banner(panel, cursor_y)
-	cursor_y = _draw_stat_row(panel, cursor_y + HUD_GAP)
-	cursor_y = _draw_gauge_row(panel, cursor_y + HUD_GAP)
-	cursor_y = _draw_score_row(panel, cursor_y + HUD_GAP)
-	cursor_y += HUD_GAP
 
-	var inventory_rows := _inventory_rows(panel_width, inventory.size())
-	_draw_weapon_inventory(
-		Rect2(
-			panel.position + Vector2(HUD_PADDING, cursor_y - panel.position.y),
-			Vector2(panel.size.x - HUD_PADDING * 2.0, float(inventory_rows) * INVENTORY_ROW_HEIGHT)
-		),
-		inventory
-	)
-	cursor_y += float(inventory_rows) * INVENTORY_ROW_HEIGHT
-	_draw_message_strip(
-		Rect2(
-			panel.position + Vector2(HUD_PADDING, cursor_y - panel.position.y + HUD_GAP),
-			Vector2(panel.size.x - HUD_PADDING * 2.0, HUD_MESSAGE_HEIGHT)
+func _classic_participants() -> Array:
+	var participants: Array = _snapshot.get("participants", [])
+	if not participants.is_empty():
+		return participants
+	return [
+		{
+			"name": str(_snapshot.get("player_name", "Player")),
+			"health": int(_snapshot.get("player_hp", 100)),
+			"fuel": float(_snapshot.get("player_fuel", 100)) / 100.0,
+			"color": GroundfireTheme.COLOR_ACCENT_HOT,
+			"weapon": str(_snapshot.get("weapon", "Shell")),
+			"ammo": int(_snapshot.get("ammo", -1)),
+			"state": "alive",
+			"order": 0,
+		},
+		{
+			"name": str(_snapshot.get("target_name", _snapshot.get("enemy_name", "Enemy"))),
+			"health": int(_snapshot.get("target_hp", _snapshot.get("enemy_hp", 100))),
+			"fuel": 1.0,
+			"color": Color("#4d95ff"),
+			"weapon": "Shell",
+			"ammo": -1,
+			"state": "alive",
+			"order": 1,
+		},
+	]
+
+
+func _draw_classic_tank_hud(participants: Array) -> void:
+	for index in range(participants.size()):
+		var participant: Dictionary = participants[index]
+		if str(participant.get("state", "alive")) != "alive":
+			continue
+		var metrics: Dictionary = _classic_hud_metrics(participant, index)
+		_draw_classic_rect_v(metrics["panel"], CLASSIC_PANEL_COLOR)
+		if bool(metrics["show_health"]):
+			_draw_classic_rect_v(metrics["health"], metrics["health_color"])
+		if bool(metrics["show_fuel"]):
+			_draw_classic_rect_v(metrics["fuel"], metrics["fuel_color"])
+		_draw_classic_polygon(metrics["tank_points"], metrics["tank_color"])
+		_draw_classic_weapon_graphic(
+			float(metrics["weapon_start_x"]),
+			str(metrics["weapon_name"]),
+			int(metrics["ammo"])
 		)
+
+
+func _classic_hud_metrics(participant: Dictionary, fallback_index: int) -> Dictionary:
+	var stats_position := int(participant.get("order", fallback_index))
+	var start_of_bar := CLASSIC_WORLD_LEFT + (CLASSIC_HUD_SPACING * float(stats_position)) + CLASSIC_HUD_LEFT_OFFSET
+	var start_bar_x := start_of_bar + CLASSIC_HUD_BAR_LEFT_PAD
+	var health_ratio: float = clampf(float(participant.get("health", 100)) / 100.0, 0.0, 1.0)
+	var fuel_ratio: float = clampf(float(participant.get("fuel", 1.0)), 0.0, 1.0)
+	var weapon_start_x := start_of_bar + CLASSIC_HUD_WEAPON_LEFT_PAD
+	return {
+		"panel": Vector4(start_of_bar, CLASSIC_HUD_TOP, start_of_bar + CLASSIC_HUD_WIDTH, CLASSIC_HUD_BOTTOM),
+		"health": Vector4(start_bar_x, CLASSIC_HUD_HEALTH_TOP, start_bar_x + CLASSIC_HUD_BAR_WIDTH * health_ratio, CLASSIC_HUD_HEALTH_BOTTOM),
+		"fuel": Vector4(start_bar_x, CLASSIC_HUD_FUEL_TOP, start_bar_x + CLASSIC_HUD_BAR_WIDTH * fuel_ratio, CLASSIC_HUD_FUEL_BOTTOM),
+		"show_health": health_ratio > 0.0,
+		"show_fuel": fuel_ratio > 0.0,
+		"health_color": _classic_health_color(health_ratio),
+		"fuel_color": _classic_fuel_color(fuel_ratio),
+		"tank_points": [
+			Vector2(start_of_bar + 0.15, CLASSIC_HUD_TANK_ICON_TOP),
+			Vector2(start_of_bar, CLASSIC_HUD_TANK_ICON_BOTTOM),
+			Vector2(start_of_bar + 0.60, CLASSIC_HUD_TANK_ICON_BOTTOM),
+			Vector2(start_of_bar + 0.45, CLASSIC_HUD_TANK_ICON_TOP),
+		],
+		"tank_color": _participant_color(participant),
+		"weapon": Vector4(weapon_start_x, CLASSIC_HUD_WEAPON_TOP, weapon_start_x + CLASSIC_HUD_WEAPON_WIDTH, CLASSIC_HUD_WEAPON_BOTTOM),
+		"weapon_start_x": weapon_start_x,
+		"weapon_name": str(participant.get("weapon", "Shell")),
+		"ammo": int(participant.get("ammo", -1)),
+	}
+
+
+func _draw_classic_tank_icon(start_of_bar: float, color: Color) -> void:
+	_draw_classic_polygon([
+		Vector2(start_of_bar + 0.15, CLASSIC_HUD_TANK_ICON_TOP),
+		Vector2(start_of_bar, CLASSIC_HUD_TANK_ICON_BOTTOM),
+		Vector2(start_of_bar + 0.60, CLASSIC_HUD_TANK_ICON_BOTTOM),
+		Vector2(start_of_bar + 0.45, CLASSIC_HUD_TANK_ICON_TOP),
+	], color)
+
+
+func _draw_classic_weapon_graphic(start_x: float, weapon_name: String, ammo: int) -> void:
+	var target_rect := _world_rect(start_x, CLASSIC_HUD_WEAPON_TOP, start_x + CLASSIC_HUD_WEAPON_WIDTH, CLASSIC_HUD_WEAPON_BOTTOM)
+	var source_rect := _weapon_icon_source_rect(weapon_name)
+	if source_rect.size.x > 0.0 and source_rect.size.y > 0.0:
+		draw_texture_rect_region(WEAPON_ICONS, target_rect, source_rect)
+	else:
+		draw_rect(target_rect, _weapon_color(weapon_name))
+	if weapon_name == "Machine Gun" and ammo > 0:
+		_draw_classic_rect(start_x + 0.40, 6.95, start_x + 0.40 + float(ammo) / 50.0, 6.75, Color.WHITE)
+	elif weapon_name == "Missile" and ammo > 0:
+		for index in range(ammo):
+			var gx := start_x + float(index) * 0.2 + 0.40
+			_draw_classic_rect(gx, 6.9, gx + 0.15, 6.8, Color.WHITE)
+
+
+func _participant_color(participant: Dictionary) -> Color:
+	var color = participant.get("color", Color.WHITE)
+	if typeof(color) == TYPE_COLOR:
+		return color
+	if typeof(color) == TYPE_STRING and not str(color).is_empty():
+		return Color(str(color))
+	return Color.WHITE
+
+
+func _classic_health_color(health_ratio: float) -> Color:
+	var red: int = clampi(int((1.0 - (health_ratio / 2.0)) * 255.0), 0, 255)
+	var green: int = clampi(int((0.5 + (health_ratio / 2.0)) * 255.0), 0, 255)
+	return Color8(red, green, 128)
+
+
+func _classic_fuel_color(fuel_ratio: float) -> Color:
+	var red: int = clampi(int((0.5 - (fuel_ratio * 0.5)) * 255.0), 0, 255)
+	var blue: int = clampi(int((0.5 + (fuel_ratio * 0.5)) * 255.0), 0, 255)
+	return Color8(red, 128, blue)
+
+
+func _draw_classic_rect(left: float, top: float, right: float, bottom: float, color: Color) -> void:
+	draw_rect(_world_rect(left, top, right, bottom), color)
+
+
+func _draw_classic_rect_v(rect: Vector4, color: Color) -> void:
+	_draw_classic_rect(rect.x, rect.y, rect.z, rect.w, color)
+
+
+func _draw_classic_polygon(points: Array, color: Color) -> void:
+	var screen_points := PackedVector2Array()
+	for point in points:
+		screen_points.append(_world_to_screen(Vector2(point)))
+	draw_colored_polygon(screen_points, color)
+
+
+func _world_rect(left: float, top: float, right: float, bottom: float) -> Rect2:
+	var first := _world_to_screen(Vector2(left, top))
+	var second := _world_to_screen(Vector2(right, bottom))
+	return Rect2(
+		Vector2(min(first.x, second.x), min(first.y, second.y)),
+		Vector2(abs(second.x - first.x), abs(second.y - first.y))
+	)
+
+
+func _world_to_screen(point: Vector2) -> Vector2:
+	return Vector2(
+		(point.x - CLASSIC_WORLD_LEFT) * (size.x / CLASSIC_WORLD_WIDTH),
+		size.y - ((point.y - CLASSIC_WORLD_BOTTOM) * (size.y / CLASSIC_WORLD_HEIGHT))
 	)
 
 
@@ -141,8 +298,8 @@ func _draw_stat_row(panel: Rect2, cursor_y: float) -> float:
 	var bar_width: float = max(76.0, (inner_width - gap * 2.0) / 3.0)
 	var y := cursor_y + 18.0
 	_draw_stat_bar(Rect2(panel.position.x + HUD_PADDING, y, bar_width, 10.0), "%s HP" % str(_snapshot.get("player_name", "Player")), int(_snapshot.get("player_hp", 0)), 100, Color("#56d364"))
-	_draw_stat_bar(Rect2(panel.position.x + HUD_PADDING + bar_width + gap, y, bar_width, 10.0), "%s HP" % str(_snapshot.get("enemy_name", "Enemy")), int(_snapshot.get("enemy_hp", 0)), 100, Color("#ff6b6b"))
-	_draw_stat_bar(Rect2(panel.position.x + HUD_PADDING + (bar_width + gap) * 2.0, y, bar_width, 10.0), "Fuel", int(_snapshot.get("player_fuel", 0)), 100, Color("#7dd3fc"))
+	_draw_stat_bar(Rect2(panel.position.x + HUD_PADDING + bar_width + gap, y, bar_width, 10.0), "%s HP" % str(_snapshot.get("target_name", _snapshot.get("enemy_name", "Enemy"))), int(_snapshot.get("target_hp", _snapshot.get("enemy_hp", 0))), 100, Color("#ff6b6b"))
+	_draw_stat_bar(Rect2(panel.position.x + HUD_PADDING + (bar_width + gap) * 2.0, y, bar_width, 10.0), "Fuel", int(_snapshot.get("player_fuel", 0)), int(_snapshot.get("player_fuel_max", 100)), Color("#7dd3fc"))
 	return cursor_y + HUD_STAT_HEIGHT
 
 
@@ -166,13 +323,14 @@ func _draw_gauge_row(panel: Rect2, cursor_y: float) -> float:
 func _draw_score_row(panel: Rect2, cursor_y: float) -> float:
 	var inner_width := panel.size.x - HUD_PADDING * 2.0
 	var gap := INVENTORY_GAP
-	var chip_width: float = max(64.0, (inner_width - gap * 3.0) / 4.0)
 	var labels := [
 		{"label": "Score", "value": str(int(_snapshot.get("score", 0))), "color": GroundfireTheme.COLOR_CYAN},
 		{"label": "Credits", "value": str(int(_snapshot.get("credits", 0))), "color": GroundfireTheme.COLOR_WARN},
-		{"label": "Player", "value": str(int(_snapshot.get("player_wins", 0))), "color": Color("#56d364")},
-		{"label": "Enemy", "value": str(int(_snapshot.get("enemy_wins", 0))), "color": Color("#ff6b6b")},
+		{"label": "Reserve", "value": "%d%%" % int(_snapshot.get("player_fuel_reserve", 100)), "color": Color("#7dd3fc")},
+		{"label": "Wins", "value": str(int(_snapshot.get("player_wins", 0))), "color": Color("#56d364")},
+		{"label": "Target", "value": str(int(_snapshot.get("target_wins", _snapshot.get("enemy_wins", 0)))), "color": Color("#ff6b6b")},
 	]
+	var chip_width: float = max(58.0, (inner_width - gap * float(labels.size() - 1)) / float(labels.size()))
 	for index in range(labels.size()):
 		var item: Dictionary = labels[index]
 		var chip_color: Color = item["color"]
@@ -206,6 +364,9 @@ func _draw_message_strip(rect: Rect2) -> void:
 		_wind_label(float(_snapshot.get("wind_effect", _snapshot.get("wind", 0)))),
 		"" if quake_label.is_empty() else "  " + quake_label,
 	]
+	var participant_summary := str(_snapshot.get("participant_summary", ""))
+	if not participant_summary.is_empty():
+		status = "%s  %s" % [status, participant_summary]
 	draw_rect(rect, Color("#07131ecc"))
 	draw_rect(rect, GroundfireTheme.COLOR_LINE, false, 1.0)
 	draw_string(ThemeDB.fallback_font, rect.position + Vector2(8.0, 18.0), status, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.36, 13, GroundfireTheme.COLOR_WARN)

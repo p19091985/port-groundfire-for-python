@@ -76,6 +76,10 @@ gf_jump={
 "deadzone": 0.5,
 "events": []
 }
+gf_shield={
+"deadzone": 0.5,
+"events": []
+}
 
 [rendering]
 

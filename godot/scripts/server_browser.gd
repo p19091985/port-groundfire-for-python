@@ -6,9 +6,20 @@ const NetworkAdapter := preload("res://scripts/network_adapter.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
 const WebSocketClient := preload("res://scripts/websocket_client.gd")
 
-const TABLE_COLUMN_WIDTHS := [292.0, 150.0, 96.0, 220.0, 96.0]
+const TABLE_COLUMN_WIDTHS := [560.0, 115.0, 80.0, 110.0, 75.0]
+const TABLE_REFERENCE_WIDTH := 1024.0
+const TABLE_HORIZONTAL_MARGIN := 44.0
+const TABLE_MIN_TOTAL_WIDTH := 440.0
+const TABLE_MAX_TOTAL_WIDTH := 980.0
 const TABLE_HEADER_HEIGHT := 30.0
-const TABLE_ROW_HEIGHT := 38.0
+const TABLE_ROW_HEIGHT := 26.0
+const TABLE_SCROLL_MIN_HEIGHT := 220.0
+const TABLE_SCROLL_MAX_HEIGHT := 520.0
+const TABLE_VERTICAL_RESERVED_HEIGHT := 250.0
+const TABLE_HORIZONTAL_SCROLL_MODE := ScrollContainer.SCROLL_MODE_DISABLED
+const TABLE_VERTICAL_SCROLL_MODE := ScrollContainer.SCROLL_MODE_AUTO
+const TABLE_HEADER_BG := Color("#00000066")
+const TABLE_HEADER_BORDER := Color("#994c0066")
 
 var _tabs: TabBar
 var _status: Label
@@ -46,6 +57,10 @@ var _directory_url := ""
 var _directory_retry_count := 0
 var _directory_retry_url := ""
 var _directory_loading := false
+var _directory_etag := ""
+var _directory_cached_url := ""
+var _directory_cached_diagnostic := ""
+var _directory_cached_entries: Array[Dictionary] = []
 var _pending_join_entry: Dictionary = {}
 var _last_undo_action: Dictionary = {}
 
@@ -53,6 +68,22 @@ var _last_undo_action: Dictionary = {}
 func _ready() -> void:
 	_capabilities = get_node("/root/PlatformCapabilities")
 	_build()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		_apply_responsive_table_metrics()
+
+
+func _exit_tree() -> void:
+	if _http_request != null:
+		_http_request.cancel_request()
+	if _websocket_client != null:
+		_websocket_client.disconnect_from_endpoint("server_browser_exit")
+
+
+func _draw() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Color("#00000066"))
 
 
 func _build() -> void:
@@ -156,7 +187,7 @@ func _build() -> void:
 
 	var panel := PanelContainer.new()
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.add_theme_stylebox_override("panel", GroundfireTheme.panel_style())
+	panel.add_theme_stylebox_override("panel", GroundfireTheme.classic_panel_style())
 	root.add_child(panel)
 
 	var panel_stack := VBoxContainer.new()
@@ -164,10 +195,10 @@ func _build() -> void:
 	panel.add_child(panel_stack)
 
 	_table_scroll = ScrollContainer.new()
-	_table_scroll.custom_minimum_size = Vector2(860, 390)
 	_table_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_table_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_table_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_table_scroll.horizontal_scroll_mode = TABLE_HORIZONTAL_SCROLL_MODE
+	_table_scroll.vertical_scroll_mode = TABLE_VERTICAL_SCROLL_MODE
 	panel_stack.add_child(_table_scroll)
 
 	_table = GridContainer.new()
@@ -215,15 +246,31 @@ func _build() -> void:
 	_action_buttons.append(_connect_button)
 	_wire_server_browser_focus()
 	_build_join_dialog()
+	_apply_responsive_table_metrics()
 	_refresh_entries()
 
 
 func _add_header(text: String, column_index: int) -> void:
+	var cell := PanelContainer.new()
+	cell.custom_minimum_size = Vector2(_column_width(column_index), TABLE_HEADER_HEIGHT)
+	cell.add_theme_stylebox_override("panel", _table_header_style())
+	_table.add_child(cell)
+
 	var label := Label.new()
 	label.text = text
 	label.custom_minimum_size = Vector2(_column_width(column_index), TABLE_HEADER_HEIGHT)
 	GroundfireTheme.apply_label(label, 16, GroundfireTheme.COLOR_WARN)
-	_table.add_child(label)
+	cell.add_child(label)
+
+
+func _table_header_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = TABLE_HEADER_BG
+	style.border_color = TABLE_HEADER_BORDER
+	style.set_border_width_all(1)
+	style.content_margin_left = 6
+	style.content_margin_right = 6
+	return style
 
 
 func _refresh_entries() -> void:
@@ -294,6 +341,7 @@ func _add_row(entry: Dictionary, muted := false, row_index := -1) -> void:
 		cell.add_theme_stylebox_override("panel", GroundfireTheme.row_style(row_index == _selected_index))
 		if row_index >= 0:
 			cell.focus_mode = Control.FOCUS_ALL
+			cell.tooltip_text = _entry_tooltip(entry)
 			cell.gui_input.connect(_on_row_gui_input.bind(row_index))
 			cell.focus_entered.connect(_on_row_focused.bind(row_index))
 			cell.mouse_entered.connect(_on_row_hovered.bind(row_index))
@@ -302,6 +350,7 @@ func _add_row(entry: Dictionary, muted := false, row_index := -1) -> void:
 
 		var label := Label.new()
 		label.text = value
+		label.custom_minimum_size = Vector2(_column_width(column_index), TABLE_ROW_HEIGHT)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var color := GroundfireTheme.COLOR_MUTED if muted else GroundfireTheme.COLOR_TEXT
 		GroundfireTheme.apply_label(label, 15, color)
@@ -311,7 +360,53 @@ func _add_row(entry: Dictionary, muted := false, row_index := -1) -> void:
 func _column_width(column_index: int) -> float:
 	if column_index < 0 or column_index >= TABLE_COLUMN_WIDTHS.size():
 		return 120.0
-	return float(TABLE_COLUMN_WIDTHS[column_index])
+	var base_total := 0.0
+	for width in TABLE_COLUMN_WIDTHS:
+		base_total += float(width)
+	var scale: float = _table_total_width() / max(base_total, 1.0)
+	return floor(float(TABLE_COLUMN_WIDTHS[column_index]) * scale)
+
+
+func _table_total_width() -> float:
+	var viewport_width := _layout_viewport_size().x
+	if viewport_width <= 0.0:
+		viewport_width = TABLE_REFERENCE_WIDTH
+	return clamp(viewport_width - TABLE_HORIZONTAL_MARGIN, TABLE_MIN_TOTAL_WIDTH, TABLE_MAX_TOTAL_WIDTH)
+
+
+func _table_scroll_size() -> Vector2:
+	var viewport_size := _layout_viewport_size()
+	var height: float = clamp(
+		viewport_size.y - TABLE_VERTICAL_RESERVED_HEIGHT,
+		TABLE_SCROLL_MIN_HEIGHT,
+		TABLE_SCROLL_MAX_HEIGHT
+	)
+	return Vector2(_table_total_width(), height)
+
+
+func _layout_viewport_size() -> Vector2:
+	if size.x > 0.0 and size.y > 0.0:
+		return size
+	return get_viewport_rect().size
+
+
+func _apply_responsive_table_metrics() -> void:
+	if _table_scroll != null:
+		_table_scroll.custom_minimum_size = _table_scroll_size()
+	if _table == null:
+		return
+	for child_index in range(_table.get_child_count()):
+		var column_index := child_index % 5
+		var row_height := TABLE_HEADER_HEIGHT if child_index < 5 else TABLE_ROW_HEIGHT
+		var minimum_size := Vector2(_column_width(column_index), row_height)
+		var cell := _table.get_child(child_index) as Control
+		if cell == null:
+			continue
+		cell.custom_minimum_size = minimum_size
+		if cell.get_child_count() > 0:
+			var label := cell.get_child(0) as Control
+			if label != null:
+				label.custom_minimum_size = minimum_size
 
 
 func _add_action(parent: Container, text: String, accent := false) -> Button:
@@ -319,7 +414,7 @@ func _add_action(parent: Container, text: String, accent := false) -> Button:
 	button.text = text
 	button.custom_minimum_size = Vector2(128, 44)
 	button.focus_mode = Control.FOCUS_ALL
-	GroundfireTheme.apply_button(button, accent)
+	GroundfireTheme.apply_classic_button(button, GroundfireTheme.BUTTON_FONT_SIZE)
 	parent.add_child(button)
 	return button
 
@@ -399,11 +494,10 @@ func _entry_matches_filter(entry: Dictionary, normalized_filter: String) -> bool
 
 
 func _entry_has_open_slot(entry: Dictionary) -> bool:
-	var players := str(entry.get("players", ""))
-	var parts := players.split("/")
-	if parts.size() != 2:
+	var max_count := _players_max_count(entry)
+	if max_count <= 0:
 		return true
-	return int(parts[0]) < int(parts[1])
+	return _players_current_count(entry) < max_count
 
 
 func _sort_entries(entries: Array[Dictionary]) -> void:
@@ -417,16 +511,52 @@ func _sort_entries(entries: Array[Dictionary]) -> void:
 
 
 func _player_count(entry: Dictionary) -> int:
-	var players := str(entry.get("players", "0"))
+	return _players_current_count(entry)
+
+
+func _players_current_count(entry: Dictionary) -> int:
+	return _players_part(entry, 0)
+
+
+func _players_max_count(entry: Dictionary) -> int:
+	return _players_part(entry, 1)
+
+
+func _players_part(entry: Dictionary, index: int) -> int:
+	var players := str(entry.get("players", "0/0"))
 	var parts := players.split("/")
-	return int(parts[0]) if not parts.is_empty() else 0
+	if index < 0 or index >= parts.size():
+		return 0
+	return _safe_int(str(parts[index]), 0)
 
 
 func _latency_value(entry: Dictionary) -> int:
-	var latency := str(entry.get("latency", "9999")).replace("ms", "").strip_edges()
+	var latency := str(entry.get("latency", "9999")).to_lower().replace("ms", "").strip_edges()
+	if latency == "lan":
+		return 0
 	if latency == "-":
 		return 9999
-	return int(latency)
+	return _safe_int(latency, 9999)
+
+
+func _safe_int(value: String, fallback: int) -> int:
+	var text := value.strip_edges()
+	if not text.is_valid_int():
+		return fallback
+	return int(text)
+
+
+func _entry_tooltip(entry: Dictionary) -> String:
+	var lines: Array[String] = []
+	lines.append("%s  %s" % [entry.get("name", "Server"), entry.get("players", "-")])
+	lines.append("Endpoint: %s" % entry.get("endpoint", ""))
+	lines.append("Map: %s  Latency: %s" % [entry.get("map", "-"), entry.get("latency", "-")])
+	lines.append("Source: %s" % str(entry.get("source", "unknown")).to_upper())
+	if str(entry.get("passworded", "false")) == "true":
+		lines.append("Password required")
+	if str(entry.get("directory_status", "")) == "missing":
+		lines.append("Favorite is missing from the current directory")
+	return "\n".join(lines)
 
 
 func _build_join_dialog() -> void:
@@ -498,30 +628,39 @@ func _focus_filter() -> void:
 
 
 func _wire_server_browser_focus() -> void:
+	var action_buttons := _focusable_action_buttons(true)
 	_wire_horizontal_focus(_filter_controls)
-	_wire_horizontal_focus(_action_buttons)
+	_wire_horizontal_focus(action_buttons)
 	if _close_button != null:
 		_close_button.focus_neighbor_bottom = _filter_line.get_path()
-		_close_button.focus_neighbor_left = _connect_button.get_path()
-		_close_button.focus_neighbor_right = _connect_button.get_path()
-	if not _filter_controls.is_empty() and not _action_buttons.is_empty():
+		if action_buttons.is_empty():
+			var close_path := _close_button.get_path()
+			_close_button.focus_neighbor_left = close_path
+			_close_button.focus_neighbor_right = close_path
+		else:
+			var last_action := action_buttons[action_buttons.size() - 1]
+			_close_button.focus_neighbor_left = last_action.get_path()
+			_close_button.focus_neighbor_right = last_action.get_path()
+			last_action.focus_neighbor_right = _close_button.get_path()
+	if not _filter_controls.is_empty() and not action_buttons.is_empty():
 		for control in _filter_controls:
 			control.focus_neighbor_top = _close_button.get_path()
-			control.focus_neighbor_bottom = _action_buttons[0].get_path()
-		for button in _action_buttons:
+			control.focus_neighbor_bottom = action_buttons[0].get_path()
+		for button in action_buttons:
 			button.focus_neighbor_top = _filter_line.get_path()
-	if _connect_button != null:
-		_connect_button.focus_neighbor_right = _close_button.get_path()
 
 
 func _wire_table_focus() -> void:
-	if _visible_entries.is_empty():
+	var action_buttons := _focusable_action_buttons()
+	if _visible_entries.is_empty() or action_buttons.is_empty():
+		return
+	if _table == null or _table.get_child_count() < 5 + _visible_entries.size() * 5:
 		return
 	var first_cell: Control = _table.get_child(5)
 	var last_row_first_cell: Control = _table.get_child(5 + (_visible_entries.size() - 1) * 5)
 	for control in _filter_controls:
 		control.focus_neighbor_bottom = first_cell.get_path()
-	for button in _action_buttons:
+	for button in action_buttons:
 		button.focus_neighbor_top = last_row_first_cell.get_path()
 	for row_index in range(_visible_entries.size()):
 		for column in range(5):
@@ -535,7 +674,7 @@ func _wire_table_focus() -> void:
 			else:
 				cell.focus_neighbor_top = _table.get_child(5 + (row_index - 1) * 5 + column).get_path()
 			if row_index == _visible_entries.size() - 1:
-				cell.focus_neighbor_bottom = _action_buttons[0].get_path()
+				cell.focus_neighbor_bottom = action_buttons[0].get_path()
 			else:
 				cell.focus_neighbor_bottom = _table.get_child(5 + (row_index + 1) * 5 + column).get_path()
 
@@ -568,6 +707,37 @@ func _wire_horizontal_focus(controls: Array) -> void:
 		var control: Control = controls[index]
 		control.focus_neighbor_left = previous.get_path()
 		control.focus_neighbor_right = next.get_path()
+
+
+func _focusable_action_buttons(clear_neighbors := false) -> Array[Button]:
+	var buttons: Array[Button] = []
+	for button in _action_buttons:
+		if clear_neighbors:
+			_clear_focus_neighbors(button)
+		if _is_focusable_control(button):
+			buttons.append(button)
+	return buttons
+
+
+func _is_focusable_control(control: Control) -> bool:
+	if control == null:
+		return false
+	if not control.visible:
+		return false
+	if control.focus_mode == Control.FOCUS_NONE:
+		return false
+	if control is BaseButton and (control as BaseButton).disabled:
+		return false
+	return true
+
+
+func _clear_focus_neighbors(control: Control) -> void:
+	if control == null:
+		return
+	control.focus_neighbor_top = NodePath()
+	control.focus_neighbor_bottom = NodePath()
+	control.focus_neighbor_left = NodePath()
+	control.focus_neighbor_right = NodePath()
 
 
 func _toggle_selected_favorite() -> void:
@@ -644,6 +814,13 @@ func _copy_history_entries(history_entries) -> Array[Dictionary]:
 	return copied
 
 
+func _copy_entries(entries: Array[Dictionary]) -> Array[Dictionary]:
+	var copied: Array[Dictionary] = []
+	for entry in entries:
+		copied.append(Dictionary(entry).duplicate(true))
+	return copied
+
+
 func _refresh_online_directory() -> void:
 	if _directory_loading:
 		_status.text = "Online server directory is already loading."
@@ -664,12 +841,13 @@ func _request_online_directory(url: String, message := "Loading online server di
 	_directory_retry_url = url
 	_directory_loading = true
 	_render_table_message(message)
-	var error := ServerDirectory.refresh_from_http(_http_request, url)
+	var etag := _directory_etag if url == _directory_cached_url else ""
+	var error := ServerDirectory.refresh_from_http(_http_request, url, etag)
 	if error != OK:
 		_load_directory_fallback("Online server directory request could not start: %d." % error)
 
 
-func _on_http_directory_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+func _on_http_directory_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
 	if ServerDirectory.should_retry_directory_request(result, response_code, _directory_retry_count):
 		_directory_retry_count += 1
 		_request_online_directory(
@@ -685,19 +863,50 @@ func _on_http_directory_completed(result: int, response_code: int, _headers: Pac
 			"Online server directory failed: %s. Using local fallback." % ServerDirectory.http_diagnostic(result, response_code)
 		)
 		return
+	if response_code == ServerDirectory.HTTP_NOT_MODIFIED:
+		_load_directory_from_cache(headers)
+		return
 	if response_code < 200 or response_code >= 300:
 		_load_directory_fallback(
 			"Online server directory failed: %s. Using local fallback." % ServerDirectory.http_diagnostic(result, response_code)
 		)
 		return
-	_entries = ServerDirectory.entries_from_http_body(body, _capabilities.supports(_capabilities.FEATURE_LAN_DISCOVERY))
+	var loaded_entries := ServerDirectory.entries_from_http_body(body, _capabilities.supports(_capabilities.FEATURE_LAN_DISCOVERY))
 	var directory_diagnostic := ServerDirectory.directory_diagnostic_from_body(body)
-	if _entries.is_empty():
+	if loaded_entries.is_empty():
 		_load_directory_fallback("Online server directory invalid or empty (%s). Using local fallback." % directory_diagnostic)
 	else:
 		_directory_loading = false
-		_status.text = "Online server directory loaded (%s)." % directory_diagnostic
+		_entries = loaded_entries
+		_directory_cached_entries = _copy_entries(_entries)
+		_directory_cached_url = _directory_retry_url
+		_directory_cached_diagnostic = directory_diagnostic
+		var etag := ServerDirectory.http_etag(headers)
+		if not etag.is_empty():
+			_directory_etag = etag
+		var cache_diagnostic := ServerDirectory.http_cache_diagnostic(headers)
 		_render_entries()
+		_status.text = "Online server directory loaded (%s%s)." % [
+			directory_diagnostic,
+			"" if cache_diagnostic.is_empty() else "; " + cache_diagnostic,
+		]
+
+
+func _load_directory_from_cache(headers: PackedStringArray) -> void:
+	if _directory_cached_entries.is_empty():
+		_load_directory_fallback("Online server directory returned 304 without a cached listing. Using local fallback.")
+		return
+	_directory_loading = false
+	_entries = _copy_entries(_directory_cached_entries)
+	var cache_diagnostic := ServerDirectory.http_cache_diagnostic(headers)
+	var directory_diagnostic := _directory_cached_diagnostic
+	if directory_diagnostic.is_empty():
+		directory_diagnostic = "%d cached server(s)" % _entries.size()
+	_render_entries()
+	_status.text = "Online server directory unchanged (%s%s)." % [
+		directory_diagnostic,
+		"" if cache_diagnostic.is_empty() else "; " + cache_diagnostic,
+	]
 
 
 func _load_directory_fallback(message: String) -> void:
@@ -730,7 +939,24 @@ func _select_row(row_index: int) -> void:
 	_update_action_buttons()
 	_render_selected_row_styles()
 	var entry := _visible_entries[_selected_index]
-	_status.text = "Selected %s at %s." % [entry.get("name", ""), entry.get("endpoint", "")]
+	_status.text = _selected_status(entry)
+
+
+func _selected_status(entry: Dictionary) -> String:
+	var details: Array[String] = []
+	var source := str(entry.get("source", "")).to_upper()
+	if not source.is_empty():
+		details.append(source)
+	if _players_max_count(entry) > 0:
+		details.append("%d/%d players" % [_players_current_count(entry), _players_max_count(entry)])
+	if not _entry_has_open_slot(entry):
+		details.append("full")
+	if str(entry.get("passworded", "false")) == "true":
+		details.append("password")
+	if str(entry.get("directory_status", "")) == "missing":
+		details.append("missing from directory")
+	var suffix := "" if details.is_empty() else " (%s)" % ", ".join(details)
+	return "Selected %s at %s%s." % [entry.get("name", ""), entry.get("endpoint", ""), suffix]
 
 
 func _on_row_hovered(row_index: int) -> void:
@@ -771,6 +997,8 @@ func _update_action_buttons() -> void:
 	if _refresh_all_button != null:
 		_refresh_all_button.disabled = _directory_loading
 		_refresh_all_button.text = "Loading..." if _directory_loading else "Refresh All"
+	_wire_server_browser_focus()
+	_wire_table_focus()
 
 
 func _on_connect_pressed() -> void:

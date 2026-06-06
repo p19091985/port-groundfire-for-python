@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, is_dataclass
-from typing import Any, Callable
-
+from typing import Any, Callable, cast
 
 Decoder = Callable[[str, dict[str, Any]], object]
 
@@ -46,9 +45,9 @@ def decode_envelope(payload: str, decoder: Decoder) -> object:
     return decoder(str(decoded["message_type"]), decoded["payload"])
 
 
-def to_plain(value: object):
-    if is_dataclass(value):
-        return {key: to_plain(raw) for key, raw in asdict(value).items()}
+def to_plain(value: object) -> Any:
+    if is_dataclass(value) and not isinstance(value, type):
+        return {key: to_plain(raw) for key, raw in asdict(cast(Any, value)).items()}
     if isinstance(value, tuple):
         return [to_plain(item) for item in value]
     if isinstance(value, list):

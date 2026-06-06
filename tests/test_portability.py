@@ -28,6 +28,7 @@ class PortabilityFilesTests(unittest.TestCase):
         self.assertIn('groundfire = "groundfire.client:main"', pyproject)
         self.assertIn('groundfire-server = "groundfire.server:main"', pyproject)
         self.assertIn('groundfire-master = "groundfire.master:main"', pyproject)
+        self.assertIn('groundfire-directory = "groundfire_net.directory_service:main"', pyproject)
         self.assertIn('"groundfire_net*"', pyproject)
         self.assertNotIn("mpgameserver", pyproject)
         self.assertNotIn("msgpack", pyproject)

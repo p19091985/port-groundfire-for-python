@@ -19,7 +19,7 @@ case "${1:-}" in
 esac
 
 if [[ -z "$BROWSER_BIN" ]]; then
-    for candidate in chromium chromium-browser google-chrome; do
+    for candidate in google-chrome chromium chromium-browser; do
         if command -v "$candidate" >/dev/null 2>&1; then
             BROWSER_BIN=$(command -v "$candidate")
             break
@@ -43,6 +43,7 @@ tmp_dir=$(mktemp -d)
 server_log="$tmp_dir/http.log"
 gateway_log="$tmp_dir/gateway.log"
 auth_gateway_log="$tmp_dir/auth-gateway.log"
+session_gateway_log="$tmp_dir/session-gateway.log"
 full_gateway_log="$tmp_dir/full-gateway.log"
 full_gateway_holder_log="$tmp_dir/full-gateway-holder.log"
 full_gateway_ready="$tmp_dir/full-gateway-holder.ready"
@@ -136,6 +137,7 @@ PY
 port=$(reserve_port)
 gateway_port=$(reserve_port)
 auth_gateway_port=$(reserve_port)
+session_gateway_port=$(reserve_port)
 full_gateway_port=$(reserve_port)
 closed_gateway_port=$(reserve_port)
 banned_gateway_port=$(reserve_port)
@@ -145,6 +147,7 @@ cleanup() {
         "${server_pid:-}" \
         "${gateway_pid:-}" \
         "${auth_gateway_pid:-}" \
+        "${session_gateway_pid:-}" \
         "${full_gateway_holder_pid:-}" \
         "${full_gateway_pid:-}" \
         "${closed_gateway_pid:-}" \
@@ -158,25 +161,74 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$PYTHON_BIN" - "$port" "$ROOT_DIR/build/godot-web" >"$server_log" 2>&1 <<'PY' &
+"$PYTHON_BIN" - "$port" "$ROOT_DIR/build/godot-web" "$ROOT_DIR" >"$server_log" 2>&1 <<'PY' &
 import functools
 import http.server
+import json
 import sys
+import urllib.parse
 
 port = int(sys.argv[1])
 directory = sys.argv[2]
+root_dir = sys.argv[3]
+sys.path.insert(0, root_dir)
+
+from groundfire_net.websocket_gateway import generate_join_token
+
+
+SESSION_SECRET = "qa-session-secret"
 
 
 class GroundfireQAHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        path = self.path.split("?", 1)[0]
+        if path == "/qa/session_token.json":
+            self._send_session_token()
+            return
+        if path == "/qa/server_directory.json" and self.headers.get("If-None-Match", "").strip() == '"groundfire-qa-directory-v1"':
+            self.send_response(304)
+            self.end_headers()
+            return
+        super().do_GET()
+
     def end_headers(self):
         path = self.path.split("?", 1)[0]
         if path == "/qa/server_directory.json":
-            self.send_header("Cache-Control", "public, max-age=30, must-revalidate")
-            self.send_header("ETag", '"groundfire-qa-directory-v1"')
-            self.send_header("X-Groundfire-Directory-Refresh", "30")
+            self._send_directory_cache_headers()
         elif path == "/" or path == "/index.html":
             self.send_header("Cache-Control", "no-cache")
         super().end_headers()
+
+    def _send_directory_cache_headers(self):
+        self.send_header("Cache-Control", "public, max-age=30, must-revalidate")
+        self.send_header("ETag", '"groundfire-qa-directory-v1"')
+        self.send_header("X-Groundfire-Directory-Refresh", "30")
+
+    def _send_session_token(self):
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        player_name = (query.get("player_name") or [""])[0].strip()
+        if not player_name:
+            body = json.dumps({"ok": False, "error": "missing_player_name"}).encode("utf-8")
+            self.send_response(400)
+        else:
+            body = json.dumps(
+                {
+                    "ok": True,
+                    "schema": 1,
+                    "token_type": "groundfire_join",
+                    "player_name": player_name,
+                    "auth_token": generate_join_token(SESSION_SECRET, player_name, ttl_seconds=60),
+                    "expires_in": 60,
+                },
+                separators=(",", ":"),
+            ).encode("utf-8")
+            self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 
 server = http.server.ThreadingHTTPServer(
@@ -198,6 +250,12 @@ PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_ne
     --port "$auth_gateway_port" \
     --auth-token qa-token >"$auth_gateway_log" 2>&1 &
 auth_gateway_pid=$!
+
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
+    --host 127.0.0.1 \
+    --port "$session_gateway_port" \
+    --session-secret qa-session-secret >"$session_gateway_log" 2>&1 &
+session_gateway_pid=$!
 
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
@@ -230,6 +288,7 @@ done
 
 wait_for_tcp_port "QA password WebSocket gateway" "$gateway_port" "$gateway_log"
 wait_for_tcp_port "QA auth WebSocket gateway" "$auth_gateway_port" "$auth_gateway_log"
+wait_for_tcp_port "QA signed-session WebSocket gateway" "$session_gateway_port" "$session_gateway_log"
 wait_for_tcp_port "QA full WebSocket gateway" "$full_gateway_port" "$full_gateway_log"
 wait_for_tcp_port "QA closed WebSocket gateway" "$closed_gateway_port" "$closed_gateway_log"
 wait_for_tcp_port "QA banned WebSocket gateway" "$banned_gateway_port" "$banned_gateway_log"
@@ -247,10 +306,15 @@ import time
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 port = int(sys.argv[1])
 ready_path = sys.argv[2]
+pending = b""
 
 
 def recv_exact(sock, length):
+    global pending
     data = bytearray()
+    if pending:
+        data.extend(pending[:length])
+        pending = pending[length:]
     while len(data) < length:
         chunk = sock.recv(length - len(data))
         if not chunk:
@@ -292,7 +356,8 @@ def write_frame(sock, message):
     sock.sendall(bytes(header) + mask + masked)
 
 
-sock = socket.create_connection(("127.0.0.1", port), timeout=5.0)
+sock = socket.create_connection(("127.0.0.1", port), timeout=60.0)
+sock.settimeout(60.0)
 key = base64.b64encode(b"groundfire-qa-1").decode("ascii")
 accept = base64.b64encode(hashlib.sha1((key + GUID).encode("ascii")).digest()).decode("ascii")
 sock.sendall(
@@ -309,8 +374,9 @@ sock.sendall(
 response = b""
 while b"\r\n\r\n" not in response:
     response += sock.recv(4096)
-if b"101 Switching Protocols" not in response or accept.encode("ascii") not in response:
-    raise SystemExit(f"unexpected handshake response: {response!r}")
+headers, pending = response.split(b"\r\n\r\n", 1)
+if b"101 Switching Protocols" not in headers or accept.encode("ascii") not in headers:
+    raise SystemExit(f"unexpected handshake response: {headers!r}")
 
 read_frame(sock)
 write_frame(sock, {"type": "hello", "protocol": 1, "client": "browser-qa-holder"})
@@ -326,7 +392,7 @@ while True:
 PY
 full_gateway_holder_pid=$!
 
-for _attempt in $(seq 1 50); do
+for _attempt in $(seq 1 700); do
     if [[ -f "$full_gateway_ready" ]]; then
         break
     fi
@@ -350,6 +416,7 @@ capture() {
     rm -f "$output"
     "$PYTHON_BIN" - "$BROWSER_BIN" "$user_data_dir-$name" "$output" "http://127.0.0.1:$port/index.html$query" <<'PY'
 import base64
+import io
 import json
 import subprocess
 import sys
@@ -357,9 +424,11 @@ import time
 import urllib.request
 from pathlib import Path
 
+from PIL import Image, ImageStat
 import websocket
 
 browser, user_data_dir, output, url = sys.argv[1:5]
+expected_ready = Path(output).stem
 debug_port = 0
 
 import socket
@@ -387,7 +456,7 @@ process = subprocess.Popen(
 
 try:
     version_url = f"http://127.0.0.1:{debug_port}/json/version"
-    deadline = time.monotonic() + 10.0
+    deadline = time.monotonic() + 30.0
     while True:
         try:
             with urllib.request.urlopen(version_url, timeout=0.2) as response:
@@ -446,9 +515,34 @@ try:
             raise SystemExit(f"Timed out waiting for Godot canvas readiness: {last_state}")
         time.sleep(0.25)
 
-    time.sleep(0.5)
-    screenshot = command("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-    Path(output).write_bytes(base64.b64decode(screenshot["data"]))
+    deadline = time.monotonic() + 15.0
+    visual_ready = ""
+    while True:
+        result = command("Runtime.evaluate", {
+            "expression": "window.__groundfireVisualReady || ''",
+            "returnByValue": True,
+        })
+        visual_ready = str(result.get("result", {}).get("value", ""))
+        if visual_ready == expected_ready:
+            break
+        if time.monotonic() > deadline:
+            raise SystemExit(
+                f"Timed out waiting for Godot visual route {expected_ready}: {visual_ready}"
+            )
+        time.sleep(0.25)
+
+    deadline = time.monotonic() + 10.0
+    screenshot_bytes = b""
+    while True:
+        screenshot = command("Page.captureScreenshot", {"format": "png", "fromSurface": True})
+        screenshot_bytes = base64.b64decode(screenshot["data"])
+        image = Image.open(io.BytesIO(screenshot_bytes)).convert("RGB")
+        if max(ImageStat.Stat(image).stddev) > 2.0:
+            break
+        if time.monotonic() > deadline:
+            raise SystemExit("Timed out waiting for painted Godot screenshot.")
+        time.sleep(0.25)
+    Path(output).write_bytes(screenshot_bytes)
     ws.close()
 finally:
     try:
@@ -472,11 +566,12 @@ PY
 capture main_menu ""
 capture options "?screen=options"
 capture server_browser "?screen=servers"
+capture local_match_setup "?screen=local_match_setup"
 capture local_match "?screen=local"
 
 browser_runtime_qa() {
     local phase="$1"
-    "$PYTHON_BIN" - "$BROWSER_BIN" "$user_data_dir-runtime" "http://127.0.0.1:$port/index.html?qa=browser_runtime&store_phase=$phase&directory_url=http://127.0.0.1:$port/qa/server_directory.json&gateway_endpoint=ws://127.0.0.1:$gateway_port/qa-gateway&auth_gateway_endpoint=ws://127.0.0.1:$auth_gateway_port/qa-auth-gateway&full_gateway_endpoint=ws://127.0.0.1:$full_gateway_port/qa-full-gateway&closed_gateway_endpoint=ws://127.0.0.1:$closed_gateway_port/qa-closed-gateway&banned_gateway_endpoint=ws://127.0.0.1:$banned_gateway_port/qa-banned-gateway" <<'PY'
+    "$PYTHON_BIN" - "$BROWSER_BIN" "$user_data_dir-runtime" "http://127.0.0.1:$port/index.html?qa=browser_runtime&store_phase=$phase&directory_url=http://127.0.0.1:$port/qa/server_directory.json%3Fphase%3D$phase&gateway_endpoint=ws://127.0.0.1:$gateway_port/qa-gateway&auth_gateway_endpoint=ws://127.0.0.1:$auth_gateway_port/qa-auth-gateway&full_gateway_endpoint=ws://127.0.0.1:$full_gateway_port/qa-full-gateway&closed_gateway_endpoint=ws://127.0.0.1:$closed_gateway_port/qa-closed-gateway&banned_gateway_endpoint=ws://127.0.0.1:$banned_gateway_port/qa-banned-gateway&session_gateway_endpoint=ws://127.0.0.1:$session_gateway_port/qa-session-gateway&session_token_url=http://127.0.0.1:$port/qa/session_token.json%3Fphase%3D$phase" <<'PY'
 import json
 import subprocess
 import sys
@@ -512,7 +607,7 @@ process = subprocess.Popen(
 
 try:
     version_url = f"http://127.0.0.1:{debug_port}/json/version"
-    deadline = time.monotonic() + 10.0
+    deadline = time.monotonic() + 30.0
     while True:
         try:
             with urllib.request.urlopen(version_url, timeout=0.2) as response:
@@ -586,7 +681,9 @@ try:
         time.sleep(0.25)
 
     if not qa_result.get("ok"):
-        raise SystemExit(f"Browser runtime QA failed: {qa_result.get('errors')}")
+        raise SystemExit(
+            f"Browser runtime QA failed: {qa_result.get('errors')}; details={qa_result.get('details')}"
+        )
     print(f"Browser runtime QA passed: {qa_result.get('details', {})}")
     ws.close()
 finally:
@@ -621,15 +718,19 @@ from PIL import Image, ImageChops
 actual_dir = Path(sys.argv[1])
 golden_dir = Path(sys.argv[2])
 update = os.environ.get("GODOT_BROWSER_GOLDEN_UPDATE") == "1"
-cases = ("main_menu", "options", "server_browser", "local_match")
+cases = ("main_menu", "options", "server_browser", "local_match_setup", "local_match")
 average_tolerance = 1.0
 changed_ratio_tolerance = 0.02
+missing_cases = []
 
 for case in cases:
     actual_path = actual_dir / f"{case}.png"
     golden_path = golden_dir / f"{case}.png"
-    if update or not golden_path.exists():
+    if update:
         shutil.copy2(actual_path, golden_path)
+        continue
+    if not golden_path.exists():
+        missing_cases.append(case)
         continue
     actual = Image.open(actual_path).convert("RGBA")
     golden = Image.open(golden_path).convert("RGBA")
@@ -646,6 +747,13 @@ for case in cases:
         raise SystemExit(
             f"{case}: visual diff too large: average={average:.3f}, changed_ratio={changed_ratio:.4f}"
         )
+
+if missing_cases:
+    raise SystemExit(
+        "Missing approved browser golden(s): "
+        + ", ".join(missing_cases)
+        + ". Run scripts/qa_godot_web.sh --update-goldens after reviewing against docs/references/pygame_visual/."
+    )
 
 print(f"Browser visual QA passed for {len(cases)} screenshots.")
 PY

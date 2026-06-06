@@ -6,6 +6,7 @@ be copied into another project and wired to that game's own message classes.
 
 from .browser import ServerBook, ServerListEntry
 from .codec import JsonDataclassCodec, decode_envelope, encode_envelope, to_plain
+from .directory_service import DirectoryServiceConfig, build_http_server, directory_diagnostics, load_directory_payload
 from .discovery import DiscoveredServer, DiscoveryService, ServerBrowser
 from .master import (
     DEFAULT_MASTER_PORT,
@@ -26,6 +27,7 @@ __all__ = [
     "DatagramEndpoint",
     "DiscoveredServer",
     "DiscoveryService",
+    "DirectoryServiceConfig",
     "JsonDataclassCodec",
     "GatewaySimulation",
     "MasterQuery",
@@ -40,8 +42,11 @@ __all__ = [
     "ServerLoopConfig",
     "WebSocketGateway",
     "WebSocketGatewaySession",
+    "build_http_server",
     "decode_envelope",
+    "directory_diagnostics",
     "encode_envelope",
+    "load_directory_payload",
     "parse_master_server_address",
     "to_plain",
 ]

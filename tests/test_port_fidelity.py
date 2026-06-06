@@ -12,9 +12,14 @@ from tests.support import (
 
 from src.common import PI, deg_cos, deg_sin, sqr
 from src.inifile import ReadIniFile
+from src.machinegunround import MachineGunRound
+from src.mirv import Mirv
+from src.missile import Missile
 from src.player import Player
+from src.shell import Shell
 from src.soundentity import SoundEntity
 from src.tank import Tank
+from src.weapons_impl import MachineGunWeapon
 
 
 SETTINGS = ReadIniFile(os.path.join(PROJECT_ROOT, "conf", "options.ini"))
@@ -58,6 +63,163 @@ class TankFidelityTests(unittest.TestCase):
         vel_x, vel_y = self.tank.gun_launch_velocity()
         self.assertAlmostEqual(vel_x, 1.5 - deg_sin(-20.0) * 12.0)
         self.assertAlmostEqual(vel_y, -0.5 + deg_cos(-20.0) * 12.0)
+
+    def test_machine_gun_launch_velocity_uses_fixed_weapon_speed(self):
+        # Fidelity target: MachineGunWeapon.update() uses
+        # gun_launch_velocity_at_power(MachineGunWeapon.OPTION_Speed).
+        #
+        # Machine Gun rounds ignore the tank's current gun power; the weapon has
+        # its own fixed classic speed.
+        weapon = self.tank._weapons[Tank.MACHINEGUN]
+        weapon._quantity = 1
+        weapon._available_quantity = 1
+        weapon._cooldown = 0.0
+        self.tank._firing = True
+        self.tank._gun_angle = -20.0
+        self.tank._airbourne_x_vel = 1.5
+        self.tank._airbourne_y_vel = -0.5
+        self.tank._gun_power = 1.0
+
+        weapon.update(0.05)
+
+        self.assertEqual(len(self.game._entities), 1)
+        low_power_round = self.game._entities[0]
+        expected_x = 1.5 - deg_sin(-20.0) * MachineGunWeapon.OPTION_Speed
+        expected_y = -0.5 + deg_cos(-20.0) * MachineGunWeapon.OPTION_Speed
+        self.assertAlmostEqual(low_power_round._x_launch_vel, expected_x)
+        self.assertAlmostEqual(low_power_round._y_launch_vel, expected_y)
+
+        self.game._entities.clear()
+        weapon._quantity = 1
+        weapon._available_quantity = 1
+        weapon._cooldown = 0.0
+        self.tank._gun_power = 20.0
+
+        weapon.update(0.05)
+
+        self.assertEqual(len(self.game._entities), 1)
+        high_power_round = self.game._entities[0]
+        self.assertAlmostEqual(high_power_round._x_launch_vel, expected_x)
+        self.assertAlmostEqual(high_power_round._y_launch_vel, expected_y)
+
+    def test_machine_gun_round_trajectory_uses_classic_gravity(self):
+        # Fidelity target: MachineGunRound.update() uses the same classic
+        # parabolic y formula as Shell.update(), including the 5.0 * t^2 term.
+        self.game.get_players = lambda: []
+        machine_gun_round = MachineGunRound(
+            self.game,
+            self.player,
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            0.25,
+            2,
+        )
+
+        self.game.set_time(0.75)
+
+        self.assertTrue(machine_gun_round.update(0.05))
+        time_since_launch = 0.5
+        t_back = 0.49
+        self.assertAlmostEqual(machine_gun_round._x, 1.0 + time_since_launch * 3.0)
+        self.assertAlmostEqual(
+            machine_gun_round._y,
+            2.0 + time_since_launch * (4.0 - 5.0 * time_since_launch),
+        )
+        self.assertAlmostEqual(machine_gun_round._x_back, 1.0 + t_back * 3.0)
+        self.assertAlmostEqual(
+            machine_gun_round._y_back,
+            2.0 + t_back * (4.0 - 5.0 * t_back),
+        )
+
+    def test_mirv_vertical_split_does_not_add_minimum_horizontal_spread(self):
+        # Fidelity target: Mirv.update() fragment spread formula.
+        #
+        # Classic fragment x velocity is based only on the MIRV's launch x
+        # velocity. A vertical launch therefore does not inject fan-out speed.
+        original_fragments = Mirv.OPTION_Fragments
+        original_spread = Mirv.OPTION_Spread
+        Mirv.OPTION_Fragments = 5
+        Mirv.OPTION_Spread = 0.2
+        try:
+            mirv = Mirv(
+                self.game,
+                self.player,
+                1.0,
+                2.0,
+                0.0,
+                10.0,
+                0.0,
+                0.3,
+                20.0,
+            )
+            self.game.set_time(1.1)
+
+            self.assertFalse(mirv.update(0.05))
+            fragments = [entity for entity in self.game._entities if isinstance(entity, Shell)]
+            self.assertEqual(len(fragments), 5)
+            self.assertTrue(all(fragment._x_launch_vel == 0.0 for fragment in fragments))
+            self.assertTrue(all(fragment._y_launch_vel == 0.0 for fragment in fragments))
+        finally:
+            Mirv.OPTION_Fragments = original_fragments
+            Mirv.OPTION_Spread = original_spread
+
+    def test_missile_powered_flight_uses_classic_angle_speed_formula(self):
+        # Fidelity target: Missile.update() powered-flight branch.
+        #
+        # Classic missiles are driven by angle and
+        # Missile.OPTION_Speed - cos(angle) while fuel remains.
+        self.game.get_players = lambda: []
+        missile = Missile(self.game, self.player, 1.0, 2.0, 30.0, 0.3, 40.0)
+
+        self.assertTrue(missile.update(0.2))
+
+        radians = math.radians(30.0)
+        speed_factor = Missile.OPTION_Speed - math.cos(radians)
+        self.assertAlmostEqual(missile._x, 1.0 - math.sin(radians) * speed_factor * 0.2)
+        self.assertAlmostEqual(missile._y, 2.0 + math.cos(radians) * speed_factor * 0.2)
+        self.assertAlmostEqual(missile._fuel, Missile.OPTION_FuelSupply - 0.2)
+        self.assertAlmostEqual(missile._x_vel, 0.0)
+        self.assertAlmostEqual(missile._y_vel, 0.0)
+
+    def test_missile_powered_flight_does_not_clamp_low_speed_factor(self):
+        # Fidelity target: Missile.update() powered-flight speed factor.
+        #
+        # The classic formula uses Missile.OPTION_Speed - cos(angle) directly,
+        # even when that produces a negative powered velocity.
+        original_speed = Missile.OPTION_Speed
+        try:
+            Missile.OPTION_Speed = 0.25
+            self.game.get_players = lambda: []
+            missile = Missile(self.game, self.player, 1.0, 2.0, 0.0, 0.3, 40.0)
+
+            self.assertTrue(missile.update(0.2))
+
+            speed_factor = Missile.OPTION_Speed - math.cos(0.0)
+            self.assertLess(speed_factor, 0.0)
+            self.assertAlmostEqual(missile._x, 1.0)
+            self.assertAlmostEqual(missile._y, 2.0 + speed_factor * 0.2)
+        finally:
+            Missile.OPTION_Speed = original_speed
+
+    def test_missile_exhaustion_starts_freefall_after_powered_frame(self):
+        # Fidelity target: Missile.update() fuel exhaustion ordering.
+        #
+        # Classic missiles finish the current update with powered-flight motion,
+        # then store that powered velocity for the later free-fall branch.
+        self.game.get_players = lambda: []
+        missile = Missile(self.game, self.player, 1.0, 2.0, 0.0, 0.3, 40.0)
+        missile._fuel = 0.05
+
+        self.assertTrue(missile.update(0.1))
+
+        powered_speed = Missile.OPTION_Speed - math.cos(0.0)
+        self.assertAlmostEqual(missile._x, 1.0)
+        self.assertAlmostEqual(missile._y, 2.0 + powered_speed * 0.1)
+        self.assertAlmostEqual(missile._fuel, -0.05)
+        self.assertAlmostEqual(missile._x_vel, 0.0)
+        self.assertAlmostEqual(missile._y_vel, powered_speed)
 
     def test_do_damage_keeps_tank_alive_at_exactly_zero(self):
         self.tank._health = 40.0
@@ -108,6 +270,94 @@ class TankFidelityTests(unittest.TestCase):
         self.assertFalse(self.tank._firing)
         self.assertEqual(weapons[Tank.SHELLS].select_calls, 1)
         self.assertTrue(all(weapon.ammo_round_calls == 1 for weapon in weapons))
+
+    def test_move_tank_passive_steep_slope_slide_matches_classic_direction(self):
+        # Fidelity target: Tank.move_tank() passive slope branch.
+        #
+        # With no left/right input, a tank resting on a slope steeper than 30
+        # degrees slides by the classic signed angle term. Positive tank angle
+        # moves left; negative tank angle moves right.
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = True
+        self.tank._x = 1.0
+        self.tank._y = 2.0
+        self.tank._tank_angle = 31.0
+
+        self.tank.move_tank(1.0, False)
+
+        expected_positive_delta = -(self.tank._movement_speed * (31.0 / 65.0))
+        self.assertAlmostEqual(self.tank._x, 1.0 + math.cos(math.radians(31.0)) * expected_positive_delta)
+        self.assertAlmostEqual(self.tank._y, 2.0 + math.sin(math.radians(31.0)) * expected_positive_delta)
+
+        self.tank._x = 1.0
+        self.tank._y = 2.0
+        self.tank._tank_angle = -31.0
+
+        self.tank.move_tank(1.0, False)
+
+        expected_negative_delta = -(self.tank._movement_speed * (-31.0 / 65.0))
+        self.assertAlmostEqual(self.tank._x, 1.0 + math.cos(math.radians(-31.0)) * expected_negative_delta)
+        self.assertAlmostEqual(self.tank._y, 2.0 + math.sin(math.radians(-31.0)) * expected_negative_delta)
+
+    def test_move_tank_ground_input_combines_with_signed_slope_term(self):
+        # Fidelity target: Tank.move_tank() grounded left/right branch.
+        #
+        # Classic grounded movement does not merely slow both directions on a
+        # slope. It adds the player's input term and the signed slope-slide term,
+        # so moving downhill is faster than moving uphill on the same slope.
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = True
+        self.tank._x = 1.0
+        self.tank._y = 2.0
+        self.tank._tank_angle = 31.0
+        self.tank._fuel = 0.5
+        self.tank._total_fuel = 0.5
+
+        self.player.commands = {Tank.CMD_TANKRIGHT: True}
+        self.tank.move_tank(1.0, False)
+
+        right_delta = self.tank._movement_speed - (self.tank._movement_speed * (31.0 / 65.0))
+        self.assertAlmostEqual(self.tank._x, 1.0 + math.cos(math.radians(31.0)) * right_delta)
+        self.assertAlmostEqual(self.tank._y, 2.0 + math.sin(math.radians(31.0)) * right_delta)
+        self.assertAlmostEqual(self.tank._fuel, 0.5)
+        self.assertAlmostEqual(self.tank._total_fuel, 0.5)
+
+        self.tank._x = 1.0
+        self.tank._y = 2.0
+        self.player.commands = {Tank.CMD_TANKLEFT: True}
+        self.tank.move_tank(1.0, False)
+
+        left_delta = -self.tank._movement_speed - (self.tank._movement_speed * (31.0 / 65.0))
+        self.assertAlmostEqual(self.tank._x, 1.0 + math.cos(math.radians(31.0)) * left_delta)
+        self.assertAlmostEqual(self.tank._y, 2.0 + math.sin(math.radians(31.0)) * left_delta)
+
+    def test_move_tank_airborne_without_boost_ignores_lateral_input(self):
+        # Fidelity target: Tank.move_tank() airborne non-boost branch.
+        #
+        # Classic left/right commands only affect grounded movement or boost
+        # rotation. Once airborne without boost, the tank follows stored velocity
+        # and gravity; lateral input does not add air control or spend fuel.
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = False
+        self.tank._x = 1.0
+        self.tank._y = 2.0
+        self.tank._tank_angle = 12.0
+        self.tank._airbourne_x_vel = 0.3
+        self.tank._airbourne_y_vel = -0.4
+        self.tank._fuel = 0.5
+        self.tank._total_fuel = 0.5
+        self.player.commands = {Tank.CMD_TANKRIGHT: True}
+
+        self.tank.move_tank(0.5, False)
+
+        expected_y_velocity = -0.4 - self.tank._tank_gravity * 0.5
+        self.assertAlmostEqual(self.tank._airbourne_x_vel, 0.3)
+        self.assertAlmostEqual(self.tank._airbourne_y_vel, expected_y_velocity)
+        self.assertAlmostEqual(self.tank._x, 1.0 + 0.3 * 0.5)
+        self.assertAlmostEqual(self.tank._y, 2.0 + expected_y_velocity * 0.5)
+        self.assertAlmostEqual(self.tank._tank_angle, 12.0)
+        self.assertAlmostEqual(self.tank._fuel, 0.5)
+        self.assertAlmostEqual(self.tank._total_fuel, 0.5)
 
     def test_update_gun_requires_release_before_second_shot(self):
         weapons = [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS)]
@@ -167,6 +417,56 @@ class TankFidelityTests(unittest.TestCase):
         self.assertEqual((x_vel, y_vel), (0.0, 0.5))
         self.assertEqual((texture, rotation, growth, fade_rate), (5, 0.1, 0.3, 0.15))
         self.assertAlmostEqual(self.tank._exhaust_time, 0.9)
+
+    def test_burn_uses_cpp_air_smoke_values(self):
+        captured = []
+
+        class FakeSmoke:
+            def __init__(self, game, x, y, x_vel, y_vel, texture, rotation, growth, fade_rate):
+                captured.append((game, x, y, x_vel, y_vel, texture, rotation, growth, fade_rate))
+
+        self.tank._on_ground = False
+        self.tank._x = 1.0
+        self.tank._y = 2.0
+        self.tank._exhaust_time = -0.1
+
+        with patch("src.tank.Smoke", FakeSmoke):
+            self.tank.burn(0.1)
+
+        self.assertEqual(len(captured), 1)
+        _, x, y, x_vel, y_vel, texture, rotation, growth, fade_rate = captured[0]
+        self.assertEqual((x, y), (1.0, 2.0))
+        self.assertEqual((x_vel, y_vel), (0.0, 0.5))
+        self.assertEqual((texture, rotation, growth, fade_rate), (5, 0.1, 0.3, 0.3))
+        self.assertAlmostEqual(self.tank._exhaust_time, -0.05)
+
+    def test_move_tank_boost_uses_cpp_jump_jet_smoke_values(self):
+        captured = []
+
+        class FakeSmoke:
+            def __init__(self, game, x, y, x_vel, y_vel, texture, rotation, growth, fade_rate):
+                captured.append((game, x, y, x_vel, y_vel, texture, rotation, growth, fade_rate))
+
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._fuel = 1.0
+        self.tank._total_fuel = 1.0
+        self.tank._x = 1.0
+        self.tank._y = 2.0
+        self.tank._tank_angle = 30.0
+        self.tank._airbourne_x_vel = 3.0
+        self.tank._airbourne_y_vel = -4.0
+        self.tank._exhaust_time = -0.1
+
+        with patch("src.tank.Smoke", FakeSmoke):
+            self.tank.move_tank(0.1, True)
+
+        self.assertEqual(len(captured), 1)
+        _, x, y, x_vel, y_vel, texture, rotation, growth, fade_rate = captured[0]
+        self.assertEqual((x, y), (1.0, 2.0))
+        self.assertAlmostEqual(x_vel, 3.0 + math.sin(math.radians(30.0)) * 2.0)
+        self.assertAlmostEqual(y_vel, -4.0 - math.cos(math.radians(30.0)) * 2.0)
+        self.assertEqual((texture, rotation, growth, fade_rate), (2, 0.0, 0.0, 2.5))
+        self.assertAlmostEqual(self.tank._exhaust_time, -0.05)
 
     def test_render_state_and_network_snapshot_expose_visual_and_sync_data(self):
         self.tank.assign_entity_id(42)

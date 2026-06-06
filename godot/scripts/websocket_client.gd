@@ -36,6 +36,15 @@ func disconnect_from_endpoint(reason := "client_disconnect") -> void:
 	status_changed.emit("websocket_disconnected")
 
 
+func _exit_tree() -> void:
+	set_process(false)
+	if _connected:
+		send_message(NetworkAdapter.disconnect_message("node_exit"))
+	_peer.close()
+	_connected = false
+	_closed_reported = true
+
+
 func join(player_name: String, password := "", auth_token := "") -> void:
 	send_message(NetworkAdapter.join_message(player_name, password, auth_token))
 

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -25,17 +26,33 @@ def test_godot_project_declares_main_scene_and_platform_autoload():
     assert "gf_move_right" in project
     assert "gf_weapon_prev" in project
     assert "gf_jump" in project
+    assert "gf_shield" in project
     assert (GODOT_ROOT / "assets" / "logo.png").exists()
     assert (GODOT_ROOT / "assets" / "menuback.png").exists()
+    assert (GODOT_ROOT / "assets" / "jumpjets.wav").exists()
+    assert (GODOT_ROOT / "assets" / "fireshell.wav").exists()
+    assert (GODOT_ROOT / "assets" / "launchmissile.wav").exists()
+    assert (GODOT_ROOT / "assets" / "missile.wav").exists()
+    assert (GODOT_ROOT / "assets" / "machinegun.wav").exists()
+    assert (GODOT_ROOT / "assets" / "nuke.wav").exists()
 
 
 def test_groundfire_theme_defines_shared_visual_language():
     script = (GODOT_ROOT / "scripts" / "groundfire_theme.gd").read_text(encoding="utf-8")
 
-    assert 'COLOR_BG := Color("#07131e")' in script
-    assert 'COLOR_ACCENT := Color("#a85d00")' in script
+    assert 'COLOR_BG := Color("#365e79")' in script
+    assert 'COLOR_MENU_TILE_TINT := Color("#66b3e6")' in script
+    assert 'COLOR_ACCENT := Color("#994c00")' in script
+    assert "BUTTON_FONT_SIZE := 16" in script
+    assert "BUTTON_BG_HOVER" in script
+    assert "BUTTON_BG_DISABLED" in script
+    assert "BUTTON_FONT_DISABLED" in script
+    assert "BUTTON_BORDER" in script
+    assert 'button.add_theme_stylebox_override("focus", button_style(true, true))' in script
     assert "static func panel_style" in script
+    assert "static func classic_panel_style" in script
     assert "static func apply_button" in script
+    assert "static func apply_classic_button" in script
     assert "static func row_style" in script
     assert "static func modal_backdrop_style" in script
 
@@ -62,11 +79,11 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert 'preload("res://scenes/local_match.tscn")' in script
     assert 'preload("res://scenes/online_match.tscn")' in script
     assert "_capabilities.supports(_capabilities.FEATURE_DEDICATED_SERVER_TOOLS)" in script
-    assert "Dedicated server tools are desktop-only." in script
     assert "Web build: browser-safe online only." in script
     assert "ServerBrowserScene.instantiate()" in script
     assert "func _show_online_match" in script
     assert "func _show_options" in script
+    assert '"local_match_setup"' in script
     assert 'preload("res://scripts/server_directory.gd")' in script
     assert 'preload("res://scripts/control_settings.gd")' in script
     assert 'preload("res://scripts/browser_store.gd")' in script
@@ -87,6 +104,20 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "InputEventJoypadMotion" in script
     assert "InputEventKey" in script
     assert "GAMEPAD_CAPTURE_CANCEL_BUTTON := JOY_BUTTON_BACK" in script
+    assert "MENU_LOGO_MIN_WIDTH := 590.0" in script
+    assert "MENU_LOGO_MAX_WIDTH := 920.0" in script
+    assert "MENU_BUTTON_MIN_SIZE := Vector2(259.0, 34.0)" in script
+    assert "MENU_BUTTON_MAX_SIZE := Vector2(414.0, 56.0)" in script
+    assert "MENU_CONTENT_MAX_WIDTH := 920.0" in script
+    assert "func _classic_logo_size" in script
+    assert "func _classic_button_size" in script
+    assert "MENU_CLASSIC_PANEL_SIZE" in script
+    assert "MENU_CLASSIC_BUTTON_SIZE" in script
+    assert "func _add_classic_button_to" in script
+    assert "func _set_classic_fullscreen_layout" in script
+    assert "LOGO_TEXTURE.get_size()" in script
+    assert "clamp(MENU_LOGO_BASE_SIZE.x * _menu_scale()" in script
+    assert "clamp(scaled.x, MENU_BUTTON_MIN_SIZE.x, MENU_BUTTON_MAX_SIZE.x)" in script
     assert "event.button_index == GAMEPAD_CAPTURE_CANCEL_BUTTON" in script
     assert "Back cancels." in script
     assert "ControlSettings.reset_defaults()" in script
@@ -95,8 +126,49 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "focus_mode = Control.FOCUS_ALL" in script
     assert "func _focus_first_button" in script
     assert "func _wire_vertical_focus" in script
+    assert "func _wire_vertical_control_focus" in script
+    assert "func _wire_horizontal_focus" in script
+    assert "func _wire_options_focus" in script
+    assert "if buttons.size() == 1:" in script
+    assert "button.focus_neighbor_left = path" in script
+    assert "button.focus_neighbor_right = path" in script
+    assert "func _focusable_controls_in_tree" in script
+    assert "func _collect_focusable_controls" in script
+    assert "func _is_focusable_control" in script
+    assert "var _paused_match_screen: Control" in script
+    assert "func _show_options_for_paused_match" in script
+    assert "func _return_to_paused_match" in script
+    assert "func _discard_paused_match_screen" in script
+    assert '_show_options(Callable(self, "_return_to_paused_match"))' in script
+    assert "_show_options(back_callback)" in script
+    assert (
+        'var back_action := back_callback if back_callback.is_valid() else Callable(self, "_show_main_menu")' in script
+    )
+    assert "func _add_options_section" in script
+    assert 'var video_section := _add_options_section(inner, "Video")' in script
+    assert 'var audio_section := _add_options_section(inner, "Audio")' in script
+    assert 'var gameplay_section := _add_options_section(inner, "Gameplay")' in script
+    assert 'var online_section := _add_options_section(inner, "Online")' in script
+    assert "var controls_section: VBoxContainer = null" in script
+    assert 'controls_section = _add_options_section(inner, "Controls")' in script
+    assert "OPTIONS_CLASSIC_ROW_SIZE" in script
+    assert "func _add_classic_options_preset_rows" in script
+    assert "func _add_classic_resolution_row" in script
+    assert "func _add_classic_screen_mode_row" in script
+    assert '"Resolution:"' in script
+    assert '"Screen Mode:"' in script
+    assert '"Set Controls"' in script
+    assert '"Apply"' in script
+    assert "scroll.ensure_control_visible(controls_section)" in script
+    assert "_focus_first_button(controls_section)" in script
+    assert "_add_server_directory_options(online_section, false)" in script
+    assert "_wire_options_focus(inner)" in script
+    assert "if control is BaseButton:" in script
+    assert "control is BaseButton and (control as BaseButton).disabled" in script
     assert "focus_neighbor_top" in script
     assert "focus_neighbor_bottom" in script
+    assert "focus_neighbor_left" in script
+    assert "focus_neighbor_right" in script
     assert '"Reset Conflicting Bindings"' in script
     assert 'event.is_action_pressed("ui_cancel")' in script
     assert 'OPTIONS_PATH := "user://groundfire_options.cfg"' in script
@@ -136,7 +208,122 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert '"ai_difficulty"' in script
     assert "func _add_ai_difficulty_selector" in script
     assert "func _show_dedicated_server_tools" in script
+    assert "LOCAL_MATCH_ROUND_OPTIONS" in script
+    assert "LOCAL_MATCH_DEFAULT_PLAYER_NAME" in script
+    assert "LOCAL_MATCH_DEFAULT_ENEMY_NAME" in script
+    assert "LOCAL_MATCH_NAME_MAX_LENGTH" in script
+    assert "LOCAL_MATCH_MAX_PLAYERS := 8" in script
+    assert "LOCAL_MATCH_CONTROLLER_LABELS" in script
+    assert "var _local_match_setup_rows: Array[Dictionary]" in script
+    assert "var _local_match_setup_back_button: Button" in script
+    assert "var _local_match_setup_rounds: OptionButton" in script
+    assert "func _local_match_setup_status_text" in script
+    assert "Enable at least 2 players to start." in script
+    assert "Add at least 1 human player to start." in script
+    assert "start_button.disabled = active_count < 2 or human_count < 1" in script
+    assert '"%d players ready  Human %d  Computer %d"' in script
+    assert "func _show_local_match_setup" in script
+    assert '"Local Match Setup"' in script
+    assert 'for header in ["Active", "Color", "Name", "Controlled by", "Controller"]' in script
+    assert '"Human"' in script
+    assert '"Computer"' in script
+    assert "func _setup_name_line_edit" in script
+    assert "line.max_length = LOCAL_MATCH_NAME_MAX_LENGTH" in script
+    assert "func _add_local_match_setup_row" in script
+    assert "func _local_match_roster_snapshot" in script
+    assert "func _next_available_local_match_controller" in script
+    assert "func _wire_local_match_setup_focus" in script
+    assert "func _wire_local_match_setup_vertical_column" in script
+    assert "func _clear_focus_neighbors" in script
+    assert "name.focus_mode = Control.FOCUS_ALL if enabled else Control.FOCUS_NONE" in script
+    assert "if name != null and _is_focusable_control(name):" in script
+    assert "if controller != null and _is_focusable_control(controller):" in script
+    assert "_wire_local_match_setup_focus()" in script
+    assert "if not start.disabled:" in script
+    assert '"Rounds"' in script
+    assert '"Start Match"' in script
+    assert "func _start_local_match" in script
+    assert '"roster": normalized_roster' in script
+    assert "func _setup_name_or_default" in script
     assert "func _start_web_gateway" in script
+    assert '"Join Password"' in script
+    assert '"Auth Token"' in script
+    assert '"Max Players"' in script
+    assert '"Closed Joins"' in script
+    assert '"Banned Players"' in script
+    assert '"Stop Gateway"' in script
+    assert '"Copy Endpoint"' in script
+    assert '"Copy Command"' in script
+    assert '"Connect endpoint: %s"' in script
+    assert '"Command preview: %s"' in script
+    assert "password_line.secret = true" in script
+    assert "auth_token_line.secret = true" in script
+    assert "var _dedicated_gateway_pid := 0" in script
+    assert "var _dedicated_stop_button: Button" in script
+    assert "var _dedicated_gateway_form_controls: Array[Control]" in script
+    assert "var _dedicated_gateway_action_buttons: Array[Button]" in script
+    assert 'var _dedicated_gateway_host := "127.0.0.1"' in script
+    assert "var _dedicated_gateway_port := 8765" in script
+    assert "var _dedicated_gateway_max_players := 0" in script
+    assert "var _dedicated_gateway_closed := false" in script
+    assert 'var _dedicated_gateway_banned_players := ""' in script
+    assert "func _load_dedicated_gateway_options" in script
+    assert 'config.set_value("dedicated_gateway", "host", _dedicated_gateway_host)' in script
+    assert 'config.set_value("dedicated_gateway", "port", _dedicated_gateway_port)' in script
+    assert 'config.set_value("dedicated_gateway", "max_players", _dedicated_gateway_max_players)' in script
+    assert 'config.set_value("dedicated_gateway", "closed", _dedicated_gateway_closed)' in script
+    assert 'config.set_value("dedicated_gateway", "banned_players", _dedicated_gateway_banned_players)' in script
+    assert '"dedicated_gateway", "password"' not in script
+    assert '"dedicated_gateway", "auth_token"' not in script
+    assert '"ban_players": banned_line.text' in script
+    assert "func _dedicated_gateway_config_from_controls" in script
+    assert "func _wire_dedicated_gateway_focus" in script
+    assert (
+        "_dedicated_gateway_form_controls = [host_line, port_spin, password_line, auth_token_line, "
+        "max_players_spin, closed_check, banned_line]" in script
+    )
+    assert (
+        "_dedicated_gateway_action_buttons = [start, _dedicated_stop_button, copy_endpoint, copy_command, back]"
+        in script
+    )
+    assert "if button != null and _is_focusable_control(button):" in script
+    assert "_wire_dedicated_gateway_focus()" in script
+    assert "func _gateway_args" in script
+    assert "func _gateway_host" in script
+    assert "func _gateway_port" in script
+    assert "func _gateway_banned_players" in script
+    assert "func _gateway_endpoint" in script
+    assert "func _gateway_endpoint_host" in script
+    assert "func _copy_gateway_endpoint" in script
+    assert "func _copy_gateway_command" in script
+    assert "func _gateway_command_preview" in script
+    assert "func _gateway_policy_summary" in script
+    assert '"Join policy: %s"' in script
+    assert '"password %s"' in script
+    assert '"auth %s"' in script
+    assert '"joins %s"' in script
+    assert '"bans %d"' in script
+    assert "func _gateway_display_args" in script
+    assert "func _shell_quote_arg" in script
+    assert "DisplayServer.clipboard_set(endpoint)" in script
+    assert "DisplayServer.clipboard_set(command)" in script
+    assert "Gateway command copied with secrets masked." in script
+    assert "groundfire-web-gateway" in script
+    assert 'masked_value = "<password>"' in script
+    assert 'masked_value = "<auth-token>"' in script
+    assert 'return "ws://%s:%d"' in script
+    assert 'host == "0.0.0.0" or host == "::"' in script
+    assert 'return "[%s]" % host' in script
+    assert "func _stop_web_gateway" in script
+    assert "OS.kill(stopped_pid)" in script
+    assert "Gateway already running with pid" in script
+    assert "_dedicated_stop_button.disabled = false" in script
+    assert "_dedicated_stop_button.disabled = true" in script
+    assert 'args.append("--password")' in script
+    assert 'args.append("--auth-token")' in script
+    assert 'args.append("--max-players")' in script
+    assert 'args.append("--closed")' in script
+    assert 'args.append("--ban-player")' in script
     assert "func _run_browser_runtime_qa" in script
     assert '"gateway_endpoint"' in script
     assert '"auth_gateway_endpoint"' in script
@@ -155,13 +342,19 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "BrowserStore.save_store" in script
     assert "ServerDirectory.refresh_from_http" in script
     assert "func _qa_check_directory_cache_headers" in script
+    assert "func _qa_check_directory_not_modified" in script
+    assert "ServerDirectory.http_etag(response_headers)" in script
+    assert "ServerDirectory.HTTP_NOT_MODIFIED" in script
     assert "func _qa_header_value" in script
     assert '"directory_cache_control"' in script
     assert '"directory_etag"' in script
+    assert '"directory_not_modified"' in script
     assert '"directory_refresh_seconds"' in script
     assert "max-age=30" in script
     assert "must-revalidate" in script
     assert "window.__groundfireQaResult" in script
+    assert "window.__groundfireVisualReady" in script
+    assert "func _publish_web_visual_ready" in script
     assert '"browser_runtime"' in script
     assert '"seed" or phase == "verify"' in script
     assert "groundfire-web-gateway" in script
@@ -176,6 +369,7 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "Screen Shake" in script
     assert "Camera Smoothing" in script
     assert "Mouse Aim" in script
+    assert "var _mouse_aim_enabled := false" in script
     assert "func _add_slider_option" in script
     assert '"Keyboard"' in script
     assert '"Gamepad"' in script
@@ -184,6 +378,13 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert '"Reset Gamepad Defaults"' in script
     assert 'preload("res://assets/logo.png")' in script
     assert 'preload("res://assets/menuback.png")' in script
+    assert "MENU_REFERENCE_SIZE := Vector2(1024.0, 768.0)" in script
+    assert "MENU_LOGO_BASE_SIZE := Vector2(819.0, 205.0)" in script
+    assert "MENU_BUTTON_BASE_SIZE := Vector2(360.0, 48.0)" in script
+    assert "func _menu_scale" in script
+    assert "func _scaled_menu_size" in script
+    assert "func _apply_menu_layout_metrics" in script
+    assert "NOTIFICATION_RESIZED" in script
     assert "GroundfireTheme.apply_button" in script
 
 
@@ -200,9 +401,15 @@ def test_server_browser_has_web_safe_empty_state():
     assert '"Open Slots"' in script
     assert "OptionButton.new()" in script
     assert "func _entry_has_open_slot" in script
+    assert "func _players_current_count" in script
+    assert "func _players_max_count" in script
+    assert "func _safe_int" in script
+    assert "func _entry_tooltip" in script
+    assert "func _selected_status" in script
+    assert "cell.tooltip_text = _entry_tooltip(entry)" in script
     assert "func _sort_entries" in script
     assert '"Refresh All"' in script
-    assert "GroundfireTheme.panel_style()" in script
+    assert "GroundfireTheme.classic_panel_style()" in script
     assert 'preload("res://scripts/browser_store.gd")' in script
     assert 'preload("res://scripts/server_directory.gd")' in script
     assert "ServerDirectory.browser_entries" in script
@@ -216,6 +423,11 @@ def test_server_browser_has_web_safe_empty_state():
     assert "TABLE_COLUMN_WIDTHS" in script
     assert "TABLE_HEADER_HEIGHT" in script
     assert "TABLE_ROW_HEIGHT" in script
+    assert "TABLE_MIN_TOTAL_WIDTH" in script
+    assert "TABLE_SCROLL_MIN_HEIGHT" in script
+    assert "func _apply_responsive_table_metrics" in script
+    assert "TABLE_HORIZONTAL_SCROLL_MODE := ScrollContainer.SCROLL_MODE_DISABLED" in script
+    assert "TABLE_VERTICAL_SCROLL_MODE := ScrollContainer.SCROLL_MODE_AUTO" in script
     assert "func _column_width" in script
     assert "func _clear_table_rows" in script
     assert "func _render_table_message" in script
@@ -231,6 +443,9 @@ def test_server_browser_has_web_safe_empty_state():
     assert "_undo_button" in script
     assert "_refresh_all_button" in script
     assert "_directory_loading := false" in script
+    assert '_directory_etag := ""' in script
+    assert '_directory_cached_url := ""' in script
+    assert "_directory_cached_entries: Array[Dictionary]" in script
     assert '"Clear History"' in script
     assert '"Undo"' in script
     assert "func _toggle_selected_favorite" in script
@@ -246,6 +461,14 @@ def test_server_browser_has_web_safe_empty_state():
     assert "func _wire_table_focus" in script
     assert "func _wire_join_modal_focus" in script
     assert "func _wire_horizontal_focus" in script
+    assert "func _focusable_action_buttons" in script
+    assert "func _is_focusable_control" in script
+    assert "func _clear_focus_neighbors" in script
+    assert "_focusable_action_buttons(true)" in script
+    assert "if control is BaseButton and (control as BaseButton).disabled:" in script
+    assert "last_action.focus_neighbor_right = _close_button.get_path()" in script
+    assert "_wire_server_browser_focus()" in script
+    assert "_wire_table_focus()" in script
     assert "func _select_row" in script
     assert "func _on_row_focused" in script
     assert 'event.is_action_pressed("ui_accept")' in script
@@ -253,7 +476,7 @@ def test_server_browser_has_web_safe_empty_state():
     assert "old_child.queue_free()" in script
     assert 'event.is_action_pressed("ui_cancel")' in script
     assert "_join_connect_button.focus_neighbor_left" in script
-    assert "_connect_button.focus_neighbor_right = _close_button.get_path()" in script
+    assert "_close_button.focus_neighbor_right = last_action.get_path()" in script
     assert "BrowserStore.forget_favorite" in script
     assert "BrowserStore.clear_history" in script
     assert '"Remove Favorite"' in script
@@ -270,11 +493,22 @@ def test_server_browser_has_web_safe_empty_state():
     assert "func _request_online_directory" in script
     assert '"Online server directory is already loading."' in script
     assert '_refresh_all_button.text = "Loading..." if _directory_loading else "Refresh All"' in script
+    assert "ServerDirectory.refresh_from_http(_http_request, url, etag)" in script
+    assert "ServerDirectory.HTTP_NOT_MODIFIED" in script
+    assert "func _load_directory_from_cache" in script
+    assert "func _copy_entries" in script
+    assert "ServerDirectory.http_etag(headers)" in script
+    assert "Online server directory unchanged" in script
+    assert "304 without a cached listing" in script
     assert "func _load_directory_fallback" in script
     assert "ServerDirectory.should_retry_directory_request" in script
     assert "ServerDirectory.http_diagnostic" in script
+    assert "ServerDirectory.http_cache_diagnostic" in script
     assert "ServerDirectory.directory_diagnostic_from_body" in script
     assert "ServerDirectory.configured_directory_label" in script
+    assert "TABLE_HEADER_BG" in script
+    assert "func _table_header_style" in script
+    assert "Online server directory loaded (%s%s)." in script
     assert "Online server directory invalid or empty" in script
     assert "func _load_browser_store" in script
     assert "func _browser_filter_state" in script
@@ -290,6 +524,9 @@ def test_server_browser_has_web_safe_empty_state():
     assert "NetworkAdapter.server_error_status_message" in script
     assert "NetworkAdapter.transport_for_endpoint" in script
     assert "_show_online_match" in script
+    assert "func _exit_tree" in script
+    assert "_http_request.cancel_request()" in script
+    assert '_websocket_client.disconnect_from_endpoint("server_browser_exit")' in script
 
 
 def test_browser_store_persists_favorites_and_history():
@@ -314,7 +551,7 @@ def test_browser_store_persists_favorites_and_history():
 def test_server_directory_separates_online_and_lan_entries():
     script = (GODOT_ROOT / "scripts" / "server_directory.gd").read_text(encoding="utf-8")
     data = json.loads((GODOT_ROOT / "data" / "server_directory.json").read_text(encoding="utf-8"))
-    directory_doc = (PROJECT_ROOT / "docs" / "godot_server_directory_schema.md").read_text(encoding="utf-8")
+    directory_doc = (PROJECT_ROOT / "docs" / "godot_migration_strategy.md").read_text(encoding="utf-8")
 
     assert 'SOURCE_ONLINE := "online"' in script
     assert 'SOURCE_LAN := "lan"' in script
@@ -333,6 +570,7 @@ def test_server_directory_separates_online_and_lan_entries():
     assert "OPTIONAL_SERVER_FIELDS" in script
     assert "OPTIONAL_STRING_SERVER_FIELDS" in script
     assert '"auth_token"' in script
+    assert '"session_token_url"' in script
     assert "static func _copy_optional_fields" in script
     assert "static func configured_directory_url" in script
     assert "static func configured_directory_environment" in script
@@ -354,10 +592,16 @@ def test_server_directory_separates_online_and_lan_entries():
     assert "endpoint must be ws:// or wss:// for online servers" in script
     assert "FileAccess.open" in script
     assert "static func refresh_from_http" in script
+    assert 'static func refresh_from_http(request: HTTPRequest, url: String, etag := "")' in script
+    assert "HTTP_NOT_MODIFIED := 304" in script
+    assert '"If-None-Match: %s"' in script
     assert "HTTP_TIMEOUT_SECONDS" in script
     assert "HTTP_RETRY_LIMIT" in script
     assert "static func should_retry_directory_request" in script
     assert "static func http_diagnostic" in script
+    assert "static func http_cache_diagnostic" in script
+    assert "static func http_etag" in script
+    assert "static func _header_value" in script
     assert "static func entries_from_http_body" in script
     assert "JSON.parse_string" in script
     assert 'entry.get("source", "") != SOURCE_LAN' in script
@@ -371,6 +615,7 @@ def test_server_directory_separates_online_and_lan_entries():
     assert any(server["endpoint"] == "127.0.0.1:27015" for server in data["servers"])
     assert "Current schema: `1`" in directory_doc
     assert "`auth_token`: string" in directory_doc
+    assert "`session_token_url`: string" in directory_doc
     assert "pre-provisioned development" in directory_doc
     assert "Online entries must use `ws://` or `wss://`" in directory_doc
     assert "fallback to `res://data/server_directory.json`" in directory_doc
@@ -401,6 +646,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "var _enemy_inventory := WeaponInventory.new()" in local_match
     assert "gf_move_left" in local_match
     assert "gf_jump" in local_match
+    assert "gf_shield" in local_match
     assert "ui_cancel" in local_match
     assert "ui_accept" in local_match
     assert "InputEventMouseMotion" in local_match
@@ -409,66 +655,184 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "move_on_terrain" in local_match
     assert "func _build_pause_overlay" in local_match
     assert "func _set_paused" in local_match
+    assert "focus_resume := true" in local_match
     assert "func _restart_round" in local_match
     assert "func _return_to_main_menu" in local_match
     assert "func _open_options_from_pause" in local_match
+    assert "_show_options_for_paused_match" in local_match
+    assert "_set_paused(true, false)" in local_match
     assert "_resume_button.grab_focus.call_deferred()" in local_match
     assert "button.focus_mode = Control.FOCUS_ALL" in local_match
     assert "focus_neighbor_top" in local_match
     assert "focus_neighbor_bottom" in local_match
+    assert "button.focus_neighbor_left = path" in local_match
+    assert "button.focus_neighbor_right = path" in local_match
     assert '"Paused"' in local_match
     assert '"Options"' in local_match
     assert '"Restart Round"' in local_match
     assert "func _fire_weapon" in local_match
     assert "func _spawn_mirv_children" in local_match
     assert "PROJECTILE_GRAVITY := 190.0" in local_match
+    assert "TANK_GUN_ARROW_START_OFFSET := TankState.TANK_BODY_HALF_WIDTH * 1.5" in local_match
+    assert "TANK_GUN_ARROW_BASE_LENGTH := TankState.TANK_BODY_HALF_WIDTH * 2.0" in local_match
+    assert "TANK_GUN_ARROW_POWER_SCALE := TankState.TANK_BODY_HALF_WIDTH * 0.5" in local_match
+    assert "TANK_GUN_ARROW_HEAD_TIP_SCALE := 1.25" in local_match
+    assert "TANK_GUN_ARROW_SHAFT_HALF_WIDTH := TankState.TANK_BODY_HALF_WIDTH * 0.4" in local_match
+    assert "TANK_GUN_ARROW_HEAD_HALF_WIDTH := TankState.TANK_BODY_HALF_WIDTH * 0.8" in local_match
     assert "MIRV_MIN_SPLIT_AGE := 0.25" in local_match
     assert "MISSILE_ANGLE_CHANGE_LIMIT := 500.0" in local_match
     assert "MISSILE_RECENTER_MULTIPLIER := 3.0" in local_match
     assert "MISSILE_AI_STEER_ANGLE_SCALE := 18.0" in local_match
-    assert "MISSILE_MIN_SPEED := 1.0" in local_match
+    assert "MISSILE_MIN_SPEED" not in local_match
+    assert "SCORE_ROUND_WIN_REWARD := 100" in local_match
+    assert "SCORE_DEFEAT_LEADER_REWARD := 200" in local_match
+    assert "SCORE_SELF_DEFEAT_PENALTY := -50" in local_match
+    assert "SCORE_SURVIVAL_REWARD := 100" in local_match
+    assert "CREDITS_ROUND_STIPEND := 10" in local_match
+    assert "MATCH_TOTAL_ROUNDS := 5" in local_match
+    assert "func setup(config: Dictionary)" in local_match
+    assert "_requested_total_rounds" in local_match
+    assert "var _player_name := TURN_PLAYER" in local_match
+    assert "var _enemy_name := TURN_ENEMY" in local_match
+    assert "var _configured_roster: Array[Dictionary]" in local_match
+    assert "var _participants: Array[Dictionary]" in local_match
+    assert 'for entry in Array(config.get("roster", []))' in local_match
+    assert '_configured_roster.append(Dictionary(entry).duplicate(true))' in local_match
+    assert "func _build_participants_from_roster" in local_match
+    assert "func _participant_rows_snapshot" in local_match
+    assert "func _participant_owner_for_index" in local_match
+    assert "func _participant_name_for_owner" in local_match
+    assert "func _score_leader_summary" in local_match
+    assert "func _participant_hud_summary" in local_match
+    assert "func _has_human_participants" in local_match
+    assert "func _participant_tank" in local_match
+    assert "func _participant_inventory" in local_match
+    assert "func _participant_score" in local_match
+    assert "func _participant_credits" in local_match
+    assert "func _participant_wins" in local_match
+    assert '"leader": bool(entry.get("leader", false))' in local_match
+    assert "func _participant_is_leader_owner" in local_match
+    assert "func _update_leader_flags" in local_match
+    assert "func _living_participant_indices" in local_match
+    assert "func _next_living_participant_index" in local_match
+    assert "func _target_index_for_attacker" in local_match
+    assert "func _set_turn_index" in local_match
+    assert "func _record_round_defeat" in local_match
+    assert (
+        '_player_name = _setup_name_or_default(str(config.get("player_name", TURN_PLAYER)), TURN_PLAYER)'
+        in local_match
+    )
+    assert '_enemy_name = _setup_name_or_default(str(config.get("enemy_name", TURN_ENEMY)), TURN_ENEMY)' in local_match
+    assert "func _round_spawn_x" in local_match
+    assert '"reset_round"' in local_match
+    assert "MACHINE_GUN_AI_EASY_BURST := 3" in local_match
+    assert "MACHINE_GUN_AI_NORMAL_BURST := 5" in local_match
+    assert "MACHINE_GUN_AI_HARD_BURST := 8" in local_match
+    assert "MACHINE_GUN_AI_FINISHER_BURST := 10" in local_match
+    assert "MACHINE_GUN_TRACER_TRAIL_TIME := 0.01" in local_match
+    assert "AI_SELF_DAMAGE_WEIGHT_HARD := 3.0" in local_match
+    assert "AI_SELF_KILL_PENALTY := 1000.0" in local_match
+    assert 'AI_SHOP_PRIORITY_EASY := ["Machine Gun", "Missile", "Jump Jet"]' in local_match
+    assert 'AI_SHOP_PRIORITY_NORMAL := ["Missile", "MIRV", "Machine Gun", "Jump Jet"]' in local_match
+    assert 'AI_SHOP_PRIORITY_HARD := ["Nuke", "MIRV", "Missile", "Machine Gun", "Jump Jet"]' in local_match
+    assert "SCORE_HUMAN_ACTIVATION_DELAY := 2.0" in local_match
+    assert "SCORE_COMPUTER_ACTIVATION_DELAY := 4.0" in local_match
+    assert "WINNER_HUMAN_ACTIVATION_DELAY := 2.0" in local_match
+    assert "WINNER_COMPUTER_ACTIVATION_DELAY := 4.0" in local_match
+    assert "SHOP_INITIAL_INPUT_DELAY := 0.4" in local_match
+    assert "SHOP_ACTION_INPUT_DELAY := 0.2" in local_match
     assert "velocity.y += PROJECTILE_GRAVITY * step" in local_match
     assert "velocity.y += PROJECTILE_GRAVITY * delta" in local_match
     assert "split_age = max(MIRV_MIN_SPLIT_AGE, -velocity.y / PROJECTILE_GRAVITY)" in local_match
     assert '"split_age": split_age' in local_match
+    assert "func _mirv_split_velocity" in local_match
+    assert "var projectiles_this_step := _projectiles.duplicate()" in local_match
+    assert (
+        'var split_delta: float = clamp(float(projectile.get("split_age", 0.8)) - previous_age, 0.0, delta)'
+        in local_match
+    )
+    assert "var split_position := previous_position + split_velocity * split_delta" in local_match
     assert 'projectile["expired"] = true' in local_match
     assert 'weapon.get("fragments", WeaponInventory.MIRV_FRAGMENTS)' in local_match
     assert 'weapon.get("spread", WeaponInventory.MIRV_SPREAD)' in local_match
-    assert "velocity.x * spread * offset" in local_match
+    assert "var spread_step: float" in local_match
+    assert "WeaponInventory.MIRV_MIN_FRAGMENT_SPREAD_SPEED" in local_match
+    assert "velocity.x + (spread_step * offset)" in local_match
     assert "func _update_missile_projectile" in local_match
+    assert "func _missile_applies_ballistic_acceleration" in local_match
+    assert "func _missile_powered_velocity" in local_match
     assert "func _missile_steer_direction" in local_match
     assert "func _short_angle_delta" in local_match
     assert "min(MISSILE_ANGLE_CHANGE_LIMIT" in local_match
     assert "max(-MISSILE_ANGLE_CHANGE_LIMIT" in local_match
     assert "MISSILE_RECENTER_MULTIPLIER * steer_sensitivity * delta" in local_match
-    assert "max(MISSILE_MIN_SPEED, velocity.length())" in local_match
+    assert "classic_speed - cos(radians)" in local_match
+    assert "fuel_exhausted_this_frame" in local_match
     assert "delta_angle / MISSILE_AI_STEER_ANGLE_SCALE" in local_match
     assert '"fuel": missile_fuel' in local_match
     assert '"steer_sensitivity": float(weapon.get("steer_sensitivity", 300.0))' in local_match
     assert "inherited_velocity := Vector2.ZERO" in local_match
     assert "velocity_override: Variant = null" in local_match
     assert "+ inherited_velocity" in local_match
-    assert "_player.launch_velocity(_player.gun_power, speed_multiplier)" in local_match
-    assert "_enemy.launch_velocity(_enemy.gun_power, speed_multiplier)" in local_match
+    assert 'tank.call("launch_velocity"' in local_match
     assert "velocity = Vector2(velocity_override)" in local_match
     assert "func _update_machine_gun_projectile" in local_match
-    assert "func _machine_gun_projectile_waits" in local_match
+    assert "func _machine_gun_projectile_position_at" in local_match
+    assert "func _machine_gun_projectile_delta" in local_match
     assert "func _apply_machine_gun_damage" in local_match
     assert "func _finish_machine_gun_volley_if_needed" in local_match
+    assert "func _begin_player_machine_gun_fire" in local_match
+    assert "func _begin_enemy_machine_gun_fire" in local_match
+    assert "func _update_machine_gun_fire" in local_match
+    assert "func _spawn_machine_gun_round" in local_match
+    assert "func _spawn_player_machine_gun_round" in local_match
+    assert "func _unselect_machine_gun_and_cycle" in local_match
+    assert "func _cancel_machine_gun_before_first_shot" in local_match
+    assert "func _stop_machine_gun_after_lethal_hit" in local_match
+    assert "func _expire_pending_machine_gun_rounds" in local_match
+    assert "func _machine_gun_ai_burst_budget" in local_match
+    assert "func _machine_gun_cooldown_time" in local_match
+    assert "func _machine_gun_launch_power" in local_match
+    assert "Machine Gun unselected. Weapon selected: %s." in local_match
+    assert "_machine_gun_active" in local_match
+    assert "_machine_gun_player_owned" in local_match
+    assert "_machine_gun_ai_burst_remaining" in local_match
+    assert 'inventory.call("consume_ammo", weapon_name, WeaponInventory.DEFAULT_AMMO_SPEND)' in local_match
     assert "func _has_projectile_kind" in local_match
     assert '"back_position": origin' in local_match
+    assert '"launch_position": origin' in local_match
+    assert '"launch_velocity": velocity' in local_match
     assert 'weapon.get("volley", WeaponInventory.MACHINE_GUN_VOLLEY)' in local_match
     assert 'weapon.get("cooldown", WeaponInventory.MACHINE_GUN_COOLDOWN)' in local_match
+    assert "_machine_gun_cooldown = _machine_gun_cooldown_time(_machine_gun_weapon)" in local_match
+    assert "while _machine_gun_cooldown < 0.0 and _machine_gun_fire_held:" in local_match
+    assert "var frame_delay: float = max(0.0, delta + _machine_gun_cooldown)" in local_match
+    assert '_projectiles[_projectiles.size() - 1]["delay"] = frame_delay' in local_match
+    assert '_cancel_machine_gun_before_first_shot(_message)' in local_match
+    assert '_cancel_machine_gun_before_first_shot("Machine Gun cancelled.")' in local_match
     assert '"delay"' in local_match
+    assert "WeaponInventory.MACHINE_GUN_CLASSIC_POWER" in local_match
     assert 'draw_line(back_position, projectile_position, Color.WHITE, 2.0)' in local_match
+    assert "_add_score_for_owner(owner, damage)" in local_match
     assert "machine_gun" in local_match
     assert "missile" in local_match
     assert "_credits" in local_match
+    assert "var _enemy_score := 0" in local_match
     assert "PHASE_PROJECTILE" in local_match
     assert "PHASE_SHOP" in local_match
     assert "func _fire_ai" in local_match
     assert "func _choose_ai_shot" in local_match
     assert "func _choose_ai_weapon" in local_match
+    assert "func _ai_weapon_candidates" in local_match
+    assert "func _ai_weapon_projection" in local_match
+    assert "func _ai_expected_player_damage" in local_match
+    assert "func _ai_expected_self_damage" in local_match
+    assert "func _ai_hit_quality" in local_match
+    assert "func _ai_weapon_score_threshold" in local_match
+    assert "func _ai_self_damage_weight" in local_match
+    assert "func _ai_nuke_health_threshold" in local_match
+    assert "AI_KILL_BONUS" in local_match
+    assert 'inventory.call("ammo_for"' in local_match
     assert "AI_DIFFICULTY_EASY" in local_match
     assert "AI_DIFFICULTY_HARD" in local_match
     assert "WIND_MIN" in local_match
@@ -481,12 +845,73 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "QUAKE_TIME_TILL_FIRST := 90.0" in local_match
     assert "QUAKE_TIME_BETWEEN := 30.0" in local_match
     assert 'preload("res://assets/quake.wav")' in local_match
+    assert 'preload("res://assets/jumpjets.wav")' in local_match
+    assert 'preload("res://assets/fireshell.wav")' in local_match
+    assert 'preload("res://assets/launchmissile.wav")' in local_match
+    assert 'preload("res://assets/missile.wav")' in local_match
+    assert 'preload("res://assets/machinegun.wav")' in local_match
+    assert 'preload("res://assets/nuke.wav")' in local_match
     assert "func _build_quake_audio" in local_match
+    assert "func _build_jump_jets_audio" in local_match
+    assert "func _build_fire_shell_audio" in local_match
+    assert "func _build_launch_missile_audio" in local_match
+    assert "func _build_missile_flight_audio" in local_match
+    assert "func _build_machine_gun_audio" in local_match
+    assert "func _build_nuke_audio" in local_match
     assert "quake_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
+    assert "jump_jets_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
+    assert "fire_shell_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
+    assert "launch_missile_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
+    assert "missile_flight_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
+    assert "machine_gun_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
+    assert "nuke_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
     assert "func _play_quake_audio" in local_match
     assert "func _stop_quake_audio" in local_match
+    assert "func _play_jump_jets_audio" in local_match
+    assert "func _stop_jump_jets_audio" in local_match
+    assert "func _tank_can_boost" in local_match
+    assert "func _play_fire_shell_audio" in local_match
+    assert "func _stop_fire_shell_audio" in local_match
+    assert "func _play_launch_missile_audio" in local_match
+    assert "func _stop_launch_missile_audio" in local_match
+    assert "func _play_missile_flight_audio" in local_match
+    assert "func _stop_missile_flight_audio" in local_match
+    assert "func _sync_missile_flight_audio" in local_match
+    assert "func _play_weapon_launch_audio" in local_match
+    assert "func _play_machine_gun_audio" in local_match
+    assert "func _stop_machine_gun_audio" in local_match
+    assert "func _play_nuke_audio" in local_match
+    assert "func _stop_nuke_audio" in local_match
+    assert "func _exit_tree" in local_match
+    assert '_stop_quake_audio()' in local_match
+    assert '_stop_jump_jets_audio()' in local_match
+    assert '_stop_fire_shell_audio()' in local_match
+    assert '_stop_launch_missile_audio()' in local_match
+    assert '_stop_missile_flight_audio()' in local_match
+    assert '_stop_machine_gun_audio()' in local_match
+    assert '_stop_nuke_audio()' in local_match
     assert "_quake_active" in local_match
     assert "_quake_countdown" in local_match
+    assert "_jump_jets_active" in local_match
+    assert "var _jump_jets_audio: AudioStreamPlayer" in local_match
+    assert "var _fire_shell_audio: AudioStreamPlayer" in local_match
+    assert "var _launch_missile_audio: AudioStreamPlayer" in local_match
+    assert "var _missile_flight_audio: AudioStreamPlayer" in local_match
+    assert "var _machine_gun_audio: AudioStreamPlayer" in local_match
+    assert "var _nuke_audio: AudioStreamPlayer" in local_match
+    assert 'FireShellAudio' in local_match
+    assert 'JumpJetsAudio' in local_match
+    assert 'LaunchMissileAudio' in local_match
+    assert 'MissileFlightAudio' in local_match
+    assert 'MachineGunAudio' in local_match
+    assert 'NukeAudio' in local_match
+    assert "_play_weapon_launch_audio(kind)" in local_match
+    assert '_play_launch_missile_audio()' in local_match
+    assert '_play_fire_shell_audio()' in local_match
+    assert "_play_machine_gun_audio()" in local_match
+    assert "_stop_machine_gun_audio()" in local_match
+    assert "_play_jump_jets_audio()" in local_match
+    assert "_play_nuke_audio()" in local_match
     assert "func _update_quake" in local_match
     assert "_terrain.drop_terrain(delta * QUAKE_DROP_RATE)" in local_match
     assert '"quake_active": _quake_active' in local_match
@@ -500,31 +925,158 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _distance_to_segment" in local_match
     assert "func _terrain_collision" in local_match
     assert "ground_collision" in local_match
+    assert "func _segment_tank_hit_owner" in local_match
+    assert 'ignored_owner := ""' in local_match
+    assert "if owner == ignored_owner:" in local_match
+    assert "func _segment_tank_hit_fraction" in local_match
     assert "func _apply_explosion" in local_match
+    assert "direct_hit_owner" in local_match
+    assert "func _explosion_damage_for_target" in local_match
+    assert "_add_score_for_owner(owner, target_damage)" in local_match
     assert "func _weapon_white_out" in local_match
     assert "func _draw_whiteout_overlay" in local_match
     assert "func _whiteout_alpha" in local_match
     assert "NUKE_WHITEOUT_FADE_RATE := 0.6" in local_match
     assert "_spawn_explosion(position, blast_radius, _weapon_white_out(weapon))" in local_match
     assert '"white_out_level": 1.0 if white_out else 0.0' in local_match
-    assert "if _enemy.state == TankState.STATE_DEAD" in local_match
-    assert "elif _player.state == TankState.STATE_DEAD" in local_match
+    assert "var living := _living_participant_indices()" in local_match
+    assert "if living.size() <= 1:" in local_match
     assert "func _start_next_turn_or_round" in local_match
     assert "func _fire" in local_match
     assert "LocalMatchHud" in local_match
     assert "LocalMatchShop" in local_match
+    assert 'PHASE_SCORE := "score"' in local_match
+    assert 'PHASE_WINNER := "winner"' in local_match
+    assert "func _build_score_overlay" in local_match
+    assert "ScoreOverlay" in local_match
+    assert '"Scoring for Round"' in local_match
+    assert "Continue to Shop" in local_match
+    assert "func _open_round_score" in local_match
+    assert "func _apply_classic_round_rewards" in local_match
+    assert "_score_round_details[owner]" in local_match
+    assert "_score_round_credits[owner]" in local_match
+    assert "_participant_is_leader_owner(defeated_owner)" in local_match
+    assert "Defeated %s leader +%d" in local_match
+    assert "Survived +%d" in local_match
+    assert "func _score_rows_snapshot" in local_match
+    assert "rows.sort_custom(_score_row_before)" in local_match
+    assert '"Round %d of %d  %d players  %s"' in local_match
+    assert "func _score_rank_label" in local_match
+    assert "func _score_round_detail_for" in local_match
+    assert "func _score_activation_delay" in local_match
+    assert "func _winner_activation_delay" in local_match
+    assert "func _update_modal_activation" in local_match
+    assert "func _refresh_score_continue_button" in local_match
+    assert "_score_continue_button.disabled = _score_continue_delay > 0.0" in local_match
+    assert "_shop_input_delay = SHOP_INITIAL_INPUT_DELAY" in local_match
+    assert "_shop_input_delay = SHOP_ACTION_INPUT_DELAY" in local_match
+    assert '"input_locked": _shop_input_delay > 0.0' in local_match
+    assert "func _continue_from_score" in local_match
+    assert "if _score_continue_delay > 0.0:" in local_match
+    assert "_update_leader_flags()" in local_match
+    assert "func _hide_score_overlay" in local_match
+    assert "func _build_winner_overlay" in local_match
+    assert "func _wire_single_button_focus" in local_match
+    assert "button.focus_neighbor_left = path" in local_match
+    assert "button.focus_neighbor_right = path" in local_match
+    assert 'or event.is_action_pressed("ui_cancel")' in local_match
+    assert "WinnerOverlay" in local_match
+    assert "var _winner_heading_label: Label" in local_match
+    assert '_winner_heading_label.text = "Final Result"' in local_match
+    assert 'const MENU_TILE := preload("res://assets/menuback.png")' in local_match
+    assert 'var backdrop := Control.new()' in local_match
+    assert '"WinnerMenuBackground"' in local_match
+    assert "TextureRect.STRETCH_TILE" in local_match
+    assert "GroundfireTheme.COLOR_MENU_TILE_TINT" in local_match
+    assert "WINNER_BACKGROUND_SCROLL_SPEED := 0.1" in local_match
+    assert "func _update_winner_background" in local_match
+    assert "_winner_background_scroll += delta * WINNER_BACKGROUND_SCROLL_SPEED" in local_match
+    assert "_winner_background.offset_left = -offset.x" in local_match
+    assert "func _open_winner_overlay" in local_match
+    assert "func _winner_rows_snapshot" in local_match
+    assert "func _refresh_winner_continue_button" in local_match
+    assert "_winner_main_menu_button.disabled = _winner_continue_delay > 0.0" in local_match
+    assert "_winner_main_menu_button.visible = false" in local_match
+    assert "_winner_main_menu_button.focus_mode = Control.FOCUS_NONE" in local_match
+    assert "_winner_main_menu_button.grab_focus.call_deferred()" not in local_match
+    assert 'row["winner"] = int(row.get("score", 0)) == top_score' in local_match
+    assert "Pygame WinnerMenu shows only winner cards" in local_match
+    assert "_winner_summary_label.visible = false" in local_match
+    assert "_winner_rows_container.visible = false" in local_match
+    assert "func _winner_card_snapshots" in local_match
+    assert '"Final result after %d rounds  %d players  Top score %d"' not in local_match
+    assert "Continue to Final Result" in local_match
+    assert "We have a winner!" in local_match
+    assert "It's a tie!" in local_match
+    assert "func _is_final_round" in local_match
     assert "func _build_shop_overlay" in local_match
     assert "func _open_post_round_shop" in local_match
     assert "func _refresh_shop_overlay" in local_match
     assert "func _buy_shop_weapon" in local_match
+    assert "func _buy_jump_jet" in local_match
+    assert '"Need $%d for %s."' in local_match
+    assert "func _shop_items_snapshot" in local_match
+    assert "func _prepare_shop_pass" in local_match
+    assert "func _current_shop_participant_index" in local_match
+    assert "func _advance_shop_participant" in local_match
+    assert "func _shop_participant_name" in local_match
+    assert "func _shop_inventory" in local_match
+    assert "func _shop_credits" in local_match
+    assert "func _set_shop_credits" in local_match
+    assert "func _shop_fuel_reserve" in local_match
+    assert "func _add_shop_fuel_reserve" in local_match
+    assert 'SHOP_JUMP_JET := "Jump Jet"' in local_match
+    assert "SHOP_JUMP_JET_COST := 50" in local_match
+    assert "_add_shop_fuel_reserve(shopper_index, TankState.TANK_FUEL_PURCHASE_AMOUNT)" in local_match
+    assert '"%d%% reserve"' in local_match
     assert "func _continue_from_shop" in local_match
+    assert "func _finish_shop_and_start_next_round" in local_match
+    assert "func _complete_computer_shop_passes" in local_match
+    assert "func _run_computer_shop_for_participant" in local_match
+    assert "func _computer_shop_priority" in local_match
+    assert "_run_computer_shop_for_participant(shopper_index)" in local_match
+    assert '"%s bought %s."' in local_match
     assert "continue_requested.connect" in local_match
     assert "buy_requested.connect" in local_match
     assert '"reward": _shop_reward' in local_match
+    assert '"round": min(_round + 1, _total_rounds)' in local_match
+    assert '"total_rounds": _total_rounds' in local_match
+    assert '"shopper_name": _shop_participant_name(shopper_index)' in local_match
+    assert '"fuel_reserve": int(round(_shop_fuel_reserve(shopper_index) * 100.0))' in local_match
+    assert '"shop_items": _shop_items_snapshot()' in local_match
+    assert '"player_fuel_max": int(TankState.TANK_FULL_FUEL * 100.0)' in local_match
+    assert '"player_fuel_reserve": int(round(float(active_tank.get("fuel_reserve")) * 100.0))' in local_match
+    assert '"target_name": str(target_tank.get("name"))' in local_match
+    assert '"target_hp": int(target_tank.get("health"))' in local_match
+    assert '"target_wins": _participant_wins(_target_index)' in local_match
+    assert '"participant_summary": _participant_hud_summary()' in local_match
+    assert '"participants": _participant_rows_snapshot()' in local_match
+    assert '"active_index": _turn_index' in local_match
+    assert '"target_index": _target_index' in local_match
+    assert '"health": tank_health' in local_match
+    assert '"fuel": tank_fuel' in local_match
+    assert '"weapon": weapon_name' in local_match
+    assert "func _draw_tank_gun_arrow" in local_match
+    assert "func _tank_gun_arrow_geometry" in local_match
+    assert 'tank.call("tank_center")' in local_match
+    assert "var shaft_start := center + direction * TANK_GUN_ARROW_START_OFFSET" in local_match
+    assert "var head_tip := center + direction * (arrow_length * TANK_GUN_ARROW_HEAD_TIP_SCALE)" in local_match
+    assert '"shaft_polygon": PackedVector2Array' in local_match
+    assert '"head_polygon": PackedVector2Array' in local_match
+    assert 'Color("#00ff0080")' in local_match
+    assert "func _tank_weapon_ready" in local_match
     assert "func set_snapshot" in hud
     assert '"player_wins"' in hud
     assert '"player_name"' in hud
     assert '"enemy_name"' in hud
+    assert '"target_name"' in hud
+    assert '"target_hp"' in hud
+    assert '"target_wins"' in hud
+    assert '"participant_summary"' in hud
+    assert 'str(_snapshot.get("target_name", _snapshot.get("enemy_name", "Enemy")))' in hud
+    assert '"player_fuel_max"' in hud
+    assert '"player_fuel_reserve"' in hud
+    assert '"Reserve"' in hud
     assert '"ammo"' in hud
     assert '"credits"' in hud
     assert '"inventory"' in hud
@@ -540,6 +1092,12 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "INVENTORY_CHIP_WIDTH" in hud
     assert "func _draw_turn_banner" in hud
     assert "func _draw_gauge_row" in hud
+    assert "ANGLE_MIN := -75.0" in hud
+    assert "ANGLE_MAX := 75.0" in hud
+    assert "POWER_MIN := 1.0" in hud
+    assert "POWER_MAX := 20.0" in hud
+    assert '"angle": 0' in hud
+    assert '"power": 10' in hud
     assert "func _draw_score_row" in hud
     assert "func _draw_value_chip" in hud
     assert "func _draw_gauge" in hud
@@ -555,6 +1113,13 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"Wind -> %d"' in hud
     assert "func _quake_label" in hud
     assert '"Quake!"' in hud
+    assert "CLASSIC_HUD_SPACING := 2.5" in hud
+    assert "CLASSIC_PANEL_COLOR := Color8(128, 230, 153, 76)" in hud
+    assert "func _draw_classic_tank_hud" in hud
+    assert "func _draw_classic_weapon_graphic" in hud
+    assert "func _classic_health_color" in hud
+    assert "func _classic_fuel_color" in hud
+    assert "func _world_to_screen" in hud
     assert "func rebuild_with_seed" in terrain
     assert "func apply_crater" in terrain
     assert "func drop_terrain" in terrain
@@ -565,9 +1130,34 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "var _chunks: Array" in terrain
     assert "func _clip_slice" in terrain
     assert "func _subtract_interval" in terrain
+    assert "func _should_skip_linked_superblock_clip" in terrain
+    assert "func _blast_state_at_point" in terrain
+    assert "func _clamped_blast_interval_for_chunk_side" in terrain
+    assert "func _bottom_blast_state_for_chunk_side" in terrain
+    assert "_world_height_to_screen(CLASSIC_MIN_LAND_HEIGHT)" in terrain
+    assert "func _align_clipped_side_parts" in terrain
+    assert "func _split_single_part_to_match" in terrain
     assert "func _vertical_color_at" in terrain
     assert "func _refresh_chunk_colors" in terrain
+    assert "func _parts_preserve_chunk_bottom" in terrain
+    assert "func _apply_detached_motion" in terrain
+    assert "func _start_detached_fall" in terrain
+    assert "func _apply_chunk_motion" in terrain
+    assert "func _propagate_removed_linked_top" in terrain
+    assert "func _superblock_start" in terrain
+    assert "func _superblock_motion_for_index" in terrain
+    assert 'elif bool(superblock_motion.get("falling", false))' in terrain
+    assert "support_cut" in terrain
     assert "func _superblock_landing_gap" in terrain
+    assert "func _superblock_landing_gaps" in terrain
+    assert "func _settle_landed_superblock" in terrain
+    assert "func _chunk_motion" in terrain
+    assert "func _move_chunk_edges" in terrain
+    assert "func _move_superblock_edges" in terrain
+    assert "left_fall_amount" in terrain
+    assert "right_fall_amount" in terrain
+    assert "var next_speed: float" in terrain
+    assert "speed + _fall_acceleration * delta" in terrain
     assert "func _merge_resting_superblocks" in terrain
     assert '"fill_color"' in terrain
     assert "func _landing_gap" in terrain
@@ -579,6 +1169,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"falling"' in terrain
     assert "_fall_acceleration" in terrain
     assert "func polygon_points" in terrain
+    assert "func move_to_ground" in terrain
+    assert "func _chunk_state_at_offset" in terrain
     assert "func slope_angle_at" in terrain
     assert "_terrain.update(delta)" in local_match
     assert "chunk_polygons" in local_match
@@ -602,50 +1194,68 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "_screen_shake_enabled" in local_match
     assert "_camera_smoothing" in local_match
     assert "_mouse_aim_enabled" in local_match
+    assert "var _mouse_aim_enabled := false" in local_match
     assert "_mouse_world_position" in local_match
     assert "projectile_velocity.normalized()" in local_match
     assert "_add_camera_shake(crater_radius)" in local_match
     assert "draw_set_transform" in local_match
     assert "position.x > _world_size.x" in local_match
+    assert "var clamped_x: float = clampf(position.x, 0.0, _world_size.x)" in local_match
+    assert "_terrain.height_at(clamped_x)" in local_match
+    assert "position.y > _world_size.y + PROJECTILE_WORLD_MARGIN" in local_match
     assert "func move_on_terrain" in tank
+    assert "func _ground_position_for_query" in tank
+    assert 'terrain.has_method("move_to_ground")' in tank
     assert "func boost" in tank
     assert "func update_gun" in tank
-    assert "GUN_ANGLE_MIN := 5.0" in tank
-    assert "GUN_ANGLE_MAX := 175.0" in tank
-    assert "GUN_ANGLE_DEFAULT := 45.0" in tank
+    assert "GUN_ANGLE_MIN := -75.0" in tank
+    assert "GUN_ANGLE_MAX := 75.0" in tank
+    assert "GUN_ANGLE_DEFAULT := 0.0" in tank
     assert "GUN_ANGLE_CHANGE_ACCELERATION := 60.0" in tank
     assert "GUN_ANGLE_MAX_CHANGE_SPEED := 75.0" in tank
-    assert "GUN_POWER_MIN := 5.0" in tank
-    assert "GUN_POWER_MAX := 100.0" in tank
-    assert "GUN_POWER_DEFAULT := 55.0" in tank
+    assert "GUN_POWER_MIN := 1.0" in tank
+    assert "GUN_POWER_MAX := 20.0" in tank
+    assert "GUN_POWER_DEFAULT := 10.0" in tank
+    assert "GUN_POWER_PIXEL_SCALE := 5.5" in tank
     assert "GUN_POWER_CHANGE_ACCELERATION := 20.0" in tank
     assert "GUN_POWER_MAX_CHANGE_SPEED := 50.0" in tank
     assert "TANK_MAX_HEALTH := 100" in tank
     assert "TANK_FULL_FUEL := 1.0" in tank
+    assert "TANK_FUEL_PURCHASE_AMOUNT := 1.0" in tank
+    assert "fuel_capacity := TANK_FULL_FUEL" in tank
+    assert "fuel_reserve := TANK_FULL_FUEL" in tank
+    assert "func add_fuel_capacity" in tank
+    assert "func add_fuel_reserve" in tank
+    assert "func _spend_fuel" in tank
     assert "gun_angle = GUN_ANGLE_DEFAULT" in tank
     assert "gun_power = GUN_POWER_DEFAULT" in tank
     assert "health = TANK_MAX_HEALTH" in tank
-    assert "fuel = TANK_FULL_FUEL" in tank
+    assert "fuel = min(TANK_FULL_FUEL, fuel_reserve)" in tank
+    assert '"fuel_reserve": fuel_reserve' in tank
     assert "GUN_ANGLE_MIN, GUN_ANGLE_MAX" in tank
     assert "GUN_POWER_MIN, GUN_POWER_MAX" in tank
-    assert "TANK_BOOST_ACCELERATION := 280.0" in tank
+    assert "TANK_BOOST_ACCELERATION := 133.0" in tank
     assert "BOOST_FUEL_USAGE_RATE := 0.2" in tank
     assert "BOOST_TURN_RATE := 90.0" in tank
     assert "BOOST_TURN_LIMIT := 15.0" in tank
-    assert "TANK_AIR_GRAVITY := 200.0" in tank
+    assert "TANK_AIR_GRAVITY := 95.0" in tank
     assert "TANK_GROUND_DETACH_THRESHOLD := 2.0" in tank
     assert "TANK_MOVE_SPEED := 74.0" in tank
-    assert "TANK_AIR_CONTROL_ACCELERATION := 60.0" in tank
-    assert "TANK_GROUND_FUEL_USAGE_RATE := 0.13" in tank
-    assert "TANK_AIR_STEER_FUEL_USAGE_RATE := 0.08" in tank
     assert "TANK_SLOPE_DRAG_SCALE := 65.0" in tank
     assert "TANK_MIN_SLOPE_MOVE_FACTOR := 0.35" in tank
     assert "TANK_PASSIVE_SLIDE_THRESHOLD := 30.0" in tank
+    assert "TANK_BODY_HALF_WIDTH := 26.0" in tank
+    assert "TANK_CENTER_OFFSET := TANK_BODY_HALF_WIDTH * 0.5" in tank
+    assert "GUN_LAUNCH_OFFSET := TANK_BODY_HALF_WIDTH * 1.2" in tank
     assert "airborne_velocity.y += TANK_AIR_GRAVITY * delta" in tank
     assert "ground_position.y > position.y + TANK_GROUND_DETACH_THRESHOLD" in tank
     assert "func _apply_passive_slope_slide" in tank
     assert "abs(ground_angle) <= TANK_PASSIVE_SLIDE_THRESHOLD" in tank
-    assert "sign(ground_angle) * slide_speed * delta" in tank
+    assert "var horizontal_delta: float = cos(deg_to_rad(ground_angle)) * slide_speed * delta" in tank
+    assert "position.x - sign(ground_angle) * horizontal_delta" in tank
+    assert "if not on_ground:\n\t\treturn" in tank
+    assert "var track_delta: float = (direction + slope_term) * TANK_MOVE_SPEED * delta" in tank
+    assert "position.x + cos(deg_to_rad(tank_angle)) * track_delta" in tank
     assert "func _constrain_to_terrain_bounds" in tank
     assert 'terrain.has_method("playable_bounds")' in tank
     assert "var bounds: Vector2 = terrain.playable_bounds()" in tank
@@ -657,10 +1267,44 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "gun_angle_change_speed = 0.0" in tank
     assert "gun_power_change_speed = 0.0" in tank
     assert "func aim_at" in tank
+    assert "func gun_direction" in tank
+    assert "func tank_center" in tank
+    assert "-sin(radians) * TANK_CENTER_OFFSET" in tank
+    assert "return tank_center() + gun_direction() * GUN_LAUNCH_OFFSET" in tank
     assert "func launch_velocity" in tank
-    assert "return airborne_velocity + Vector2(cos(radians), -sin(radians)) * power * speed_multiplier" in tank
+    assert "return airborne_velocity + gun_direction() * power * GUN_POWER_PIXEL_SCALE * speed_multiplier" in tank
     assert "func apply_damage" in tank
     assert "health < 0 and state == STATE_ALIVE" in tank
+    assert "GROUND_SMOKE_RELEASE_TIME := 1.0" in tank
+    assert "AIR_SMOKE_RELEASE_TIME := 0.05" in tank
+    assert "SMOKE_TEXTURE_ID := 5" in tank
+    assert "GROUND_SMOKE_Y_OFFSET := 0.2" in tank
+    assert "SMOKE_Y_VELOCITY := 0.5" in tank
+    assert "SMOKE_ROTATION_RATE := 0.1" in tank
+    assert "GROUND_SMOKE_GROWTH_RATE := 0.3" in tank
+    assert "GROUND_SMOKE_FADE_RATE := 0.15" in tank
+    assert "AIR_SMOKE_FADE_RATE := 0.3" in tank
+    assert "BOOST_SMOKE_RELEASE_TIME := 0.05" in tank
+    assert "BOOST_SMOKE_TEXTURE_ID := 2" in tank
+    assert "BOOST_SMOKE_VELOCITY := 2.0" in tank
+    assert "BOOST_SMOKE_FADE_RATE := 2.5" in tank
+    assert "var exhaust_time := 0.0" in tank
+    assert "exhaust_time = -0.5" in tank
+    assert "func _update_smoke_particles" in local_match
+    assert "func _update_tank_burn_smoke" in local_match
+    assert "func _emit_tank_burn_smoke" in local_match
+    assert "func _emit_jump_jet_smoke" in local_match
+    assert (GODOT_ROOT / "assets" / "smoke.png").exists()
+    assert 'preload("res://assets/smoke.png")' in local_match
+    assert "func _draw_smoke_particle" in local_match
+    assert "func _smoke_particle_draw_points" in local_match
+    assert "func _smoke_particle_draw_uvs" in local_match
+    assert "draw_polygon(" in local_match
+    assert "SMOKE_TEXTURE" in local_match
+    assert 'draw_circle(Vector2(smoke.get("position", Vector2.ZERO))' not in local_match
+    assert "TankState.GROUND_SMOKE_RELEASE_TIME if on_ground else TankState.AIR_SMOKE_RELEASE_TIME" in local_match
+    assert "TankState.BOOST_SMOKE_TEXTURE_ID" in local_match
+    assert "TankState.BOOST_SMOKE_VELOCITY * TankState.GUN_POWER_PIXEL_SCALE" in local_match
     assert "const MACHINE_GUN" in weapons
     assert "const NUKE" in weapons
     assert '"kind": "mirv"' in weapons
@@ -672,6 +1316,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"spread": MIRV_SPREAD' in weapons
     assert '"fuel": 3.0' in weapons
     assert '"steer_sensitivity": 300.0' in weapons
+    assert '"powered_speed": MISSILE_CLASSIC_SPEED' in weapons
     assert '"damage": 2' in weapons
     assert '"blast": 0.0' in weapons
     assert '"direct_damage": true' in weapons
@@ -679,10 +1324,26 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "MACHINE_GUN_ROUND_AMMO := 50" in weapons
     assert "MACHINE_GUN_VOLLEY := 5" in weapons
     assert "MACHINE_GUN_COOLDOWN := 0.1" in weapons
+    assert "MACHINE_GUN_SHOP_PACK := 50" in weapons
+    assert "MACHINE_GUN_TRACER_GRAVITY := 190.0" in weapons
+    assert "MACHINE_GUN_CLASSIC_POWER := 25.0" in weapons
+    assert "MIRV_MIN_FRAGMENT_SPREAD_SPEED := 0.0" in weapons
+    assert "MIRV_SHOP_PACK := 1" in weapons
+    assert "MISSILE_SHOP_PACK := 5" in weapons
+    assert "MISSILE_CLASSIC_SPEED := 9.0" in weapons
+    assert "NUKE_SHOP_PACK := 1" in weapons
     assert '"ammo": MACHINE_GUN_ROUND_AMMO' in weapons
+    assert '"shop_pack": MACHINE_GUN_SHOP_PACK' in weapons
     assert '"cooldown": MACHINE_GUN_COOLDOWN' in weapons
+    assert '"tracer_gravity": MACHINE_GUN_TRACER_GRAVITY' in weapons
+    assert '"launch_power": MACHINE_GUN_CLASSIC_POWER' in weapons
+    assert '"min_fragment_spread_speed": MIRV_MIN_FRAGMENT_SPREAD_SPEED' in weapons
     assert '"white_out": true' in weapons
     assert "func consume_current" in weapons
+    assert "func consume_current_amount" in weapons
+    assert "func consume_ammo" in weapons
+    assert "func select_shell" in weapons
+    assert "select_shell()" in weapons
     assert '"volley": MACHINE_GUN_VOLLEY' in weapons
     assert 'current().get("volley", DEFAULT_AMMO_SPEND)' in weapons
     assert "func ammo_for" in weapons
@@ -691,20 +1352,57 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func has_ammo" in weapons
     assert "func weapon_cost" in weapons
     assert "func ammo_pack_size" in weapons
+    assert 'weapon.get("shop_pack", weapon.get("ammo", 0))' in weapons
     assert "func add_ammo" in weapons
     assert "func inventory_snapshot" in weapons
     assert '"selected"' in weapons
-    assert '"inventory": _inventory.inventory_snapshot()' in local_match
+    assert '"inventory": _shop_inventory(shopper_index).inventory_snapshot()' in local_match
     assert "signal continue_requested" in shop
     assert "signal buy_requested" in shop
     assert "func refresh" in shop
     assert "func _rebuild_weapon_rows" in shop
     assert "var _focus_buttons: Array[Button]" in shop
     assert "func _wire_vertical_focus" in shop
+    assert "func _remember_shop_focus" in shop
+    assert "func _restore_shop_focus" in shop
+    assert '"shop_focus_name"' in shop
+    assert 'var input_locked := bool(_state.get("input_locked", false))' in shop
+    assert "_continue_button.disabled = input_locked" in shop
+    assert "buy_button.disabled = input_locked or cost <= 0 or credits < cost" in shop
+    assert "buy_button.disabled = input_locked or item_cost <= 0 or credits < item_cost" in shop
     assert "focus_neighbor_top" in shop
     assert "focus_neighbor_bottom" in shop
-    assert '"Credits %d"' in shop
-    assert '"Buy %d"' in shop
+    assert "focus_neighbor_left" in shop
+    assert "focus_neighbor_right" in shop
+    assert '"Round %d of %d  Score %d  Reward %d"' in shop
+    assert '"%s  Money %s  Fuel reserve %d%%"' in shop
+    assert "Fuel reserve %d%%" in shop
+    assert "func _format_money" in shop
+    assert 'return "$%d" % value' in shop
+    assert 'CLASSIC_BUY_ACTION_LABEL := "Buy"' in shop
+    assert "_shop_button(CLASSIC_BUY_ACTION_LABEL)" in shop
+    assert "Pack %s" in shop
+    assert "func _cost_cell" in shop
+    assert "CLASSIC_SHOP_DISPLAY_NAMES" in shop
+    assert '"MIRV": "Mirvs"' in shop
+    assert '"Missile": "Missiles"' in shop
+    assert '"Nuke": "Nukes"' in shop
+    assert "func _catalog_display_name" in shop
+    assert "label.text = _format_money(cost)" in shop
+    assert "row.add_child(_cost_cell(cost))" in shop
+    assert "row.add_child(_cost_cell(item_cost))" in shop
+    assert "func _format_pack" in shop
+    assert '"shop_items"' in shop
+    assert "Current %s" in shop
+    assert "DISABLED_CLASSIC_ITEMS" in shop
+    assert '"Rolling Mines"' in shop
+    assert '"Airstrike"' in shop
+    assert '"Death\'s Head"' in shop
+    assert '"Hover Coil"' in shop
+    assert '"Corbomite"' in shop
+    assert "func _add_disabled_catalog_rows" in shop
+    assert "func _disabled_shop_items" in shop
+    assert '"Locked"' in shop
     assert "continue_requested.emit()" in shop
     assert "buy_requested.emit(captured_name)" in shop
     assert 'TRANSPORT_WEBSOCKET := "websocket"' in network
@@ -746,6 +1444,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func last_sequence" in websocket
     assert "_closed_reported" in websocket
     assert "NetworkAdapter.hello_message()" in websocket
+    assert "func _exit_tree" in websocket
+    assert 'NetworkAdapter.disconnect_message("node_exit")' in websocket
     assert (GODOT_ROOT / "scenes" / "online_match.tscn").exists()
     assert (GODOT_ROOT / "tests" / "terrain_collision_check.gd").exists()
 
@@ -763,8 +1463,21 @@ def test_online_match_scene_consumes_websocket_snapshots_and_sends_input():
     assert "func _fail_server_error" in script
     assert "func _is_protocol_error" in script
     assert "func _send_join_after_hello" in script
+    assert "func _exit_tree" in script
+    assert '_websocket_client.disconnect_from_endpoint("online_match_exit")' in script
     assert "_auth_token" in script
     assert 'str(_entry.get("auth_token", ""))' in script
+    assert "_session_token_url" in script
+    assert 'str(_entry.get("session_token_url", ""))' in script
+    assert "func _request_session_token" in script
+    assert "func _on_session_token_request_completed" in script
+    assert "func _session_token_request_url" in script
+    assert "func _has_session_auth_token" in script
+    assert "_session_token_received = true" in script
+    assert "Cache-Control: no-store" in script
+    assert "player_name=%s" in script
+    assert '"Session token received."' in script
+    assert '"Join failed: session token response was cacheable."' in script
     assert "HELLO_TIMEOUT" in script
     assert "_server_protocol_ready" in script
     assert "_server_protocol_status" in script
@@ -778,6 +1491,7 @@ def test_online_match_scene_consumes_websocket_snapshots_and_sends_input():
     assert "send_input" in script
     assert "gf_aim_left" in script
     assert "gf_weapon_next" in script
+    assert "gf_shield" in script
     assert "func _draw_replicated_world" in script
     assert "func _draw_terrain_profile" in script
     assert "func _draw_entities" in script
@@ -792,10 +1506,18 @@ def test_online_match_scene_consumes_websocket_snapshots_and_sends_input():
     assert "RECONNECT_MAX_ATTEMPTS" in script
     assert "PING_INTERVAL" in script
     assert "PREDICTION_MOVE_STEP" in script
+    assert "INTERPOLATION_RATE" in script
+    assert "LOCAL_RECONCILE_RATE" in script
+    assert "PROJECTILE_EXTRAPOLATION_SECONDS" in script
     assert "func _schedule_reconnect" in script
     assert "func _update_reconnect" in script
     assert '"Reconnect"' in script
     assert '"Back"' in script
+    assert "func _wire_overlay_focus" in script
+    assert "_manual_reconnect_button.focus_neighbor_left = back_path" in script
+    assert "_manual_reconnect_button.focus_neighbor_top = reconnect_path" in script
+    assert "_back_button.focus_neighbor_right = reconnect_path" in script
+    assert "_manual_reconnect_button.grab_focus.call_deferred()" in script
     assert "func _manual_reconnect" in script
     assert "func _return_to_main_menu" in script
     assert 'disconnect_from_endpoint("manual_reconnect")' in script
@@ -803,6 +1525,8 @@ def test_online_match_scene_consumes_websocket_snapshots_and_sends_input():
     assert "func _draw_network_diagnostics" in script
     assert "func _ingest_acknowledgements" in script
     assert "func _apply_local_prediction" in script
+    assert "_last_prediction_error" in script
+    assert '"prediction error: %.2f"' in script
     assert "_last_latency_ms" in script
     assert "_pending_commands" in script
     assert "acknowledged_command_sequence" in script
@@ -816,6 +1540,12 @@ def test_control_settings_persist_input_bindings():
     assert 'SETTINGS_PATH := "user://groundfire_controls.cfg"' in script
     assert "DEFAULT_BINDINGS" in script
     assert "static func apply_saved_bindings" in script
+    assert "ACTION_ORDER" in script
+    assert '"gf_fire"' in script
+    assert '"gf_weapon_next"' in script
+    assert '"gf_weapon_prev"' in script
+    assert '"gf_shield"' in script
+    assert 'for action_name in ACTION_ORDER:' in script
     assert "static func save_key_binding" in script
     assert "static func save_gamepad_button_binding" in script
     assert "static func save_gamepad_axis_binding" in script
@@ -856,16 +1586,61 @@ def test_migration_strategy_documents_web_feature_rule():
     assert "WebSocket/WebRTC" in doc
 
 
+def test_migration_strategy_declares_pygame_fidelity_contract():
+    doc = (PROJECT_ROOT / "docs" / "godot_migration_strategy.md").read_text(encoding="utf-8")
+    contract_script = (PROJECT_ROOT / "scripts" / "validate_godot_migration_contract.py").read_text(encoding="utf-8")
+    fidelity_script = (PROJECT_ROOT / "scripts" / "validate_godot_fidelity.sh").read_text(encoding="utf-8")
+
+    assert "## Migration Fidelity Contract" in doc
+    assert "User experience cannot be changed by the migration." in doc
+    assert "The Python/Pygame client is the behavioral, visual, input, audio, timing, and flow source of truth" in doc
+    assert "Godot browser goldens are regression captures, not fidelity targets." in doc
+    assert "Every migration implementation batch must name its Pygame reference" in doc
+    assert "### Fidelity Annotation Template" in doc
+    assert "scripts/validate_godot_migration_contract.py" in doc
+    assert "validate_godot_migration_contract.py" in fidelity_script
+    assert "REQUIRED_GLOBAL_PHRASES" in contract_script
+    assert "PENDING_SECTION_HEADERS" in contract_script
+
+    section_headers = (
+        "### 1. Main Menu Visual Parity",
+        "### 2. Server Browser Final Visual Parity",
+        "### 3. Real Online Server Directory",
+        "### 4. Local Match Gameplay Fidelity",
+        "### 5. Input And HUD Completion",
+        "### 6. Networked Gameplay Adapter",
+        "### 7. Export And Runtime Validation",
+    )
+    labels = (
+        "`Fidelity target:`",
+        "`User-visible invariants:`",
+        "`Allowed Godot adaptation:`",
+        "`Required validation:`",
+    )
+
+    for header in section_headers:
+        match = re.search(rf"^{re.escape(header)}\n(?P<body>.*?)(?=^### |^## |\Z)", doc, re.MULTILINE | re.DOTALL)
+        assert match is not None
+        body = match.group("body")
+        assert "Fidelity annotations:" in body
+        for label in labels:
+            assert label in body
+
+
 def test_godot_export_presets_exist_for_desktop_and_web():
     presets = (GODOT_ROOT / "export_presets.cfg").read_text(encoding="utf-8")
     export_script = (PROJECT_ROOT / "scripts" / "export_godot.sh").read_text(encoding="utf-8")
     package_script = (PROJECT_ROOT / "scripts" / "package_godot_release.sh").read_text(encoding="utf-8")
     visual_script = (PROJECT_ROOT / "scripts" / "validate_godot_visuals.sh").read_text(encoding="utf-8")
+    fidelity_script = (PROJECT_ROOT / "scripts" / "validate_godot_fidelity.sh").read_text(encoding="utf-8")
     qa_script = (PROJECT_ROOT / "scripts" / "qa_godot_web.sh").read_text(encoding="utf-8")
+    pygame_reference_script = (PROJECT_ROOT / "scripts" / "capture_pygame_references.py").read_text(encoding="utf-8")
     validate_script = (PROJECT_ROOT / "scripts" / "validate_godot.sh").read_text(encoding="utf-8")
     visual_check = (GODOT_ROOT / "tests" / "visual_golden_check.gd").read_text(encoding="utf-8")
     runtime_smoke = (GODOT_ROOT / "tests" / "runtime_smoke_check.gd").read_text(encoding="utf-8")
-    runtime_doc = (PROJECT_ROOT / "docs" / "godot_build_and_runtime.md").read_text(encoding="utf-8")
+    main_script = (GODOT_ROOT / "scripts" / "main.gd").read_text(encoding="utf-8")
+    local_match_script = (GODOT_ROOT / "scripts" / "local_match.gd").read_text(encoding="utf-8")
+    migration_doc = (PROJECT_ROOT / "docs" / "godot_migration_strategy.md").read_text(encoding="utf-8")
 
     assert 'name="Linux Desktop"' in presets
     assert 'platform="Linux"' in presets
@@ -873,6 +1648,13 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert 'platform="Web"' in presets
     assert 'exclude_filter="tests/*"' in presets
     assert "scripts/validate_godot.sh" in export_script
+    assert "scripts/validate_godot.sh" in fidelity_script
+    assert "scripts/validate_godot_migration_contract.py" in fidelity_script
+    assert "test_godot_migration_scaffold.py" in fidelity_script
+    assert "test_groundfire_net_module.py" in fidelity_script
+    assert "test_replicated_scene.py" in fidelity_script
+    assert "test_port_fidelity.py" in fidelity_script
+    assert "test_landscape_fidelity.py" in fidelity_script
     assert "GODOT_TEMPLATE_DIR" in export_script
     assert "web_nothreads_release.zip" in export_script
     assert "linux_release.x86_64" in export_script
@@ -881,9 +1663,30 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "runtime_smoke_check.gd" in validate_script
     assert "visible_server_browser_tabs_for(true)" in runtime_smoke
     assert "MainScene.instantiate()" in runtime_smoke
+    assert "func _check_main_menu_responsive_metrics" in runtime_smoke
+    assert "func _check_menu_subscreen_responsive_metrics" in runtime_smoke
+    assert 'main.call("_show_local_match_setup")' in runtime_smoke
+    assert 'main.call("_show_dedicated_server_tools")' in runtime_smoke
+    assert "Vector2i(1920, 720)" in runtime_smoke
     assert "ServerBrowserScene.instantiate()" in runtime_smoke
     assert "LocalMatchScene.instantiate()" in runtime_smoke
     assert "OnlineMatchScene.instantiate()" in runtime_smoke
+    assert "func _free_node" in runtime_smoke
+    assert 'node.call("_prepare_for_shutdown")' in runtime_smoke
+    assert "await process_frame" in runtime_smoke
+    assert "func _prepare_for_shutdown" in main_script
+    assert "_prepare_screen_for_shutdown" in main_script
+    assert "func _qa_directory_request" in main_script
+    assert "func _qa_should_retry_directory_response" in main_script
+    assert "session_gateway_endpoint" in main_script
+    assert "func _qa_check_gateway_session_token_join" in main_script
+    assert '"gateway_session_token_auth"' in main_script
+    assert "signed session-token join fetched auth_token" in main_script
+    assert "directory_http_status" in main_script
+    assert "directory_body_prefix" in main_script
+    assert "func _prepare_for_shutdown" in local_match_script
+    assert "func _release_audio_stream" in local_match_script
+    assert "player.stream = null" in local_match_script
     assert "GROUNDFIRE_RELEASE_VERSION" in package_script
     assert "GROUNDFIRE_RELEASE_PREFIX" in package_script
     assert "GROUNDFIRE_RELEASE_NOTES" in package_script
@@ -893,6 +1696,15 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "sha256" in package_script
     assert "GODOT_VISUAL_UPDATE=1" in visual_script
     assert "visual_golden_check.gd" in visual_script
+    release_script = (PROJECT_ROOT / "scripts" / "validate_godot_release.sh").read_text(encoding="utf-8")
+    assert "scripts/validate_godot_fidelity.sh" in release_script
+    assert "scripts/qa_godot_web.sh --check" in release_script
+    assert "scripts/package_godot_release.sh" in release_script
+    assert "sha256sum --check" in release_script
+    assert '"docs" / "references" / "pygame_visual"' in pygame_reference_script
+    assert "_capture_main_menu" in pygame_reference_script
+    assert "_capture_server_browser" in pygame_reference_script
+    assert "_capture_local_match" in pygame_reference_script
     assert "qa=browser_runtime" in qa_script
     assert "store_phase=$phase" in qa_script
     assert "gateway_endpoint=ws://127.0.0.1:$gateway_port/qa-gateway" in qa_script
@@ -900,9 +1712,12 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "full_gateway_endpoint=ws://127.0.0.1:$full_gateway_port/qa-full-gateway" in qa_script
     assert "closed_gateway_endpoint=ws://127.0.0.1:$closed_gateway_port/qa-closed-gateway" in qa_script
     assert "banned_gateway_endpoint=ws://127.0.0.1:$banned_gateway_port/qa-banned-gateway" in qa_script
+    assert "session_gateway_endpoint=ws://127.0.0.1:$session_gateway_port/qa-session-gateway" in qa_script
+    assert "session_token_url=http://127.0.0.1:$port/qa/session_token.json%3Fphase%3D$phase" in qa_script
     assert "-m groundfire_net.websocket_gateway" in qa_script
     assert "--password qa-secret" in qa_script
     assert "--auth-token qa-token" in qa_script
+    assert "--session-secret qa-session-secret" in qa_script
     assert "--max-players 1" in qa_script
     assert "SlotHolder" in qa_script
     assert "--closed" in qa_script
@@ -910,27 +1725,85 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "browser_runtime_qa seed" in qa_script
     assert "browser_runtime_qa verify" in qa_script
     assert "GroundfireQAHandler" in qa_script
+    assert "def do_GET" in qa_script
+    assert "If-None-Match" in qa_script
+    assert "self.send_response(304)" in qa_script
     assert "Cache-Control" in qa_script
     assert "X-Groundfire-Directory-Refresh" in qa_script
     assert "groundfire-qa-directory-v1" in qa_script
+    assert "/qa/session_token.json" in qa_script
+    assert "generate_join_token(SESSION_SECRET, player_name" in qa_script
+    assert 'capture local_match_setup "?screen=local_match_setup"' in qa_script
+
+    assert '"local_match_setup"' in qa_script
+    assert "missing_cases" in qa_script
+    assert "Missing approved browser golden(s)" in qa_script
+    assert "--update-goldens after reviewing against docs/references/pygame_visual/" in qa_script
     assert "window.__groundfireQaResult" in qa_script
     assert "Browser runtime QA passed" in qa_script
     assert "server_directory.json" in qa_script
+    assert "server_directory.json%3Fphase%3D$phase" in qa_script
     assert "Run scripts/validate_godot_visuals.sh --update-goldens first" in visual_check
     assert "not FileAccess.file_exists(golden_path)" in visual_check
-    assert "scripts/export_godot.sh all" in runtime_doc
-    assert "scripts/package_godot_release.sh" in runtime_doc
-    assert "scripts/validate_godot_visuals.sh --check" in runtime_doc
-    assert "scripts/qa_godot_web.sh --check" in runtime_doc
-    assert "Browser runtime QA" in runtime_doc
-    assert "seed" in runtime_doc
-    assert "verify" in runtime_doc
-    assert "Cache-Control" in runtime_doc
-    assert "ETag" in runtime_doc
-    assert "X-Groundfire-Directory-Refresh" in runtime_doc
-    assert "Release Verification" in runtime_doc
-    assert "sha256sum --check" in runtime_doc
-    assert "Signing policy" in runtime_doc
-    assert "Browser Hosting" in runtime_doc
-    assert "Distribution Notes" in runtime_doc
-    assert "build/godot-web/index.html" in runtime_doc
+    assert "scripts/export_godot.sh all" in migration_doc
+    assert "scripts/package_godot_release.sh" in migration_doc
+    assert "scripts/validate_godot_visuals.sh --check" in migration_doc
+    assert "scripts/validate_godot_fidelity.sh" in migration_doc
+    assert "scripts/validate_godot_release.sh" in migration_doc
+    assert "scripts/qa_godot_web.sh --check" in migration_doc
+    assert "scripts/capture_pygame_references.py" in migration_doc
+    assert "groundfire-directory" in migration_doc
+    directory_service = (PROJECT_ROOT / "groundfire_net" / "directory_service.py").read_text(encoding="utf-8")
+    assert "def directory_diagnostics" in directory_service
+    assert "def _etag_matches" in directory_service
+    assert 'candidate == "*"' in directory_service
+    assert '"/session-token.json"' in directory_service
+    assert '"session_tokens_disabled"' in directory_service
+    assert '"Cache-Control", "no-store"' in directory_service
+    assert "GROUNDFIRE_DIRECTORY_SESSION_SECRET" in directory_service
+    assert "allow_static_auth_tokens" in directory_service
+    assert "GROUNDFIRE_DIRECTORY_ALLOW_STATIC_AUTH_TOKENS" in directory_service
+    assert "--allow-static-auth-tokens" in directory_service
+    assert "auth_token is not allowed in public directory entries; use session_token_url" in directory_service
+    assert "session_token_url must be http:// or https://" in directory_service
+    assert '"/diagnostics.json"' in directory_service
+    assert '"invalid_gateway_endpoint"' in directory_service
+    assert "/session-token.json?player_name=GodotPlayer" in migration_doc
+    assert "GROUNDFIRE_DIRECTORY_SESSION_SECRET" in migration_doc
+    assert "--allow-static-auth-tokens" in migration_doc
+    assert "GROUNDFIRE_DIRECTORY_ALLOW_STATIC_AUTH_TOKENS" in migration_doc
+    assert "docs/references/pygame_visual/" in migration_doc
+    assert "Pygame-style top status cards" in migration_doc
+    assert "classic translucent per-tank gun arrow" in migration_doc
+    assert "Godot Fidelity Audit" in migration_doc
+    assert "Current Automated Coverage" in migration_doc
+    assert "scripts/validate_godot_fidelity.sh" in migration_doc
+    assert "Browser runtime QA" in migration_doc
+    assert "seed" in migration_doc
+    assert "verify" in migration_doc
+    assert "Cache-Control" in migration_doc
+    assert "ETag" in migration_doc
+    assert "X-Groundfire-Directory-Refresh" in migration_doc
+    assert "Release Verification" in migration_doc
+    assert "sha256sum --check" in migration_doc
+    assert "Signing policy" in migration_doc
+    assert "Browser Hosting" in migration_doc
+    assert "Distribution Notes" in migration_doc
+    assert "build/godot-web/index.html" in migration_doc
+
+
+def test_ci_has_godot_release_gate():
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert "workflow_dispatch" in workflow
+    assert "run-godot-browser-qa" in workflow
+    assert "package-godot" in workflow
+    assert "godot-release-gate" in workflow
+    assert 'GODOT_VERSION: "4.6.2"' in workflow
+    assert "Godot_v${godot_tag}_linux.x86_64.zip" in workflow
+    assert "Godot_v${godot_tag}_export_templates.tpz" in workflow
+    assert "linux_release.x86_64" in workflow
+    assert "web_nothreads_release.zip" in workflow
+    assert "scripts/validate_godot_release.sh" in workflow
+    assert "--browser-qa" in workflow
+    assert "--package" in workflow

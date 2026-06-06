@@ -138,6 +138,7 @@ class ServerBook:
         for raw in raw_entries:
             if not isinstance(raw, dict):
                 continue
+            latency_ms = raw.get("latency_ms")
             try:
                 entries.append(
                     ServerListEntry(
@@ -148,7 +149,7 @@ class ServerBook:
                         map_name=str(raw.get("map_name", "generated")),
                         player_count=int(raw.get("player_count", 0)),
                         max_players=int(raw.get("max_players", 8)),
-                        latency_ms=None if raw.get("latency_ms") is None else int(raw.get("latency_ms")),
+                        latency_ms=None if latency_ms is None else int(latency_ms),
                         source=str(raw.get("source", "favorite")),
                         description=str(raw.get("description", "")),
                         last_played=str(raw.get("last_played", "")),

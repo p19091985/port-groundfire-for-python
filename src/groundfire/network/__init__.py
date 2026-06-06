@@ -1,5 +1,5 @@
-from .client_state import ClientReplicatedState
 from .browser import GroundfireServerScanner, default_master_server_addresses, default_server_book_path
+from .client_state import ClientReplicatedState
 from .codec import decode_json, decode_message, encode_json, encode_message
 from .lan import DiscoveredLanServer, LanDiscoveryService, LanServerBrowser
 from .messages import (

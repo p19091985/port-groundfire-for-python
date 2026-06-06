@@ -63,7 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-players", type=parse_player_count, default=8, help="Maximum player slots.")
     parser.add_argument("--server-name", default="Groundfire Server", help="Name announced to clients.")
     parser.add_argument("--password", default="", help="Require this password before accepting players.")
-    parser.add_argument("--rcon-password", default="", help="Remote admin password reserved for dedicated-server tools.")
+    parser.add_argument(
+        "--rcon-password",
+        default="",
+        help="Remote admin password reserved for dedicated-server tools.",
+    )
     parser.add_argument("--region", default="world", help="Region announced to browsers and master servers.")
     parser.add_argument("--no-discovery", action="store_true", help="Disable LAN discovery announcements.")
     parser.add_argument(

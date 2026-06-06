@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import cast
 
 from ..gameplay.constants import WEAPON_SPECS
-from ..input.commands import PlayerCommand
 from ..sim.match import MatchSnapshot, ReplicatedPlayerState
 
 
@@ -433,7 +432,13 @@ class ClientMenuRenderer(_ClassicThemeMixin):
                 continue
             self._draw_tank_icon(game, -3.55 + x_pos, y_top - 0.82, defeated_player.colour, size=0.24)
             if defeated_player.is_leader:
-                game.get_graphics().draw_world_rect(-3.7 + x_pos, y_top - 0.3, -3.6 + x_pos, y_top - 0.9, (128, 128, 128))
+                game.get_graphics().draw_world_rect(
+                    -3.7 + x_pos,
+                    y_top - 0.3,
+                    -3.6 + x_pos,
+                    y_top - 0.9,
+                    (128, 128, 128),
+                )
                 game.get_graphics().draw_world_rect(
                     -3.6 + x_pos,
                     y_top - 0.3,

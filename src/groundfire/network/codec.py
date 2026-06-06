@@ -25,7 +25,6 @@ from .messages import (
     SessionToken,
 )
 
-
 _CODEC = JsonDataclassCodec(lambda message_type, payload: _decode_typed_message(message_type, payload))
 
 

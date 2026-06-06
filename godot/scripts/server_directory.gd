@@ -13,11 +13,12 @@ const ENVIRONMENT_STAGING := "staging"
 const ENVIRONMENT_PRODUCTION := "production"
 const DIRECTORY_ENVIRONMENTS := [ENVIRONMENT_DEV, ENVIRONMENT_STAGING, ENVIRONMENT_PRODUCTION]
 const DIRECTORY_SCHEMA_VERSION := 1
+const HTTP_NOT_MODIFIED := 304
 const HTTP_TIMEOUT_SECONDS := 8.0
 const HTTP_RETRY_LIMIT := 1
 const REQUIRED_SERVER_FIELDS := ["name", "game", "players", "map", "latency", "source", "endpoint", "passworded"]
 const STRING_SERVER_FIELDS := ["name", "game", "players", "map", "latency", "source", "endpoint"]
-const OPTIONAL_STRING_SERVER_FIELDS := ["region", "description", "version", "auth_token"]
+const OPTIONAL_STRING_SERVER_FIELDS := ["region", "description", "version", "auth_token", "session_token_url"]
 const OPTIONAL_ARRAY_SERVER_FIELDS := ["tags"]
 const OPTIONAL_INTEGER_SERVER_FIELDS := ["last_seen_msec"]
 const OPTIONAL_SERVER_FIELDS := OPTIONAL_STRING_SERVER_FIELDS + OPTIONAL_ARRAY_SERVER_FIELDS + OPTIONAL_INTEGER_SERVER_FIELDS
@@ -85,9 +86,12 @@ static func configured_directory_label() -> String:
 	return "%s: %s" % [environment, url]
 
 
-static func refresh_from_http(request: HTTPRequest, url: String) -> int:
+static func refresh_from_http(request: HTTPRequest, url: String, etag := "") -> int:
 	request.timeout = HTTP_TIMEOUT_SECONDS
-	return request.request(url, PackedStringArray(), HTTPClient.METHOD_GET)
+	var headers := PackedStringArray()
+	if not etag.strip_edges().is_empty():
+		headers.append("If-None-Match: %s" % etag)
+	return request.request(url, headers, HTTPClient.METHOD_GET)
 
 
 static func should_retry_directory_request(result: int, response_code: int, attempt: int) -> bool:
@@ -104,6 +108,24 @@ static func http_diagnostic(result: int, response_code: int) -> String:
 	if response_code == 0:
 		return "no HTTP response"
 	return "HTTP %d" % response_code
+
+
+static func http_cache_diagnostic(headers: PackedStringArray) -> String:
+	var details: Array[String] = []
+	var cache_control := _header_value(headers, "cache-control")
+	var etag := http_etag(headers)
+	var refresh_seconds := _header_value(headers, "x-groundfire-directory-refresh")
+	if not cache_control.is_empty():
+		details.append("cache %s" % cache_control)
+	if not etag.is_empty():
+		details.append("etag %s" % etag.left(12))
+	if not refresh_seconds.is_empty():
+		details.append("refresh %ss" % refresh_seconds)
+	return _join_errors(details)
+
+
+static func http_etag(headers: PackedStringArray) -> String:
+	return _header_value(headers, "etag")
 
 
 static func expected_schema() -> Dictionary:
@@ -288,6 +310,17 @@ static func _join_errors(errors: Array) -> String:
 			label += "; "
 		label += str(errors[index])
 	return label
+
+
+static func _header_value(headers: PackedStringArray, name: String) -> String:
+	var normalized := name.to_lower()
+	for header in headers:
+		var parts := str(header).split(":", true, 1)
+		if parts.size() != 2:
+			continue
+		if str(parts[0]).strip_edges().to_lower() == normalized:
+			return str(parts[1]).strip_edges()
+	return ""
 
 
 static func filter_for_tab(entries: Array[Dictionary], tab_name: String) -> Array[Dictionary]:

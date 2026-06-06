@@ -3,18 +3,40 @@ import base64
 import hashlib
 import json
 import struct
+import threading
 import unittest
+from contextlib import redirect_stdout
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
-from groundfire_net import JsonDataclassCodec, ServerBook, ServerListEntry
+from groundfire_net import (
+    DirectoryServiceConfig,
+    JsonDataclassCodec,
+    ServerBook,
+    ServerListEntry,
+    build_http_server,
+)
+from groundfire_net.directory_service import (
+    build_parser as build_directory_parser,
+    directory_diagnostics,
+    directory_server_errors,
+    load_directory_payload,
+    response_bytes,
+    response_etag,
+)
 from groundfire_net.websocket_gateway import (
     GatewayJoinRegistry,
     GatewaySimulation,
     WebSocketGateway,
     WebSocketGatewaySession,
     build_parser,
+    generate_join_token,
+    main as websocket_gateway_main,
+    validate_join_token,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -74,13 +96,381 @@ class GroundfireNetModuleTests(unittest.TestCase):
             self.assertFalse(reloaded.get_internet()[0].secure)
             self.assertEqual(reloaded.entries_for_tab("internet")[0].endpoint, "203.0.113.1:27015")
 
+    def test_directory_service_converts_server_book_to_schema_one(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "servers.json"
+            book = ServerBook(path)
+            book.set_internet_servers(
+                (
+                    ServerListEntry(
+                        name="Public Gateway",
+                        host="play.example.test",
+                        port=443,
+                        map_name="classic",
+                        player_count=2,
+                        max_players=8,
+                        latency_ms=42,
+                        source="internet",
+                        requires_password=True,
+                        region="world",
+                        secure=True,
+                        protocol_version=1,
+                    ),
+                )
+            )
+
+            payload = load_directory_payload(DirectoryServiceConfig(directory_path=path))
+            server = payload["servers"][0]
+
+            self.assertEqual(payload["schema"], 1)
+            self.assertEqual(server["name"], "Public Gateway")
+            self.assertEqual(server["players"], "2/8")
+            self.assertEqual(server["latency"], "42ms")
+            self.assertEqual(server["source"], "online")
+            self.assertEqual(server["endpoint"], "wss://play.example.test:443")
+            self.assertTrue(server["passworded"])
+
+    def test_directory_service_injects_session_token_url_for_gateway_entry(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "directory.json"
+            path.write_text('{"schema":1,"servers":[]}', encoding="utf-8")
+            payload = load_directory_payload(
+                DirectoryServiceConfig(
+                    directory_path=path,
+                    gateway_endpoint="wss://play.example.test/gateway",
+                    session_secret="session-secret",
+                    session_token_url="https://directory.example.test/session-token.json",
+                )
+            )
+
+            server = payload["servers"][0]
+
+            self.assertEqual(server["endpoint"], "wss://play.example.test/gateway")
+            self.assertEqual(server["session_token_url"], "https://directory.example.test/session-token.json")
+
+    def test_directory_service_serves_http_with_cache_headers(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "directory.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "servers": [
+                            {
+                                "name": "Online",
+                                "game": "Groundfire",
+                                "players": "1/8",
+                                "map": "classic",
+                                "latency": "20ms",
+                                "source": "online",
+                                "endpoint": "ws://127.0.0.1:8765",
+                                "passworded": False,
+                            },
+                            {
+                                "name": "LAN",
+                                "game": "Groundfire",
+                                "players": "0/8",
+                                "map": "classic",
+                                "latency": "LAN",
+                                "source": "lan",
+                                "endpoint": "127.0.0.1:27015",
+                                "passworded": False,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = DirectoryServiceConfig(
+                host="127.0.0.1",
+                port=0,
+                directory_path=path,
+                gateway_endpoint="ws://127.0.0.1:9999",
+                server_name="Injected Gateway",
+                cache_seconds=17,
+                refresh_seconds=23,
+            )
+            server = build_http_server(config)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                host, port = server.server_address
+                with urlopen(f"http://{host}:{port}/servers.json", timeout=5) as response:
+                    body = response.read()
+                    payload = json.loads(body.decode("utf-8"))
+                    etag = response.headers["ETag"]
+                    self.assertEqual(response.headers["Cache-Control"], "public, max-age=17, must-revalidate")
+                    self.assertEqual(response.headers["X-Groundfire-Directory-Refresh"], "23")
+                    self.assertEqual(etag, response_etag(body))
+                    self.assertRegex(etag, r'^"[0-9a-f]{64}"$')
+                    self.assertEqual(payload["schema"], 1)
+                    self.assertEqual([item["name"] for item in payload["servers"]], ["Injected Gateway", "Online"])
+                    self.assertFalse(any(item["source"] == "lan" for item in payload["servers"]))
+
+                with urlopen(f"http://{host}:{port}/healthz", timeout=5) as response:
+                    health = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(health["served_servers"], 2)
+                    self.assertEqual(health["filtered_lan_servers"], 1)
+
+                with urlopen(f"http://{host}:{port}/diagnostics.json", timeout=5) as response:
+                    diagnostics = json.loads(response.read().decode("utf-8"))
+                    self.assertTrue(diagnostics["ok"])
+                    self.assertEqual(diagnostics["served_servers"], 2)
+                    self.assertEqual(diagnostics["filtered_lan_servers"], 1)
+                    self.assertFalse(diagnostics["invalid_servers"])
+
+                request = Request(f"http://{host}:{port}/servers.json", headers={"If-None-Match": etag})
+                with self.assertRaises(HTTPError) as raised:
+                    urlopen(request, timeout=5)
+                self.assertEqual(raised.exception.code, 304)
+
+                request = Request(f"http://{host}:{port}/servers.json", headers={"If-None-Match": f'"old", {etag}'})
+                with self.assertRaises(HTTPError) as raised:
+                    urlopen(request, timeout=5)
+                self.assertEqual(raised.exception.code, 304)
+
+                request = Request(
+                    f"http://{host}:{port}/servers.json",
+                    headers={"If-None-Match": etag.strip('"')},
+                )
+                with self.assertRaises(HTTPError) as raised:
+                    urlopen(request, timeout=5)
+                self.assertEqual(raised.exception.code, 304)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_directory_service_issues_no_store_signed_session_token(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "directory.json"
+            path.write_text('{"schema":1,"servers":[]}', encoding="utf-8")
+            config = DirectoryServiceConfig(
+                host="127.0.0.1",
+                port=0,
+                directory_path=path,
+                session_secret="session-secret",
+                session_token_ttl=45,
+            )
+            server = build_http_server(config)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                host, port = server.server_address
+                with urlopen(f"http://{host}:{port}/session-token.json?player_name=Alice%20One", timeout=5) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                    self.assertNotIn("ETag", response.headers)
+                    self.assertEqual(response.headers["Access-Control-Allow-Origin"], "*")
+                    self.assertTrue(payload["ok"])
+                    self.assertEqual(payload["token_type"], "groundfire_join")
+                    self.assertEqual(payload["player_name"], "Alice One")
+                    self.assertEqual(payload["expires_in"], 45)
+                    self.assertTrue(validate_join_token(payload["auth_token"], "session-secret", "Alice One"))
+                    self.assertFalse(validate_join_token(payload["auth_token"], "session-secret", "Bob"))
+
+                with self.assertRaises(HTTPError) as raised:
+                    urlopen(f"http://{host}:{port}/session-token.json?player_name=", timeout=5)
+                self.assertEqual(raised.exception.code, 400)
+                self.assertEqual(json.loads(raised.exception.read().decode("utf-8"))["error"], "missing_player_name")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_directory_service_session_token_endpoint_is_opt_in(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "directory.json"
+            path.write_text('{"schema":1,"servers":[]}', encoding="utf-8")
+            server = build_http_server(DirectoryServiceConfig(host="127.0.0.1", port=0, directory_path=path))
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                host, port = server.server_address
+
+                with self.assertRaises(HTTPError) as raised:
+                    urlopen(f"http://{host}:{port}/session-token.json?player_name=Alice", timeout=5)
+
+                self.assertEqual(raised.exception.code, 404)
+                self.assertEqual(json.loads(raised.exception.read().decode("utf-8"))["error"], "session_tokens_disabled")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_directory_service_filters_invalid_public_entries(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "directory.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "servers": [
+                            {
+                                "name": "Valid Online",
+                                "game": "Groundfire",
+                                "players": "1/8",
+                                "map": "classic",
+                                "latency": "20ms",
+                                "source": "online",
+                                "endpoint": "wss://play.example.test/gateway",
+                                "passworded": False,
+                            },
+                            {
+                                "name": "Invalid Online",
+                                "game": "Groundfire",
+                                "players": "1/8",
+                                "map": "classic",
+                                "latency": "20ms",
+                                "source": "online",
+                                "endpoint": "https://play.example.test/gateway",
+                                "passworded": False,
+                            },
+                            {
+                                "name": "Local Dev",
+                                "game": "Groundfire",
+                                "players": "0/8",
+                                "map": "classic",
+                                "latency": "LAN",
+                                "source": "lan",
+                                "endpoint": "127.0.0.1:27015",
+                                "passworded": False,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            public_payload = load_directory_payload(
+                DirectoryServiceConfig(directory_path=path, gateway_endpoint="https://invalid.example.test")
+            )
+            dev_payload = load_directory_payload(DirectoryServiceConfig(directory_path=path, include_lan=True))
+            diagnostics = directory_diagnostics(
+                DirectoryServiceConfig(directory_path=path, gateway_endpoint="https://invalid.example.test")
+            )
+
+            self.assertEqual([server["name"] for server in public_payload["servers"]], ["Valid Online"])
+            self.assertEqual([server["name"] for server in dev_payload["servers"]], ["Valid Online", "Local Dev"])
+            self.assertFalse(diagnostics["ok"])
+            self.assertEqual(diagnostics["accepted_servers"], 1)
+            self.assertEqual(diagnostics["served_servers"], 1)
+            self.assertEqual(diagnostics["filtered_lan_servers"], 1)
+            self.assertTrue(diagnostics["invalid_gateway_endpoint"])
+            self.assertEqual(diagnostics["invalid_servers"][0]["index"], 1)
+            self.assertIn(
+                "endpoint must be ws:// or wss:// for online servers",
+                directory_server_errors(
+                    {
+                        "name": "Bad",
+                        "game": "Groundfire",
+                        "players": "1/8",
+                        "map": "classic",
+                        "latency": "20ms",
+                        "source": "online",
+                        "endpoint": "https://example.test",
+                        "passworded": False,
+                    }
+                ),
+            )
+
+    def test_directory_service_rejects_static_auth_tokens_for_public_payloads_by_default(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "directory.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "servers": [
+                            {
+                                "name": "Static Secret",
+                                "game": "Groundfire",
+                                "players": "1/8",
+                                "map": "classic",
+                                "latency": "20ms",
+                                "source": "online",
+                                "endpoint": "wss://play.example.test/static",
+                                "passworded": False,
+                                "auth_token": "shared-secret",
+                            },
+                            {
+                                "name": "Signed Session",
+                                "game": "Groundfire",
+                                "players": "1/8",
+                                "map": "classic",
+                                "latency": "20ms",
+                                "source": "online",
+                                "endpoint": "wss://play.example.test/signed",
+                                "passworded": False,
+                                "session_token_url": "https://directory.example.test/session-token.json",
+                            },
+                            {
+                                "name": "Bad Issuer",
+                                "game": "Groundfire",
+                                "players": "1/8",
+                                "map": "classic",
+                                "latency": "20ms",
+                                "source": "online",
+                                "endpoint": "wss://play.example.test/bad-issuer",
+                                "passworded": False,
+                                "session_token_url": "file:///tmp/session-token.json",
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            public_payload = load_directory_payload(DirectoryServiceConfig(directory_path=path))
+            private_payload = load_directory_payload(
+                DirectoryServiceConfig(directory_path=path, allow_static_auth_tokens=True)
+            )
+            diagnostics = directory_diagnostics(DirectoryServiceConfig(directory_path=path))
+
+            self.assertEqual([server["name"] for server in public_payload["servers"]], ["Signed Session"])
+            self.assertEqual([server["name"] for server in private_payload["servers"]], ["Static Secret", "Signed Session"])
+            self.assertFalse(diagnostics["ok"])
+            self.assertFalse(diagnostics["allow_static_auth_tokens"])
+            self.assertEqual(diagnostics["accepted_servers"], 1)
+            self.assertEqual(diagnostics["served_servers"], 1)
+            self.assertEqual(diagnostics["invalid_servers"][0]["index"], 0)
+            self.assertEqual(diagnostics["invalid_servers"][1]["index"], 2)
+            self.assertIn(
+                "auth_token is not allowed in public directory entries; use session_token_url",
+                diagnostics["invalid_servers"][0]["errors"],
+            )
+            self.assertIn("session_token_url must be http:// or https://", diagnostics["invalid_servers"][1]["errors"])
+            self.assertIn(
+                "auth_token is not allowed in public directory entries; use session_token_url",
+                directory_server_errors(
+                    {
+                        "name": "Static Secret",
+                        "game": "Groundfire",
+                        "players": "1/8",
+                        "map": "classic",
+                        "latency": "20ms",
+                        "source": "online",
+                        "endpoint": "wss://play.example.test/static",
+                        "passworded": False,
+                        "auth_token": "shared-secret",
+                    },
+                    allow_static_auth_tokens=False,
+                ),
+            )
+
+    def test_directory_service_response_etag_is_stable(self):
+        payload = {"schema": 1, "servers": []}
+
+        self.assertEqual(response_etag(response_bytes(payload)), response_etag(response_bytes(payload)))
+
     def test_websocket_gateway_session_speaks_godot_message_contract(self):
         session = WebSocketGatewaySession()
 
         hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')
         joined = session.handle_text('{"type":"join","protocol":1,"player_name":"GodotPlayer","password":""}')
         input_response = session.handle_text(
-            '{"type":"input","protocol":1,"sequence":7,"command":{"fire":true,"aim_left":false}}'
+            '{"type":"input","protocol":1,"sequence":7,"command":{"fire":true,"aim_left":false,"shield":true}}'
         )
         pong = session.handle_text('{"type":"ping","protocol":1,"sequence":8,"client_time_msec":1234}')
 
@@ -99,12 +489,16 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertEqual(joined[0]["type"], "snapshot")
         self.assertEqual(joined[0]["protocol"], 1)
         self.assertEqual(joined[0]["state"]["player_name"], "GodotPlayer")
+        self.assertEqual(joined[0]["state"]["player_number"], 1)
+        self.assertEqual(joined[0]["state"]["max_players"], 0)
+        self.assertEqual(joined[0]["state"]["players_connected"], 1)
         self.assertEqual(joined[0]["state"]["match_snapshot_schema"], 1)
         self.assertEqual(joined[0]["state"]["event_schema"], 1)
         self.assertEqual(joined[0]["state"]["match_snapshot"]["players"][0]["name"], "GodotPlayer")
         self.assertEqual(joined[0]["state"]["match_snapshot"]["entities"][0]["entity_type"], "tank")
         self.assertEqual(input_response[0]["sequence"], 7)
         self.assertEqual(input_response[0]["state"]["last_input"]["fire"], True)
+        self.assertEqual(input_response[0]["state"]["last_input"]["shield"], True)
         self.assertEqual(input_response[0]["state"]["match_snapshot"]["simulation_tick"], 1)
         self.assertEqual(pong[0]["type"], "pong")
         self.assertEqual(pong[0]["protocol"], 1)
@@ -118,6 +512,7 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertEqual(connected["type"], "snapshot")
         self.assertEqual(connected["protocol"], 1)
         self.assertEqual(connected["state"]["status"], "connected")
+        self.assertEqual(connected["state"]["players_connected"], 0)
         self.assertEqual(hello["type"], "hello")
         self.assertTrue(hello["password_required"])
         self.assertEqual(rejected["type"], "error")
@@ -168,6 +563,88 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertEqual(joined["type"], "snapshot")
         self.assertEqual(joined["state"]["player_name"], "Alice")
 
+    def test_websocket_gateway_session_rejects_input_before_join(self):
+        session = WebSocketGatewaySession()
+
+        rejected = session.handle_text(
+            json.dumps(
+                {
+                    "type": "input",
+                    "protocol": 1,
+                    "sequence": 1,
+                    "command": {"move_right": True},
+                },
+                separators=(",", ":"),
+            )
+        )[0]
+
+        self.assertEqual(rejected["type"], "error")
+        self.assertEqual(rejected["message"], "not_joined")
+        self.assertIsNone(session.simulation.tank_entity_id)
+
+    def test_websocket_gateway_session_accepts_signed_expiring_auth_token(self):
+        token = generate_join_token("session-secret", "Alice", ttl_seconds=60)
+        wrong_player_token = generate_join_token("session-secret", "Bob", ttl_seconds=60)
+        expired_token = generate_join_token("session-secret", "Alice", ttl_seconds=-1)
+        session = WebSocketGatewaySession(session_secret="session-secret")
+
+        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
+        missing = session.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":""}')[0]
+        wrong_player = session.handle_text(
+            json.dumps(
+                {
+                    "type": "join",
+                    "protocol": 1,
+                    "player_name": "Alice",
+                    "password": "",
+                    "auth_token": wrong_player_token,
+                },
+                separators=(",", ":"),
+            )
+        )[0]
+        expired = session.handle_text(
+            json.dumps(
+                {
+                    "type": "join",
+                    "protocol": 1,
+                    "player_name": "Alice",
+                    "password": "",
+                    "auth_token": expired_token,
+                },
+                separators=(",", ":"),
+            )
+        )[0]
+        joined = session.handle_text(
+            json.dumps(
+                {
+                    "type": "join",
+                    "protocol": 1,
+                    "player_name": "Alice",
+                    "password": "",
+                    "auth_token": token,
+                },
+                separators=(",", ":"),
+            )
+        )[0]
+
+        self.assertTrue(hello["auth_required"])
+        self.assertEqual(hello["auth_token_mode"], "signed")
+        self.assertEqual(missing["message"], "authentication_failed")
+        self.assertEqual(wrong_player["message"], "authentication_failed")
+        self.assertEqual(expired["message"], "authentication_failed")
+        self.assertEqual(joined["type"], "snapshot")
+        self.assertEqual(joined["state"]["player_name"], "Alice")
+
+    def test_signed_join_token_validation_checks_signature_expiry_and_player(self):
+        token = generate_join_token("session-secret", "Alice", now=1000, ttl_seconds=30)
+        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+
+        self.assertTrue(validate_join_token(token, "session-secret", "Alice", now=1030))
+        self.assertFalse(validate_join_token(token, "session-secret", "Alice", now=1031))
+        self.assertFalse(validate_join_token(token, "wrong-secret", "Alice", now=1005))
+        self.assertFalse(validate_join_token(token, "session-secret", "Bob", now=1005))
+        self.assertFalse(validate_join_token(tampered, "session-secret", "Alice", now=1005))
+
     def test_websocket_gateway_session_rejects_server_full_until_slot_released(self):
         registry = GatewayJoinRegistry(max_players=1)
         first = WebSocketGatewaySession(join_registry=registry)
@@ -193,8 +670,35 @@ class GroundfireNetModuleTests(unittest.TestCase):
 
         self.assertEqual(second_join["type"], "snapshot")
         self.assertEqual(second_join["state"]["player_name"], "Bob")
+        self.assertEqual(second_join["state"]["player_number"], 1)
         self.assertEqual(registry.active_players, 1)
         second.close()
+        self.assertEqual(registry.active_players, 0)
+
+    def test_websocket_gateway_session_assigns_reusable_unique_player_numbers(self):
+        registry = GatewayJoinRegistry(max_players=2)
+        first = WebSocketGatewaySession(join_registry=registry)
+        second = WebSocketGatewaySession(join_registry=registry)
+        third = WebSocketGatewaySession(join_registry=registry)
+
+        first_join = first.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":""}')[0]
+        second_join = second.handle_text('{"type":"join","protocol":1,"player_name":"Bob","password":""}')[0]
+        rejected = third.handle_text('{"type":"join","protocol":1,"player_name":"Cora","password":""}')[0]
+
+        self.assertEqual(first_join["state"]["player_number"], 1)
+        self.assertEqual(second_join["state"]["player_number"], 2)
+        self.assertEqual(first.simulation.player_number, 1)
+        self.assertEqual(second.simulation.player_number, 2)
+        self.assertEqual(registry.active_players, 2)
+        self.assertEqual(rejected["message"], "server_full")
+
+        first.close()
+        third_join = third.handle_text('{"type":"join","protocol":1,"player_name":"Cora","password":""}')[0]
+
+        self.assertEqual(third_join["state"]["player_number"], 1)
+        self.assertEqual(registry.active_players, 2)
+        second.close()
+        third.close()
         self.assertEqual(registry.active_players, 0)
 
     def test_websocket_gateway_session_rejects_server_closed(self):
@@ -233,6 +737,12 @@ class GroundfireNetModuleTests(unittest.TestCase):
             "secret",
             "--auth-token",
             "token-123",
+            "--session-secret",
+            "signing-secret",
+            "--session-token-ttl",
+            "90",
+            "--issue-token",
+            "Alice",
             "--max-players",
             "4",
             "--closed",
@@ -244,9 +754,46 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertEqual(args.port, 27999)
         self.assertEqual(args.password, "secret")
         self.assertEqual(args.auth_token, "token-123")
+        self.assertEqual(args.session_secret, "signing-secret")
+        self.assertEqual(args.session_token_ttl, 90)
+        self.assertEqual(args.issue_token, "Alice")
         self.assertEqual(args.max_players, 4)
         self.assertTrue(args.closed)
         self.assertEqual(args.ban_player, ["Mallory"])
+
+    def test_websocket_gateway_main_can_issue_signed_join_token(self):
+        output = StringIO()
+
+        with redirect_stdout(output):
+            exit_code = websocket_gateway_main([
+                "--session-secret",
+                "signing-secret",
+                "--session-token-ttl",
+                "90",
+                "--issue-token",
+                "Alice",
+            ])
+
+        token = output.getvalue().strip()
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(validate_join_token(token, "signing-secret", "Alice"))
+        self.assertFalse(validate_join_token(token, "signing-secret", "Bob"))
+
+    def test_directory_service_parser_exposes_session_token_options(self):
+        args = build_directory_parser().parse_args([
+            "--session-secret",
+            "directory-secret",
+            "--session-token-ttl",
+            "120",
+            "--session-token-url",
+            "https://directory.example.test/session-token.json",
+            "--allow-static-auth-tokens",
+        ])
+
+        self.assertEqual(args.session_secret, "directory-secret")
+        self.assertEqual(args.session_token_ttl, 120)
+        self.assertEqual(args.session_token_url, "https://directory.example.test/session-token.json")
+        self.assertTrue(args.allow_static_auth_tokens)
 
     def test_gateway_simulation_replicates_tank_and_terrain_state(self):
         simulation = GatewaySimulation()
@@ -318,8 +865,8 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertEqual(invalid_disconnect["message"], "invalid_field")
         self.assertEqual(invalid_disconnect["field"], "reason")
 
-    def test_godot_websocket_protocol_document_matches_gateway_contract(self):
-        doc = (PROJECT_ROOT / "docs" / "godot_websocket_protocol.md").read_text(encoding="utf-8")
+    def test_godot_migration_strategy_documents_gateway_contract(self):
+        doc = (PROJECT_ROOT / "docs" / "godot_migration_strategy.md").read_text(encoding="utf-8")
 
         self.assertIn("Current protocol: `1`", doc)
         self.assertIn("Supported protocol range: `1..1`", doc)
@@ -327,6 +874,16 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertIn("password_required", doc)
         self.assertIn("auth_required", doc)
         self.assertIn("auth_token", doc)
+        self.assertIn("auth_token_mode", doc)
+        self.assertIn("--session-secret", doc)
+        self.assertIn("--issue-token", doc)
+        self.assertIn("/session-token.json", doc)
+        self.assertIn("GROUNDFIRE_DIRECTORY_SESSION_SECRET", doc)
+        self.assertIn("--allow-static-auth-tokens", doc)
+        self.assertIn("GROUNDFIRE_DIRECTORY_ALLOW_STATIC_AUTH_TOKENS", doc)
+        self.assertIn("rejects embedded `auth_token` entries by default", doc)
+        self.assertIn("signed session tokens", doc)
+        self.assertIn("GROUNDFIRE_WEB_GATEWAY_SESSION_SECRET", doc)
         self.assertIn("joins_open", doc)
         self.assertIn("ban_enforced", doc)
         self.assertIn("max_players", doc)
@@ -358,7 +915,7 @@ async def _exercise_websocket_gateway_over_tcp() -> list[dict]:
             {"type": "hello", "protocol": 1, "client": "godot"},
             {"type": "join", "protocol": 1, "player_name": "GodotPlayer", "password": "wrong"},
             {"type": "join", "protocol": 1, "player_name": "GodotPlayer", "password": "secret"},
-            {"type": "input", "protocol": 1, "sequence": 3, "command": {"move_right": True}},
+            {"type": "input", "protocol": 1, "sequence": 3, "command": {"move_right": True, "shield": False}},
             {"type": "ping", "protocol": 1, "sequence": 4, "client_time_msec": 1234},
             {"type": "disconnect", "protocol": 1, "reason": "test_done"},
         ):

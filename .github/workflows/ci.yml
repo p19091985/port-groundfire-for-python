@@ -3,6 +3,24 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      run-godot-browser-qa:
+        description: "Run exported Godot web browser QA"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      package-godot:
+        description: "Package and checksum Godot release artifacts"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   quality:
@@ -36,3 +54,56 @@ jobs:
         env:
           GROUNDFIRE_LAUNCHER_PYTHON: python
         run: bats tests/shell/test_lan_launchers.bats
+
+  godot-release-gate:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.6.2"
+      GODOT_BIN: ${{ github.workspace }}/tools/godot/Godot_v4.6.2-stable_linux.x86_64
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Install Godot
+        run: |
+          set -euo pipefail
+          godot_tag="${GODOT_VERSION}-stable"
+          mkdir -p tools/godot
+          curl -L --retry 3 \
+            -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${godot_tag}/Godot_v${godot_tag}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d tools/godot
+          chmod +x "$GODOT_BIN"
+      - name: Install Godot export templates
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.run-godot-browser-qa == 'true' || inputs.package-godot == 'true') }}
+        run: |
+          set -euo pipefail
+          godot_tag="${GODOT_VERSION}-stable"
+          template_dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$template_dir"
+          curl -L --retry 3 \
+            -o /tmp/godot-export-templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${godot_tag}/Godot_v${godot_tag}_export_templates.tpz"
+          unzip -q /tmp/godot-export-templates.tpz -d /tmp/godot-export-templates
+          cp /tmp/godot-export-templates/templates/linux_release.x86_64 "$template_dir/"
+          cp /tmp/godot-export-templates/templates/web_nothreads_release.zip "$template_dir/"
+      - name: Run Godot release validation
+        env:
+          RUN_GODOT_BROWSER_QA: ${{ github.event_name == 'workflow_dispatch' && inputs.run-godot-browser-qa == 'true' }}
+          PACKAGE_GODOT: ${{ github.event_name == 'workflow_dispatch' && inputs.package-godot == 'true' }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [[ "$RUN_GODOT_BROWSER_QA" == "true" ]]; then
+            flags+=(--browser-qa)
+          fi
+          if [[ "$PACKAGE_GODOT" == "true" ]]; then
+            flags+=(--package)
+          fi
+          scripts/validate_godot_release.sh "${flags[@]}"

@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import os
 import struct
@@ -23,6 +24,8 @@ MAX_PROTOCOL_VERSION = PROTOCOL_VERSION
 SUPPORTED_PROTOCOL_VERSIONS = tuple(range(MIN_PROTOCOL_VERSION, MAX_PROTOCOL_VERSION + 1))
 MATCH_SNAPSHOT_SCHEMA_VERSION = 1
 EVENT_SCHEMA_VERSION = 1
+SESSION_TOKEN_VERSION = "gf1"
+DEFAULT_SESSION_TOKEN_TTL_SECONDS = 3600
 INPUT_COMMAND_FIELDS = frozenset(
     {
         "aim_left",
@@ -32,6 +35,7 @@ INPUT_COMMAND_FIELDS = frozenset(
         "move_left",
         "move_right",
         "jump",
+        "shield",
         "fire",
         "weapon_next",
         "weapon_prev",
@@ -43,18 +47,38 @@ INPUT_COMMAND_FIELDS = frozenset(
 class GatewayJoinRegistry:
     max_players: int = 0
     active_players: int = 0
+    _occupied_player_numbers: set[int] = field(default_factory=set)
 
     def acquire_slot(self) -> bool:
-        if self.max_players > 0 and self.active_players >= self.max_players:
-            return False
-        self.active_players += 1
-        return True
+        return self.acquire_player_number() > 0
 
-    def release_slot(self) -> None:
-        self.active_players = max(0, self.active_players - 1)
+    def acquire_player_number(self) -> int:
+        if self.max_players > 0 and len(self._occupied_player_numbers) >= self.max_players:
+            return 0
+        player_number = 1
+        while player_number in self._occupied_player_numbers:
+            player_number += 1
+        if self.max_players > 0 and player_number > self.max_players:
+            return 0
+        self._occupied_player_numbers.add(player_number)
+        self._sync_active_players()
+        return player_number
+
+    def release_slot(self, player_number: int | None = None) -> None:
+        if player_number is None:
+            if self._occupied_player_numbers:
+                player_number = max(self._occupied_player_numbers)
+            else:
+                self.active_players = max(0, self.active_players - 1)
+                return
+        self._occupied_player_numbers.discard(player_number)
+        self._sync_active_players()
 
     def metadata(self) -> dict[str, int]:
         return {"max_players": self.max_players, "players_connected": self.active_players}
+
+    def _sync_active_players(self) -> None:
+        self.active_players = len(self._occupied_player_numbers)
 
 
 @dataclass
@@ -169,6 +193,7 @@ class GatewaySimulation:
             "state": {
                 "status": status,
                 "player_name": self.player_name,
+                "player_number": self.player_number,
                 "joined": self.tank_entity_id is not None,
                 "last_input": self.last_input,
                 "server_time_msec": int(time.time() * 1000),
@@ -186,10 +211,17 @@ class WebSocketGatewaySession:
     simulation: GatewaySimulation = field(default_factory=GatewaySimulation)
     required_password: str = ""
     required_auth_token: str = ""
+    session_secret: str = ""
     join_registry: GatewayJoinRegistry = field(default_factory=GatewayJoinRegistry)
     joins_closed: bool = False
     banned_players: frozenset[str] = field(default_factory=frozenset)
     _joined: bool = False
+    _player_number: int = 0
+
+    def snapshot(self, *, status: str) -> dict[str, Any]:
+        payload = self.simulation.snapshot(status=status)
+        payload["state"].update(self.join_registry.metadata())
+        return payload
 
     def handle_text(self, payload: str) -> list[dict[str, Any]]:
         try:
@@ -218,7 +250,8 @@ class WebSocketGatewaySession:
                     "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
                     "event_schema": EVENT_SCHEMA_VERSION,
                     "password_required": bool(self.required_password),
-                    "auth_required": bool(self.required_auth_token),
+                    "auth_required": bool(self.required_auth_token or self.session_secret),
+                    "auth_token_mode": _auth_token_mode(self.required_auth_token, self.session_secret),
                     "joins_open": not self.joins_closed,
                     "ban_enforced": bool(self.banned_players),
                     **self.join_registry.metadata(),
@@ -231,21 +264,33 @@ class WebSocketGatewaySession:
             player_name = str(message.get("player_name", self.simulation.player_name))
             if _normalized_player_name(player_name) in self.banned_players:
                 return [_error("banned")]
-            if self.required_auth_token and str(message.get("auth_token", "")) != self.required_auth_token:
+            if not _auth_token_is_authorized(
+                str(message.get("auth_token", "")),
+                required_auth_token=self.required_auth_token,
+                session_secret=self.session_secret,
+                player_name=player_name,
+            ):
                 return [_error("authentication_failed")]
             if self.required_password and str(message.get("password", "")) != self.required_password:
                 return [_error("invalid_password")]
             if not self._joined:
-                if not self.join_registry.acquire_slot():
+                player_number = self.join_registry.acquire_player_number()
+                if player_number <= 0:
                     return [_error("server_full", **self.join_registry.metadata())]
+                self._player_number = player_number
+                self.simulation.player_number = player_number
                 self._joined = True
+            elif self._player_number > 0:
+                self.simulation.player_number = self._player_number
             self.simulation.join(player_name)
-            return [self.simulation.snapshot(status="joined")]
+            return [self.snapshot(status="joined")]
         if message_type == "input":
+            if not self._joined:
+                return [_error("not_joined")]
             sequence = int(message.get("sequence", self.simulation.sequence + 1))
             command = message.get("command", {})
             self.simulation.apply_input(sequence, command if isinstance(command, dict) else {})
-            return [self.simulation.snapshot(status="input")]
+            return [self.snapshot(status="input")]
         if message_type == "ping":
             return [
                 {
@@ -270,7 +315,8 @@ class WebSocketGatewaySession:
     def close(self) -> None:
         if not self._joined:
             return
-        self.join_registry.release_slot()
+        self.join_registry.release_slot(self._player_number)
+        self._player_number = 0
         self._joined = False
 
 
@@ -282,6 +328,7 @@ class WebSocketGateway:
         *,
         password: str = "",
         auth_token: str = "",
+        session_secret: str = "",
         max_players: int = 0,
         closed: bool = False,
         banned_players: Iterable[str] = (),
@@ -290,6 +337,7 @@ class WebSocketGateway:
         self.port = port
         self.password = password
         self.auth_token = auth_token
+        self.session_secret = session_secret
         self.closed = closed
         self.banned_players = _normalized_player_names(banned_players)
         self.join_registry = GatewayJoinRegistry(max_players=max(0, max_players))
@@ -303,13 +351,14 @@ class WebSocketGateway:
         session = WebSocketGatewaySession(
             required_password=self.password,
             required_auth_token=self.auth_token,
+            session_secret=self.session_secret,
             join_registry=self.join_registry,
             joins_closed=self.closed,
             banned_players=self.banned_players,
         )
         try:
             await _accept_handshake(reader, writer)
-            connected_snapshot = session.simulation.snapshot(status="connected")
+            connected_snapshot = session.snapshot(status="connected")
             await _write_text(writer, json.dumps(connected_snapshot, separators=(",", ":")))
             while not reader.at_eof():
                 payload = await _read_frame(reader)
@@ -477,6 +526,106 @@ def _validate_input_command(command: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def generate_join_token(
+    session_secret: str,
+    player_name: str,
+    *,
+    now: float | None = None,
+    ttl_seconds: int = DEFAULT_SESSION_TOKEN_TTL_SECONDS,
+) -> str:
+    if not session_secret:
+        raise ValueError("session_secret is required")
+    issued_at = int(time.time() if now is None else now)
+    claims = {
+        "version": 1,
+        "player_name": str(player_name),
+        "player_key": _normalized_player_name(player_name),
+        "issued_at": issued_at,
+        "expires_at": issued_at + int(ttl_seconds),
+    }
+    payload = _base64url_encode(json.dumps(claims, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    signature = _join_token_signature(session_secret, payload)
+    return f"{SESSION_TOKEN_VERSION}.{payload}.{signature}"
+
+
+def validate_join_token(
+    token: str,
+    session_secret: str,
+    player_name: str,
+    *,
+    now: float | None = None,
+) -> bool:
+    if not token or not session_secret:
+        return False
+    parts = token.split(".")
+    if len(parts) != 3 or parts[0] != SESSION_TOKEN_VERSION:
+        return False
+    _prefix, payload, signature = parts
+    expected_signature = _join_token_signature(session_secret, payload)
+    if not hmac.compare_digest(signature, expected_signature):
+        return False
+    try:
+        raw_claims = json.loads(_base64url_decode(payload).decode("utf-8"))
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    if not isinstance(raw_claims, dict):
+        return False
+    expires_at = raw_claims.get("expires_at")
+    if not isinstance(expires_at, int) or isinstance(expires_at, bool):
+        return False
+    current_time = int(time.time() if now is None else now)
+    if expires_at < current_time:
+        return False
+    expected_player_key = _normalized_player_name(player_name)
+    if str(raw_claims.get("player_key", "")) != expected_player_key:
+        return False
+    return True
+
+
+def _auth_token_is_authorized(
+    auth_token: str,
+    *,
+    required_auth_token: str,
+    session_secret: str,
+    player_name: str,
+) -> bool:
+    if not required_auth_token and not session_secret:
+        return True
+    if required_auth_token and hmac.compare_digest(auth_token, required_auth_token):
+        return True
+    if session_secret and validate_join_token(auth_token, session_secret, player_name):
+        return True
+    return False
+
+
+def _auth_token_mode(required_auth_token: str, session_secret: str) -> str:
+    if required_auth_token and session_secret:
+        return "static_or_signed"
+    if session_secret:
+        return "signed"
+    if required_auth_token:
+        return "static"
+    return "none"
+
+
+def _join_token_signature(session_secret: str, payload: str) -> str:
+    digest = hmac.new(
+        session_secret.encode("utf-8"),
+        f"{SESSION_TOKEN_VERSION}.{payload}".encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    return _base64url_encode(digest)
+
+
+def _base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def _base64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode((value + padding).encode("ascii"))
+
+
 def _version_event(event: dict[str, Any]) -> dict[str, Any]:
     versioned = dict(event)
     versioned.setdefault("schema", EVENT_SCHEMA_VERSION)
@@ -496,6 +645,32 @@ def build_parser() -> argparse.ArgumentParser:
         "--auth-token",
         default=os.environ.get("GROUNDFIRE_WEB_GATEWAY_AUTH_TOKEN", ""),
         help="Optional join auth token. Also configurable through GROUNDFIRE_WEB_GATEWAY_AUTH_TOKEN.",
+    )
+    parser.add_argument(
+        "--session-secret",
+        default=os.environ.get("GROUNDFIRE_WEB_GATEWAY_SESSION_SECRET", ""),
+        help=(
+            "Optional HMAC secret for signed expiring join tokens. "
+            "Also configurable through GROUNDFIRE_WEB_GATEWAY_SESSION_SECRET."
+        ),
+    )
+    parser.add_argument(
+        "--session-token-ttl",
+        type=_positive_int,
+        default=_environment_positive_int(
+            "GROUNDFIRE_WEB_GATEWAY_SESSION_TOKEN_TTL",
+            DEFAULT_SESSION_TOKEN_TTL_SECONDS,
+        ),
+        help=(
+            "Lifetime, in seconds, for tokens generated by --issue-token. "
+            "Also configurable through GROUNDFIRE_WEB_GATEWAY_SESSION_TOKEN_TTL."
+        ),
+    )
+    parser.add_argument(
+        "--issue-token",
+        default="",
+        metavar="PLAYER_NAME",
+        help="Print a signed join token for PLAYER_NAME and exit. Requires --session-secret.",
     )
     parser.add_argument(
         "--max-players",
@@ -526,12 +701,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.issue_token:
+        if not args.session_secret:
+            parser.error("--issue-token requires --session-secret or GROUNDFIRE_WEB_GATEWAY_SESSION_SECRET")
+        print(generate_join_token(args.session_secret, args.issue_token, ttl_seconds=args.session_token_ttl))
+        return 0
     gateway = WebSocketGateway(
         args.host,
         args.port,
         password=args.password,
         auth_token=args.auth_token,
+        session_secret=args.session_secret,
         max_players=args.max_players,
         closed=args.closed,
         banned_players=args.ban_player,
@@ -558,10 +740,24 @@ def _environment_int(name: str, default: int) -> int:
         return default
 
 
+def _environment_positive_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.environ.get(name, str(default))))
+    except ValueError:
+        return default
+
+
 def _non_negative_int(value: str) -> int:
     parsed = int(value)
     if parsed < 0:
         raise argparse.ArgumentTypeError("must be greater than or equal to 0")
+    return parsed
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
     return parsed
 
 

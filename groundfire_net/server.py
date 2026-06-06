@@ -19,8 +19,8 @@ class NativeServerLoop:
     def __init__(
         self,
         *,
-        poll_network: Callable[[], None],
-        step_simulation: Callable[[], None],
+        poll_network: Callable[[], object],
+        step_simulation: Callable[[], object],
         now: Callable[[], float],
         sleep: Callable[[float], None],
     ):

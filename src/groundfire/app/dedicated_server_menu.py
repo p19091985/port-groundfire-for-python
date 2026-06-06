@@ -9,16 +9,19 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pygame
 
+pygame_gui: Any
 try:  # pygame_gui is the preferred widget layer when available.
-    import pygame_gui  # type: ignore
+    import pygame_gui
 except Exception:  # pragma: no cover - optional dependency fallback
     pygame_gui = None
 
+pygame_menu: Any
 try:  # pygame-menu remains useful for future desktop/web menu composition.
-    import pygame_menu  # type: ignore
+    import pygame_menu
 except Exception:  # pragma: no cover - optional dependency fallback
     pygame_menu = None
 

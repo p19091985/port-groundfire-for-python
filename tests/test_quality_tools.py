@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from scripts.run_quality_checks import QualityResult, build_checks, summarize_results
 
@@ -16,7 +17,8 @@ class QualityToolsTests(unittest.TestCase):
         self.assertIn("src/font.py", checks[3].command)
 
     def test_summarize_results_only_fails_on_required_errors(self):
-        checks = build_checks("python")
+        with patch.dict("os.environ", {"CI": ""}):
+            checks = build_checks("python")
         results = (
             QualityResult(check=checks[0], returncode=0, stdout="", stderr=""),
             QualityResult(check=checks[1], returncode=0, stdout="", stderr=""),

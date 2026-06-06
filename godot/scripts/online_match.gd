@@ -14,12 +14,21 @@ const SNAPSHOT_STALE_TIMEOUT := 10.0
 const PENDING_COMMAND_TIMEOUT_MSEC := 5000
 const PREDICTION_MOVE_STEP := 0.08
 const PREDICTION_ANGLE_STEP := 1.5
+const INTERPOLATION_RATE := 12.0
+const LOCAL_RECONCILE_RATE := 18.0
+const PROJECTILE_EXTRAPOLATION_SECONDS := 0.06
 
 var _websocket_client: Node
 var _entry: Dictionary = {}
 var _endpoint := ""
 var _password := ""
+var _static_auth_token := ""
 var _auth_token := ""
+var _session_token_url := ""
+var _session_token_request: HTTPRequest
+var _session_token_pending := false
+var _session_token_requested := false
+var _session_token_received := false
 var _status := "Preparing online match."
 var _snapshot: Dictionary = {}
 var _match_snapshot: Dictionary = {}
@@ -34,6 +43,7 @@ var _last_latency_ms := -1
 var _last_ack_sequence := 0
 var _last_snapshot_tick := 0
 var _last_terrain_revision := 0
+var _last_prediction_error := 0.0
 var _snapshot_age := 0.0
 var _handshake_age := 0.0
 var _server_protocol_ready := false
@@ -50,12 +60,18 @@ func setup(entry: Dictionary) -> void:
 	_entry = entry.duplicate()
 	_endpoint = str(_entry.get("endpoint", ""))
 	_password = str(_entry.get("password", ""))
-	_auth_token = str(_entry.get("auth_token", ""))
+	_static_auth_token = str(_entry.get("auth_token", ""))
+	_auth_token = _static_auth_token
+	_session_token_url = str(_entry.get("session_token_url", ""))
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build_overlay_controls()
+	_session_token_request = HTTPRequest.new()
+	_session_token_request.timeout = 5.0
+	_session_token_request.request_completed.connect(_on_session_token_request_completed)
+	add_child(_session_token_request)
 	_websocket_client = WebSocketClient.new()
 	_websocket_client.status_changed.connect(_on_websocket_status_changed)
 	_websocket_client.message_received.connect(_on_websocket_message_received)
@@ -65,6 +81,14 @@ func _ready() -> void:
 		_status = "Missing online endpoint."
 	else:
 		_connect_now("Connecting to %s." % _endpoint)
+
+
+func _exit_tree() -> void:
+	set_process(false)
+	if _session_token_request != null:
+		_session_token_request.cancel_request()
+	if _websocket_client != null:
+		_websocket_client.disconnect_from_endpoint("online_match_exit")
 
 
 func _process(delta: float) -> void:
@@ -84,6 +108,11 @@ func _process(delta: float) -> void:
 		return
 	if not _join_sent:
 		_send_join_after_hello()
+		if not _join_sent:
+			_update_interpolation(delta)
+			_update_effects(delta)
+			queue_redraw()
+			return
 	_snapshot_age += delta
 	_prune_stale_pending_commands()
 	if _snapshot_age >= SNAPSHOT_STALE_TIMEOUT:
@@ -123,6 +152,7 @@ func _send_input_snapshot() -> void:
 		"move_left": Input.is_action_pressed("gf_move_left"),
 		"move_right": Input.is_action_pressed("gf_move_right"),
 		"jump": Input.is_action_pressed("gf_jump"),
+		"shield": Input.is_action_pressed("gf_shield"),
 		"fire": Input.is_action_pressed("gf_fire"),
 		"weapon_next": Input.is_action_just_pressed("gf_weapon_next"),
 		"weapon_prev": Input.is_action_just_pressed("gf_weapon_prev"),
@@ -235,6 +265,9 @@ func _send_join_after_hello() -> void:
 		return
 	if not _websocket_client.is_websocket_connected():
 		return
+	if _needs_session_token():
+		_request_session_token()
+		return
 	_join_sent = true
 	_snapshot_age = 0.0
 	_input_tick = 0.0
@@ -244,6 +277,85 @@ func _send_join_after_hello() -> void:
 	_status = "%s Join sent." % _server_protocol_status
 
 
+func _needs_session_token() -> bool:
+	return _auth_token.strip_edges().is_empty() and not _session_token_url.strip_edges().is_empty()
+
+
+func _request_session_token() -> void:
+	if _session_token_pending or _session_token_requested:
+		return
+	if _session_token_request == null:
+		_fail_server_error("Join failed: session token request is unavailable.", "authentication_failed")
+		return
+	_session_token_pending = true
+	_session_token_requested = true
+	var request_url := _session_token_request_url(NetworkAdapter.PLAYER_NAME_DEFAULT)
+	var headers := PackedStringArray(["Cache-Control: no-store"])
+	var error := _session_token_request.request(request_url, headers, HTTPClient.METHOD_GET)
+	if error != OK:
+		_session_token_pending = false
+		_fail_server_error("Join failed: session token request could not start.", "authentication_failed")
+		return
+	_status = "Requesting session token."
+
+
+func _on_session_token_request_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	if not _session_token_pending:
+		return
+	_session_token_pending = false
+	if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300:
+		_fail_server_error("Join failed: session token request failed.", "authentication_failed")
+		return
+	if not _header_value(headers, "cache-control").to_lower().contains("no-store"):
+		_fail_server_error("Join failed: session token response was cacheable.", "authentication_failed")
+		return
+	var parsed = JSON.parse_string(body.get_string_from_utf8())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_fail_server_error("Join failed: session token response was invalid.", "authentication_failed")
+		return
+	var payload := Dictionary(parsed)
+	var token := str(payload.get("auth_token", ""))
+	if token.strip_edges().is_empty() or not bool(payload.get("ok", false)):
+		_fail_server_error("Join failed: session token was rejected.", "authentication_failed")
+		return
+	_auth_token = token
+	_session_token_received = true
+	_status = "Session token received."
+	_send_join_after_hello()
+
+
+func _session_token_request_url(player_name: String) -> String:
+	var separator := "&" if _session_token_url.contains("?") else "?"
+	return "%s%splayer_name=%s" % [_session_token_url, separator, player_name.uri_encode()]
+
+
+func _has_session_auth_token() -> bool:
+	return _session_token_received and not _auth_token.strip_edges().is_empty()
+
+
+func _session_token_debug_state() -> Dictionary:
+	return {
+		"auth_token_length": _auth_token.length(),
+		"pending": _session_token_pending,
+		"received": _session_token_received,
+		"requested": _session_token_requested,
+		"session_token_url": _session_token_url,
+		"static_auth_token_length": _static_auth_token.length(),
+	}
+
+
+func _header_value(headers: PackedStringArray, header_name: String) -> String:
+	var normalized_name := header_name.to_lower()
+	for header in headers:
+		var separator := header.find(":")
+		if separator <= 0:
+			continue
+		var name := header.substr(0, separator).to_lower().strip_edges()
+		if name == normalized_name:
+			return header.substr(separator + 1).strip_edges()
+	return ""
+
+
 func _connect_now(message: String) -> void:
 	_manual_disconnect = false
 	_protocol_failure = false
@@ -251,6 +363,11 @@ func _connect_now(message: String) -> void:
 	_server_protocol_ready = false
 	_server_protocol_status = "Protocol handshake pending."
 	_join_sent = false
+	_session_token_pending = false
+	_session_token_requested = false
+	_session_token_received = false
+	if not _session_token_url.strip_edges().is_empty() and _static_auth_token.strip_edges().is_empty():
+		_auth_token = ""
 	_handshake_age = 0.0
 	_status = message
 	_snapshot_age = 0.0
@@ -320,8 +437,23 @@ func _build_overlay_controls() -> void:
 	actions.add_child(_manual_reconnect_button)
 	_back_button = _header_button("Back", _return_to_main_menu)
 	actions.add_child(_back_button)
-	_manual_reconnect_button.focus_neighbor_right = _back_button.get_path()
-	_back_button.focus_neighbor_left = _manual_reconnect_button.get_path()
+	_wire_overlay_focus()
+	_manual_reconnect_button.grab_focus.call_deferred()
+
+
+func _wire_overlay_focus() -> void:
+	if _manual_reconnect_button == null or _back_button == null:
+		return
+	var reconnect_path := _manual_reconnect_button.get_path()
+	var back_path := _back_button.get_path()
+	_manual_reconnect_button.focus_neighbor_left = back_path
+	_manual_reconnect_button.focus_neighbor_right = back_path
+	_manual_reconnect_button.focus_neighbor_top = reconnect_path
+	_manual_reconnect_button.focus_neighbor_bottom = reconnect_path
+	_back_button.focus_neighbor_left = reconnect_path
+	_back_button.focus_neighbor_right = reconnect_path
+	_back_button.focus_neighbor_top = back_path
+	_back_button.focus_neighbor_bottom = back_path
 
 
 func _header_button(text: String, callback: Callable) -> Button:
@@ -480,6 +612,7 @@ func _draw_network_diagnostics(origin: Vector2) -> void:
 		"ack: %d  pending: %d" % [_last_ack_sequence, _pending_commands.size()],
 		"tick: %d  terrain: %d" % [_last_snapshot_tick, _last_terrain_revision],
 		"snapshot age: %.1fs  stale cmd: %d" % [_snapshot_age, _stale_pending_count()],
+		"prediction error: %.2f" % _last_prediction_error,
 	])
 	for index in range(lines.size()):
 		draw_string(
@@ -518,17 +651,21 @@ func _ingest_replicated_entities() -> void:
 		live_ids.append(entity_id)
 		if _render_entities.has(entity_id):
 			var current := Dictionary(_render_entities[entity_id])
+			if int(current.get("owner_player", 0)) == 1 and str(current.get("entity_type", "")) == "tank":
+				_last_prediction_error = Vector2(current.get("render_position", target_position)).distance_to(target_position)
 			current["target_position"] = target_position
 			current["velocity"] = _entity_velocity(entity)
 			current["angle"] = float(entity.get("angle", 0.0))
 			current["payload"] = Dictionary(entity.get("payload", {}))
 			current["owner_player"] = int(entity.get("owner_player", 0))
 			current["entity_type"] = str(entity.get("entity_type", "entity"))
+			current["predicted"] = false
 			_render_entities[entity_id] = current
 		else:
 			entity["render_position"] = target_position
 			entity["target_position"] = target_position
 			entity["velocity"] = _entity_velocity(entity)
+			entity["predicted"] = false
 			_render_entities[entity_id] = entity
 	for entity_id in _render_entities.keys():
 		if not live_ids.has(int(entity_id)):
@@ -581,6 +718,7 @@ func _apply_local_prediction(command: Dictionary) -> void:
 			entity["angle"] = float(entity.get("angle", 0.0)) + PREDICTION_ANGLE_STEP
 		if bool(command.get("aim_right", false)):
 			entity["angle"] = float(entity.get("angle", 0.0)) - PREDICTION_ANGLE_STEP
+		entity["predicted"] = true
 		entity["render_position"] = render_position
 		entity["target_position"] = render_position
 		_render_entities[entity_id] = entity
@@ -592,7 +730,10 @@ func _update_interpolation(delta: float) -> void:
 		var entity := Dictionary(_render_entities[entity_id])
 		var current_position := Vector2(entity.get("render_position", Vector2.ZERO))
 		var target_position := Vector2(entity.get("target_position", current_position))
-		entity["render_position"] = current_position.lerp(target_position, min(1.0, delta * 12.0))
+		if str(entity.get("entity_type", "entity")) == "projectile":
+			target_position += Vector2(entity.get("velocity", Vector2.ZERO)) * PROJECTILE_EXTRAPOLATION_SECONDS
+		var rate := LOCAL_RECONCILE_RATE if bool(entity.get("predicted", false)) else INTERPOLATION_RATE
+		entity["render_position"] = current_position.lerp(target_position, min(1.0, delta * rate))
 		_render_entities[entity_id] = entity
 
 

@@ -2,6 +2,26 @@ extends Control
 
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
 
+const DISABLED_CLASSIC_ITEMS := []
+const CLASSIC_SHOP_ORDER := [
+	"Machine Gun",
+	"Jump Jet",
+	"MIRV",
+	"Missile",
+	"Nuke",
+	"Rolling Mines",
+	"Airstrike",
+	"Death's Head",
+	"Hover Coil",
+	"Corbomite",
+]
+const CLASSIC_SHOP_DISPLAY_NAMES := {
+	"MIRV": "Mirvs",
+	"Missile": "Missiles",
+	"Nuke": "Nukes",
+}
+const CLASSIC_BUY_ACTION_LABEL := "Buy"
+
 signal continue_requested
 signal buy_requested(weapon_name: String)
 
@@ -13,6 +33,7 @@ var _weapon_list: VBoxContainer
 var _continue_button: Button
 var _focus_buttons: Array[Button] = []
 var _state := {}
+var _preferred_focus_name := ""
 
 
 func _ready() -> void:
@@ -25,15 +46,29 @@ func refresh(state: Dictionary) -> void:
 	if _weapon_list == null:
 		return
 	_title_label.text = str(_state.get("title", "Round Complete"))
-	_subtitle_label.text = "Round %d  Score %d  Reward %d" % [
-		int(_state.get("round", 1)),
-		int(_state.get("score", 0)),
-		int(_state.get("reward", 0)),
+	var round_number := int(_state.get("round", 1))
+	var total_rounds := int(_state.get("total_rounds", 0))
+	if total_rounds > 0:
+		_subtitle_label.text = "Round %d of %d  Score %d  Reward %d" % [
+			round_number,
+			total_rounds,
+			int(_state.get("score", 0)),
+			int(_state.get("reward", 0)),
+		]
+	else:
+		_subtitle_label.text = "Round %d  Score %d  Reward %d" % [
+			round_number,
+			int(_state.get("score", 0)),
+			int(_state.get("reward", 0)),
+		]
+	_credits_label.text = "%s  Money %s  Fuel reserve %d%%" % [
+		str(_state.get("shopper_name", "Player")),
+		_format_money(int(_state.get("credits", 0))),
+		int(_state.get("fuel_reserve", 100)),
 	]
-	_credits_label.text = "Credits %d" % int(_state.get("credits", 0))
 	_message_label.text = str(_state.get("message", ""))
 	_rebuild_weapon_rows()
-	_continue_button.grab_focus.call_deferred()
+	call_deferred("_restore_shop_focus")
 
 
 func _build() -> void:
@@ -82,7 +117,7 @@ func _build() -> void:
 	_weapon_list.add_theme_constant_override("separation", 8)
 	stack.add_child(_weapon_list)
 
-	_continue_button = _shop_button("Continue", true)
+	_continue_button = _shop_button("Done!", true)
 	_continue_button.pressed.connect(func() -> void: continue_requested.emit())
 	stack.add_child(_continue_button)
 
@@ -91,36 +126,155 @@ func _rebuild_weapon_rows() -> void:
 	for child in _weapon_list.get_children():
 		child.queue_free()
 	_focus_buttons.clear()
-	var inventory: Array = _state.get("inventory", [])
 	var credits := int(_state.get("credits", 0))
-	for weapon in inventory:
+	var input_locked := bool(_state.get("input_locked", false))
+	_add_catalog_header()
+	for item_data in _classic_catalog_rows():
+		if bool(item_data.get("is_shop_item", false)):
+			_add_shop_item_row(item_data, credits, input_locked)
+		else:
+			_add_weapon_row(item_data, credits, input_locked)
+	_add_disabled_catalog_rows()
+	_continue_button.disabled = input_locked
+	_focus_buttons.append(_continue_button)
+	_wire_vertical_focus(_focus_buttons)
+
+
+func _add_catalog_header() -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_weapon_list.add_child(row)
+	var cost := Label.new()
+	cost.text = "Cost"
+	cost.custom_minimum_size = Vector2(84.0, 22.0)
+	GroundfireTheme.apply_label(cost, 13, GroundfireTheme.COLOR_WARN)
+	row.add_child(cost)
+	var item := Label.new()
+	item.text = "Item"
+	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	GroundfireTheme.apply_label(item, 13, GroundfireTheme.COLOR_WARN)
+	row.add_child(item)
+
+
+func _classic_catalog_rows() -> Array[Dictionary]:
+	var by_name: Dictionary = {}
+	for weapon in Array(_state.get("inventory", [])):
 		var weapon_data: Dictionary = weapon
-		var weapon_name := str(weapon_data.get("name", "Weapon"))
-		var cost := int(weapon_data.get("cost", 0))
+		if int(weapon_data.get("cost", 0)) > 0:
+			by_name[str(weapon_data.get("name", ""))] = weapon_data.duplicate(true)
+	for shop_item in Array(_state.get("shop_items", [])):
+		var item_data: Dictionary = shop_item
+		var copy := item_data.duplicate(true)
+		copy["is_shop_item"] = true
+		by_name[str(copy.get("name", ""))] = copy
+	var ordered: Array[Dictionary] = []
+	for name in CLASSIC_SHOP_ORDER:
+		if by_name.has(name):
+			ordered.append(Dictionary(by_name[name]))
+	return ordered
+
+
+func _add_weapon_row(weapon_data: Dictionary, credits: int, input_locked := false) -> void:
+	var weapon_name := str(weapon_data.get("name", "Weapon"))
+	var cost := int(weapon_data.get("cost", 0))
+	var pack_size := int(weapon_data.get("shop_pack", weapon_data.get("ammo", 0)))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_weapon_list.add_child(row)
+
+	row.add_child(_cost_cell(cost))
+
+	var label := Label.new()
+	label.text = "%s  Ammo %s  Pack %s  Damage %d  Blast %d" % [
+		_catalog_display_name(weapon_name),
+		_format_ammo(int(weapon_data.get("ammo", -1))),
+		_format_pack(pack_size),
+		int(weapon_data.get("damage", 0)),
+		int(weapon_data.get("blast", 0)),
+	]
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	GroundfireTheme.apply_label(label, 14, GroundfireTheme.COLOR_MUTED)
+	row.add_child(label)
+
+	var buy_button := _shop_button(CLASSIC_BUY_ACTION_LABEL)
+	buy_button.disabled = input_locked or cost <= 0 or credits < cost
+	buy_button.set_meta("shop_focus_name", weapon_name)
+	var captured_name := weapon_name
+	buy_button.focus_entered.connect(_remember_shop_focus.bind(captured_name))
+	buy_button.pressed.connect(func() -> void: buy_requested.emit(captured_name))
+	row.add_child(buy_button)
+	if not buy_button.disabled:
+		_focus_buttons.append(buy_button)
+
+
+func _add_shop_item_row(item_data: Dictionary, credits: int, input_locked := false) -> void:
+	var item_name := str(item_data.get("name", "Item"))
+	var item_cost := int(item_data.get("cost", 0))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_weapon_list.add_child(row)
+
+	row.add_child(_cost_cell(item_cost))
+
+	var label := Label.new()
+	label.text = "%s  %s  Current %s" % [
+		_catalog_display_name(item_name),
+		str(item_data.get("effect", "")),
+		str(item_data.get("current", "")),
+	]
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	GroundfireTheme.apply_label(label, 14, GroundfireTheme.COLOR_MUTED)
+	row.add_child(label)
+
+	var buy_button := _shop_button(CLASSIC_BUY_ACTION_LABEL)
+	buy_button.disabled = input_locked or item_cost <= 0 or credits < item_cost
+	buy_button.set_meta("shop_focus_name", item_name)
+	var captured_name := item_name
+	buy_button.focus_entered.connect(_remember_shop_focus.bind(captured_name))
+	buy_button.pressed.connect(func() -> void: buy_requested.emit(captured_name))
+	row.add_child(buy_button)
+	if not buy_button.disabled:
+		_focus_buttons.append(buy_button)
+
+
+func _add_disabled_catalog_rows() -> void:
+	for item in DISABLED_CLASSIC_ITEMS:
+		var item_data: Dictionary = item
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		_weapon_list.add_child(row)
 
+		row.add_child(_cost_cell(int(item_data.get("cost", 0)), GroundfireTheme.COLOR_MUTED))
+
 		var label := Label.new()
-		label.text = "%s  Ammo %s  Damage %d  Blast %d" % [
-			weapon_name,
-			_format_ammo(int(weapon_data.get("ammo", -1))),
-			int(weapon_data.get("damage", 0)),
-			int(weapon_data.get("blast", 0)),
-		]
+		label.text = "%s  Not migrated yet" % str(item_data.get("name", "Item"))
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		GroundfireTheme.apply_label(label, 14, GroundfireTheme.COLOR_MUTED)
 		row.add_child(label)
 
-		var buy_button := _shop_button("Buy %d" % cost)
-		buy_button.disabled = cost <= 0 or credits < cost
-		var captured_name := weapon_name
-		buy_button.pressed.connect(func() -> void: buy_requested.emit(captured_name))
-		row.add_child(buy_button)
-		if not buy_button.disabled:
-			_focus_buttons.append(buy_button)
-	_focus_buttons.append(_continue_button)
-	_wire_vertical_focus(_focus_buttons)
+		var locked_button := _shop_button("Locked")
+		locked_button.disabled = true
+		row.add_child(locked_button)
+
+
+func _disabled_shop_items() -> Array:
+	return DISABLED_CLASSIC_ITEMS.duplicate(true)
+
+
+func _catalog_display_name(item_name: String) -> String:
+	return str(CLASSIC_SHOP_DISPLAY_NAMES.get(item_name, item_name))
+
+
+func _cost_cell(cost: int, color := GroundfireTheme.COLOR_WARN) -> Label:
+	var label := Label.new()
+	label.text = _format_money(cost)
+	label.custom_minimum_size = Vector2(84.0, 24.0)
+	GroundfireTheme.apply_label(label, 14, color)
+	return label
+
+
+func _format_money(value: int) -> String:
+	return "$%d" % value
 
 
 func _shop_button(text: String, accent := false) -> Button:
@@ -132,10 +286,31 @@ func _shop_button(text: String, accent := false) -> Button:
 	return button
 
 
+func _remember_shop_focus(item_name: String) -> void:
+	_preferred_focus_name = item_name
+
+
+func _restore_shop_focus() -> void:
+	for button in _focus_buttons:
+		if button == null or button.disabled:
+			continue
+		if str(button.get_meta("shop_focus_name", "")) == _preferred_focus_name:
+			button.grab_focus()
+			return
+	if _continue_button != null:
+		_continue_button.grab_focus()
+
+
 func _format_ammo(value: int) -> String:
 	if value < 0:
 		return "inf"
 	return str(value)
+
+
+func _format_pack(value: int) -> String:
+	if value <= 0:
+		return "-"
+	return "+%d" % value
 
 
 func _wire_vertical_focus(buttons: Array[Button]) -> void:
@@ -144,6 +319,8 @@ func _wire_vertical_focus(buttons: Array[Button]) -> void:
 	if buttons.size() == 1:
 		buttons[0].focus_neighbor_top = buttons[0].get_path()
 		buttons[0].focus_neighbor_bottom = buttons[0].get_path()
+		buttons[0].focus_neighbor_left = buttons[0].get_path()
+		buttons[0].focus_neighbor_right = buttons[0].get_path()
 		return
 	for index in range(buttons.size()):
 		var button := buttons[index]
@@ -151,3 +328,5 @@ func _wire_vertical_focus(buttons: Array[Button]) -> void:
 		var next := buttons[wrapi(index + 1, 0, buttons.size())]
 		button.focus_neighbor_top = previous.get_path()
 		button.focus_neighbor_bottom = next.get_path()
+		button.focus_neighbor_left = button.get_path()
+		button.focus_neighbor_right = button.get_path()

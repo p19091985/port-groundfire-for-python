@@ -94,12 +94,12 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | Terreno destrutível | 🟢 ativo | Crateras, queda de terreno e efeitos possuem testes dedicados |
 | Loja entre rodadas | 🟢 ativa | Compra de armas e jump jets |
 | Rede | 🟡 em evolução | Cliente, servidor headless, descoberta LAN e transporte seguro |
-| Cliente Godot desktop/web | 🟡 iniciado | Scaffold em [`godot/`](godot/) com capacidades separadas para desktop e web |
+| Cliente Godot desktop/web | 🟡 release slice validada | Cliente em [`godot/`](godot/) com builds Linux/Web `0.25.0` empacotados; a migração completa segue rastreada em docs |
 | Fidelidade histórica | 🟡 em evolução | Testes e registros ajudam a comparar comportamento |
 
 ### Migração desktop/web
 
-O projeto iniciou uma migração gradual para um cliente **Godot 4 + GDScript**, mantendo o Python/Pygame atual funcionando durante a transição. A regra de produto para web e simples: recursos que dependem de comportamento nativo do sistema operacional ou rede local nao aparecem no navegador.
+O projeto iniciou uma migração gradual para um cliente **Godot 4 + GDScript**, mantendo o Python/Pygame atual funcionando durante a transição. A release slice Godot `0.25.0` já foi validada, exportada e empacotada para Linux/Web, mas isso não significa que a migração inteira esteja encerrada. A regra de produto para web e simples: recursos que dependem de comportamento nativo do sistema operacional ou rede local nao aparecem no navegador.
 
 | Recurso | Desktop | Web |
 |:---|:---:|:---:|
@@ -109,7 +109,7 @@ O projeto iniciou uma migração gradual para um cliente **Godot 4 + GDScript**,
 | UDP nativo | sim | nao |
 | Ferramentas de servidor dedicado local | sim | nao |
 
-O plano de migracao esta em [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md).
+O plano de migracao, as pendencias, o handoff para agentes e o marco de verificacao/empacotamento da release Godot seguem em [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md).
 
 ---
 
@@ -1374,7 +1374,14 @@ Provide a modern, verifiable version of Groundfire for:
 | Destructible terrain | 🟢 active | Craters, terrain falling, and effects have dedicated tests |
 | Between-round shop | 🟢 active | Weapon and jump jet purchasing |
 | Network | 🟡 evolving | Client, headless server, LAN discovery, native UDP transport, and server registry helpers |
+| Godot desktop/web client | 🟡 validated release slice | Client under [`godot/`](godot/) with packaged Linux/Web `0.25.0` builds; the full migration remains tracked in docs |
 | Historical fidelity | 🟡 evolving | Tests and recorded output help compare behavior |
+
+### Desktop/Web Migration
+
+The project has started a gradual migration to a **Godot 4 + GDScript** client while keeping the current Python/Pygame client alive during the transition. The Godot `0.25.0` release slice has been validated, exported, and packaged for Linux/Web, but that is not a claim that the whole migration is complete.
+
+The migration plan, remaining work, agent handoff, and Godot release verification and packaging walkthrough are tracked in [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md).
 
 ---
 

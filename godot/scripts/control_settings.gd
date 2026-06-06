@@ -18,7 +18,23 @@ const DEFAULT_BINDINGS := {
 	"gf_move_left": KEY_A,
 	"gf_move_right": KEY_D,
 	"gf_jump": KEY_SHIFT,
+	"gf_shield": KEY_K,
 }
+
+const ACTION_ORDER := [
+	"gf_fire",
+	"gf_weapon_next",
+	"gf_weapon_prev",
+	"gf_jump",
+	"gf_shield",
+	"gf_move_left",
+	"gf_move_right",
+	"gf_aim_left",
+	"gf_aim_right",
+	"gf_power_up",
+	"gf_power_down",
+	"gf_pause",
+]
 
 const DEFAULT_GAMEPAD_BUTTONS := {
 	"gf_fire": JOY_BUTTON_A,
@@ -26,6 +42,7 @@ const DEFAULT_GAMEPAD_BUTTONS := {
 	"gf_weapon_prev": JOY_BUTTON_LEFT_SHOULDER,
 	"gf_pause": JOY_BUTTON_START,
 	"gf_jump": JOY_BUTTON_B,
+	"gf_shield": JOY_BUTTON_Y,
 }
 
 const DEFAULT_GAMEPAD_AXES := {
@@ -41,7 +58,7 @@ const DEFAULT_GAMEPAD_AXES := {
 static func apply_saved_bindings() -> void:
 	var config := ConfigFile.new()
 	var has_config := config.load(SETTINGS_PATH) == OK
-	for action_name in DEFAULT_BINDINGS.keys():
+	for action_name in ACTION_ORDER:
 		var keycode: int = int(DEFAULT_BINDINGS[action_name])
 		if has_config:
 			keycode = int(config.get_value("bindings", action_name, keycode))
@@ -93,7 +110,7 @@ static func clear_gamepad_binding(action_name: String) -> void:
 static func reset_defaults() -> void:
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)
-	for action_name in DEFAULT_BINDINGS.keys():
+	for action_name in ACTION_ORDER:
 		config.set_value("bindings", action_name, int(DEFAULT_BINDINGS[action_name]))
 		_apply_action_binding(str(action_name), int(DEFAULT_BINDINGS[action_name]), config)
 	config.save(SETTINGS_PATH)
@@ -103,7 +120,7 @@ static func reset_gamepad_defaults() -> void:
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)
 	var section := _gamepad_section(config)
-	for action_name in DEFAULT_BINDINGS.keys():
+	for action_name in ACTION_ORDER:
 		for suffix in ["type", "index", "value"]:
 			var key := "%s_%s" % [action_name, suffix]
 			if config.has_section_key(section, key):
@@ -141,14 +158,14 @@ static func gamepad_profiles() -> Array[Dictionary]:
 
 static func binding_labels() -> Array[String]:
 	var labels: Array[String] = []
-	for action_name in DEFAULT_BINDINGS.keys():
+	for action_name in ACTION_ORDER:
 		labels.append("%s: %s" % [display_name(str(action_name)), key_label(str(action_name))])
 	return labels
 
 
 static func action_names() -> Array[String]:
 	var actions: Array[String] = []
-	for action_name in DEFAULT_BINDINGS.keys():
+	for action_name in ACTION_ORDER:
 		actions.append(str(action_name))
 	return actions
 

@@ -246,7 +246,10 @@ class ServerApp:
         elif isinstance(message, RconCommand):
             responses.append(self._handle_rcon_command(message, address=address))
         elif isinstance(message, DisconnectNotice):
-            disconnected = self._controller.disconnect_player(message.player_number, session_token=message.session_token)
+            disconnected = self._controller.disconnect_player(
+                message.player_number,
+                session_token=message.session_token,
+            )
             self._log_event(
                 "disconnect_notice "
                 f"player_number={message.player_number} ok={str(disconnected).lower()} "
@@ -269,7 +272,13 @@ class ServerApp:
 
         if self._controller.should_emit_snapshot():
             snapshot = self._controller.build_snapshot_envelope()
-            if snapshot.events or snapshot.terrain_patches or snapshot.removed_entity_ids or snapshot.removed_player_numbers:
+            has_delta = (
+                snapshot.events
+                or snapshot.terrain_patches
+                or snapshot.removed_entity_ids
+                or snapshot.removed_player_numbers
+            )
+            if has_delta:
                 self._log_event(
                     "snapshot_emit "
                     f"sequence={snapshot.snapshot_sequence} kind={snapshot.snapshot_kind} "
@@ -504,7 +513,9 @@ class ServerApp:
                 self._master_client.unregister(address, host=host, port=port, timeout=0.01)
                 self._log_event(f"master_unregister address={address.host}:{address.port} host={host} port={port}")
             except OSError:
-                self._log_event(f"master_unregister_failed address={address.host}:{address.port} host={host} port={port}")
+                self._log_event(
+                    f"master_unregister_failed address={address.host}:{address.port} host={host} port={port}"
+                )
                 continue
 
     def _build_master_entry(self) -> ServerListEntry:

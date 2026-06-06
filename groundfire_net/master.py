@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import asdict, dataclass
+from typing import Any
 
 from .browser import ServerListEntry
 from .transport import DatagramEndpoint
@@ -108,12 +109,13 @@ class MasterServerApp:
     def poll(self, *, timeout: float = 0.0) -> tuple[object, ...]:
         self.open()
         assert self._endpoint is not None
-        responses = []
+        responses: list[tuple[str, dict[str, Any]]] = []
         for datagram in self._endpoint.poll(timeout=timeout):
             try:
                 message_type, payload = decode_master_packet(datagram.payload)
             except (ValueError, TypeError, KeyError, json.JSONDecodeError):
                 continue
+            response: tuple[str, dict[str, Any]]
             if message_type == "register":
                 entry = _entry_from_payload(payload)
                 registered = self._directory.register(entry, source_host=datagram.address[0])
@@ -224,6 +226,7 @@ def parse_master_server_address(raw: str) -> MasterServerAddress:
 
 
 def _entry_from_payload(payload: dict) -> ServerListEntry:
+    latency_ms = payload.get("latency_ms")
     return ServerListEntry(
         name=str(payload.get("name", "Groundfire Server")),
         host=str(payload.get("host", "")),
@@ -232,7 +235,7 @@ def _entry_from_payload(payload: dict) -> ServerListEntry:
         map_name=str(payload.get("map_name", "generated")),
         player_count=int(payload.get("player_count", 0)),
         max_players=int(payload.get("max_players", 8)),
-        latency_ms=None if payload.get("latency_ms") is None else int(payload.get("latency_ms")),
+        latency_ms=None if latency_ms is None else int(latency_ms),
         source=str(payload.get("source", "internet")),
         description=str(payload.get("description", "")),
         last_played=str(payload.get("last_played", "")),
