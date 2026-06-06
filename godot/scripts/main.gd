@@ -1,6 +1,7 @@
 extends Control
 
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
+const ClassicSelector := preload("res://scripts/classic_selector.gd")
 const LocalMatchScene := preload("res://scenes/local_match.tscn")
 const OnlineMatchScene := preload("res://scenes/online_match.tscn")
 const ServerBrowserScene := preload("res://scenes/server_browser.tscn")
@@ -1778,11 +1779,10 @@ func _add_classic_options_preset_rows(parent: Container, scroll: ScrollContainer
 	)
 
 
-func _add_classic_resolution_row(parent: Container) -> OptionButton:
-	var selector := OptionButton.new()
-	selector.focus_mode = Control.FOCUS_ALL
-	selector.disabled = _capabilities != null and _capabilities.is_web()
-	GroundfireTheme.apply_classic_button(selector, int(round(float(OPTIONS_CLASSIC_ROW_FONT_SIZE) * _menu_scale())))
+func _add_classic_resolution_row(parent: Container) -> Control:
+	var selector := ClassicSelector.new()
+	selector.set_font_size(int(round(float(OPTIONS_CLASSIC_ROW_FONT_SIZE) * _menu_scale())))
+	selector.set_disabled(_capabilities != null and _capabilities.is_web())
 	for index in range(RESOLUTION_PRESETS.size()):
 		var preset: Dictionary = RESOLUTION_PRESETS[index]
 		selector.add_item(str(preset.get("label", "")))
@@ -1796,10 +1796,9 @@ func _add_classic_resolution_row(parent: Container) -> OptionButton:
 	return selector
 
 
-func _add_classic_screen_mode_row(parent: Container) -> OptionButton:
-	var selector := OptionButton.new()
-	selector.focus_mode = Control.FOCUS_ALL
-	GroundfireTheme.apply_classic_button(selector, int(round(float(OPTIONS_CLASSIC_ROW_FONT_SIZE) * _menu_scale())))
+func _add_classic_screen_mode_row(parent: Container) -> Control:
+	var selector := ClassicSelector.new()
+	selector.set_font_size(int(round(float(OPTIONS_CLASSIC_ROW_FONT_SIZE) * _menu_scale())))
 	selector.add_item("Fullscreen")
 	selector.add_item("Windowed")
 	selector.select(0 if _fullscreen else 1)

@@ -66,6 +66,38 @@ def test_groundfire_theme_defines_shared_visual_language():
     assert "static func modal_backdrop_style" in script
 
 
+def test_classic_selector_matches_pygame_triangle_selector_contract():
+    script_path = GODOT_ROOT / "scripts" / "classic_selector.gd"
+    assert script_path.exists()
+    script = script_path.read_text(encoding="utf-8")
+
+    assert "extends Control" in script
+    assert 'preload("res://scripts/groundfire_theme.gd")' in script
+    assert "signal item_selected(index: int)" in script
+    assert "var selected := 0" in script
+    assert "var item_count := 0" in script
+    assert "func add_item(text: String)" in script
+    assert "func get_item_text(index: int)" in script
+    assert "func select(index: int)" in script
+    assert "func set_disabled(value: bool)" in script
+    assert "focus_mode = Control.FOCUS_NONE if _disabled else Control.FOCUS_ALL" in script
+    assert "mouse_filter = Control.MOUSE_FILTER_IGNORE if _disabled else Control.MOUSE_FILTER_STOP" in script
+    assert "GroundfireTheme.apply_classic_text_effect(self)" in script
+    assert "draw_colored_polygon" in script
+    assert "Vector2(left_base - arrow_size, center_y)" in script
+    assert "Vector2(right_base + arrow_size, center_y)" in script
+    assert "draw_string(" in script
+    assert "ThemeDB.fallback_font" in script
+    assert "GroundfireTheme.COLOR_WARN" in script
+    assert 'event.is_action_pressed("ui_left")' in script
+    assert 'event.is_action_pressed("ui_right")' in script
+    assert 'event.is_action_pressed("ui_accept")' in script
+    assert "func _arrow_at(point: Vector2) -> int" in script
+    assert "func _step(direction: int) -> void" in script
+    assert "selected = wrapi(selected + direction, 0, _items.size())" in script
+    assert "item_selected.emit(selected)" in script
+
+
 def test_platform_capabilities_hide_native_networking_on_web():
     script = (GODOT_ROOT / "scripts" / "platform_capabilities.gd").read_text(encoding="utf-8")
 
@@ -97,6 +129,7 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert 'preload("res://scripts/control_settings.gd")' in script
     assert 'preload("res://scripts/browser_store.gd")' in script
     assert 'preload("res://scripts/network_adapter.gd")' in script
+    assert 'preload("res://scripts/classic_selector.gd")' in script
     assert "ControlSettings.apply_saved_bindings()" in script
     assert "ControlSettings.action_names()" in script
     assert "ControlSettings.save_key_binding" in script
@@ -164,8 +197,13 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert 'controls_section = _add_options_section(inner, "Controls")' in script
     assert "OPTIONS_CLASSIC_ROW_SIZE" in script
     assert "func _add_classic_options_preset_rows" in script
-    assert "func _add_classic_resolution_row" in script
-    assert "func _add_classic_screen_mode_row" in script
+    assert "func _add_classic_resolution_row(parent: Container) -> Control" in script
+    assert "func _add_classic_screen_mode_row(parent: Container) -> Control" in script
+    assert "ClassicSelector.new()" in script
+    assert "selector.set_font_size" in script
+    assert "selector.set_disabled(_capabilities != null and _capabilities.is_web())" in script
+    assert "selector.add_item" in script
+    assert "selector.item_selected.connect" in script
     assert '"Resolution:"' in script
     assert '"Screen Mode:"' in script
     assert '"Set Controls"' in script
@@ -1675,9 +1713,12 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "linux_release.x86_64" in export_script
     assert '--export-release "Linux Desktop"' in export_script
     assert '--export-release "Web"' in export_script
+    assert "classic_selector.gd" in validate_script
     assert "runtime_smoke_check.gd" in validate_script
     assert "visible_server_browser_tabs_for(true)" in runtime_smoke
     assert "MainScene.instantiate()" in runtime_smoke
+    assert 'preload("res://scripts/classic_selector.gd")' in runtime_smoke
+    assert "func _find_classic_selector_with_items" in runtime_smoke
     assert "func _check_main_menu_responsive_metrics" in runtime_smoke
     assert "func _check_menu_subscreen_responsive_metrics" in runtime_smoke
     assert 'main.call("_show_local_match_setup")' in runtime_smoke

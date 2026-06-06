@@ -13,6 +13,7 @@ fi
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --import
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/platform_capabilities.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/groundfire_theme.gd
+"$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/classic_selector.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/control_settings.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/browser_store.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/network_adapter.gd

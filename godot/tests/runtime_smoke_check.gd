@@ -7,6 +7,7 @@ const ServerBrowserScene := preload("res://scenes/server_browser.tscn")
 const PlatformCapabilities := preload("res://scripts/platform_capabilities.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
+const ClassicSelector := preload("res://scripts/classic_selector.gd")
 const SHUTDOWN_DRAIN_FRAMES := 8
 
 
@@ -309,8 +310,8 @@ func _check_main_menu_and_options() -> void:
 	assert(_has_button(main, "Set Controls"))
 	assert(_has_button(main, "Apply"))
 	assert(_has_button(main, "Back"))
-	var classic_resolution := _find_option_button_with_items(main, PackedStringArray(["640 x 480", "800 x 600", "1024 x 768", "1280 x 960", "1280 x 1024", "1600 x 1200"]))
-	var screen_mode := _find_option_button_with_items(main, PackedStringArray(["Fullscreen", "Windowed"]))
+	var classic_resolution := _find_classic_selector_with_items(main, PackedStringArray(["640 x 480", "800 x 600", "1024 x 768", "1280 x 960", "1280 x 1024", "1600 x 1200"]))
+	var screen_mode := _find_classic_selector_with_items(main, PackedStringArray(["Fullscreen", "Windowed"]))
 	var set_controls := _find_control_with_text(main, "Button", "Set Controls") as Button
 	var resolution_label := _find_control_with_text(main, "Label", "Resolution:") as Label
 	var show_fps := _find_control_with_text(main, "CheckButton", "Show FPS") as CheckButton
@@ -329,6 +330,10 @@ func _check_main_menu_and_options() -> void:
 	assert(options_back != null)
 	assert(classic_resolution.custom_minimum_size.x >= 220.0)
 	assert(screen_mode.custom_minimum_size.y >= 29.0)
+	assert(classic_resolution.item_count == 6)
+	assert(screen_mode.item_count == 2)
+	assert(classic_resolution.has_method("set_disabled"))
+	assert(screen_mode.focus_mode == Control.FOCUS_ALL)
 	_assert_classic_text_effect(classic_resolution)
 	_assert_classic_text_effect(set_controls)
 	_assert_classic_text_effect(resolution_label)
@@ -416,8 +421,8 @@ func _check_menu_subscreen_responsive_metrics() -> void:
 		await process_frame
 		var options_scroll := _find_first(main, "ScrollContainer") as ScrollContainer
 		var options_back := _find_control_with_text(main, "Button", "Back") as Button
-		var classic_resolution := _find_option_button_with_items(main, PackedStringArray(["640 x 480", "800 x 600", "1024 x 768", "1280 x 960", "1280 x 1024", "1600 x 1200"]))
-		var screen_mode := _find_option_button_with_items(main, PackedStringArray(["Fullscreen", "Windowed"]))
+		var classic_resolution := _find_classic_selector_with_items(main, PackedStringArray(["640 x 480", "800 x 600", "1024 x 768", "1280 x 960", "1280 x 1024", "1600 x 1200"]))
+		var screen_mode := _find_classic_selector_with_items(main, PackedStringArray(["Fullscreen", "Windowed"]))
 		var set_controls := _find_control_with_text(main, "Button", "Set Controls") as Button
 		var show_fps := _find_control_with_text(main, "CheckButton", "Show FPS") as CheckButton
 		assert(options_scroll != null)
@@ -658,6 +663,23 @@ func _find_option_button_with_items(node: Node, items: PackedStringArray) -> Opt
 			return option
 	for child in node.get_children():
 		var found := _find_option_button_with_items(child, items)
+		if found != null:
+			return found
+	return null
+
+
+func _find_classic_selector_with_items(node: Node, items: PackedStringArray) -> ClassicSelector:
+	if node is ClassicSelector and int(node.get("item_count")) == items.size():
+		var selector := node as ClassicSelector
+		var matches := true
+		for index in range(items.size()):
+			if selector.get_item_text(index) != items[index]:
+				matches = false
+				break
+		if matches:
+			return selector
+	for child in node.get_children():
+		var found := _find_classic_selector_with_items(child, items)
 		if found != null:
 			return found
 	return null
