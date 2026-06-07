@@ -622,6 +622,421 @@ class TankFidelityTests(unittest.TestCase):
         self.assertEqual(self.tank.get_colour(), (90, 80, 70))
 
 
+class AIPlayerFidelityTests(unittest.TestCase):
+    """
+    Fidelity target: src/aiplayer.py — record_shot() miss-correction loop
+    and find_new_target() target-selection scoring.
+
+    User-visible invariants:
+    - AI progressively corrects angle by abs(sin(angle)) * x_dist * 4.0 and
+      power by x_dist * 1.2 * (1 - sin(abs(angle))) each miss.
+    - A "going-away" shot (two consecutive misses moving farther from target)
+      halves the angle and adds 2.0 to power instead.
+    - find_new_target awards +100 for a direct line-of-sight to an enemy, +50
+      if the enemy is higher than the AI tank.
+
+    Required validation: paired Python reference regressions confirming every
+    constant in the correction loop.
+    """
+
+    def _make_game_and_ai(self):
+        from src.aiplayer import AIPlayer
+        from src.common import GameState as _GameState
+
+        _game_state_initial = _GameState.ROUND_IN_ACTION
+
+        class MockGame:
+            def __init__(self):
+                self.GameState = _GameState
+                self._game_state = _game_state_initial
+                self._players = [None] * 8
+                self._entities = []
+
+            def get_game_state(self):
+                return self._game_state
+
+            def get_settings(self):
+                return SETTINGS
+
+            def get_time(self):
+                return 0.0
+
+            def get_landscape(self):
+                return None
+
+            def get_players(self):
+                return [p for p in self._players if p is not None]
+
+            def add_entity(self, _e):
+                self._entities.append(_e)
+
+            def get_interface(self):
+                return None
+
+            def get_current_menu(self):
+                return None
+
+            def get_controls(self):
+                return None
+
+        game = MockGame()
+        ai = AIPlayer(game, 0, "Bot", (255, 0, 0))
+        ai._tank = Tank(DummyGameForTank(SETTINGS), CommandPlayer(), 0)
+        ai._tank._gun_angle = 0.0
+        ai._tank._gun_power = 10.0
+        ai._tank._x = 0.0
+        ai._tank._y = 0.0
+        return game, ai
+
+
+    def test_record_shot_miss_correction_angle_uses_four_constant(self):
+        # Fidelity target: aiplayer.py:125 / 134
+        # angle += abs(sin(angle)) * x_dist * 4.0
+        # When shot lands short of the target (curr_x_dist < 0, target is to the
+        # right), the AI nudges the angle left by 4 * abs(sin(angle)) * |dist|.
+        # Setup: prev shot was farther short (x=2.5) so curr (x=3.0) is closer
+        # → not going-away (curr_x_dist=-2.0 > prev_x_dist=-2.5) → normal branch.
+        _game, ai = self._make_game_and_ai()
+
+        # Target is to the right of the AI tank.
+        class FakeTargetTank:
+            _x = 5.0
+            _y = 0.0
+            _state = Tank.TANK_ALIVE
+
+        initial_angle = 30.0
+        ai._target_tank = FakeTargetTank()
+        ai._target_last_x_pos = 5.0
+        ai._target_last_y_pos = 0.0
+        ai._target_angle = initial_angle
+        ai._target_power = 10.0
+        ai._tank._gun_angle = initial_angle
+        ai._tank._gun_power = 10.0
+        ai._last_shot = True
+        ai._ignore_shot = False
+        ai._aim_directly = False
+
+        # prev miss at x=2.5 → prev_x_dist = -2.5
+        # curr miss at x=3.0 → curr_x_dist = -2.0  (> -2.5, not going-away)
+        ai._last_shot_x = 2.5
+        ai._last_shot_y = 0.0
+        ai.record_shot(3.0, 0.0, -1)  # -1 = miss, no tank hit
+
+        curr_x_dist = 3.0 - 5.0  # = -2.0
+        expected_angle_delta = abs(deg_sin(initial_angle)) * curr_x_dist * 4.0
+        expected_angle = initial_angle + expected_angle_delta
+        self.assertAlmostEqual(ai._target_angle, expected_angle, places=6)
+
+    def test_record_shot_miss_correction_power_uses_1_2_constant(self):
+        # Fidelity target: aiplayer.py:130-132
+        # power += -curr_x_dist * 1.2 * (1 - sin(abs(angle)))  [target right, shot left]
+        # Setup: prev shot was farther short so curr is closer → normal branch (not going-away).
+        _game, ai = self._make_game_and_ai()
+
+        class FakeTargetTank:
+            _x = 5.0
+            _y = 0.0
+            _state = Tank.TANK_ALIVE
+
+        initial_angle = 30.0
+        initial_power = 10.0
+        ai._target_tank = FakeTargetTank()
+        ai._target_last_x_pos = 5.0
+        ai._target_last_y_pos = 0.0
+        ai._target_angle = initial_angle
+        ai._target_power = initial_power
+        ai._tank._gun_angle = initial_angle
+        ai._tank._gun_power = initial_power
+        ai._tank._x = 0.0
+        ai._last_shot = True
+        ai._ignore_shot = False
+        ai._aim_directly = False
+        # prev at x=2.5 → prev_x_dist = -2.5; curr at x=3.0 → curr_x_dist = -2.0 (> -2.5, not going-away)
+        ai._last_shot_x = 2.5
+
+        ai.record_shot(3.0, 0.0, -1)
+
+        curr_x_dist = 3.0 - 5.0  # = -2.0
+        # IMPORTANT: angle is updated FIRST in record_shot, so power correction
+        # uses the already-updated target_angle, not the initial_angle.
+        updated_angle = initial_angle + abs(deg_sin(initial_angle)) * curr_x_dist * 4.0
+        # curr_x_dist < 0 and target (5.0) > ai (0.0) → power += -curr_x_dist * 1.2 * factor
+        power_factor = 1 - deg_sin(abs(updated_angle))
+        power_delta = -curr_x_dist * 1.2 * power_factor
+        expected_power = initial_power + power_delta
+        expected_power = max(ai._tank._gun_power_min, min(ai._tank._gun_power_max, expected_power))
+        self.assertAlmostEqual(ai._target_power, expected_power, places=6)
+
+    def test_record_shot_going_away_halves_angle_and_adds_power(self):
+        # Fidelity target: aiplayer.py:114-122
+        # Two consecutive shots move farther from the target in the same
+        # direction → halve the angle and add 2.0 power.
+        _game, ai = self._make_game_and_ai()
+
+        class FakeTargetTank:
+            _x = 5.0
+            _y = 0.0
+            _state = Tank.TANK_ALIVE
+
+        ai._target_tank = FakeTargetTank()
+        ai._target_last_x_pos = 5.0
+        ai._target_last_y_pos = 0.0
+        ai._tank._gun_angle = 30.0
+        initial_angle = 40.0
+        initial_power = 8.0
+        ai._target_angle = initial_angle
+        ai._target_power = initial_power
+        ai._last_shot = True
+        ai._ignore_shot = False
+        ai._aim_directly = False
+
+        # Both shots landed to the left of the target and prev_x_dist is more
+        # negative than curr_x_dist (i.e. both < 0 and curr < prev).
+        ai._last_shot_x = 3.5  # prev: dist = 3.5 - 5.0 = -1.5
+        # curr at x=2.0: dist = 2.0 - 5.0 = -3.0 < -1.5 → going-away branch
+        ai.record_shot(2.0, 0.0, -1)
+
+        expected_angle = initial_angle / 2.0
+        expected_power = min(ai._tank._gun_power_max, initial_power + 2.0)
+        self.assertAlmostEqual(ai._target_angle, expected_angle, places=6)
+        self.assertAlmostEqual(ai._target_power, expected_power, places=6)
+
+    def test_record_shot_direct_hit_sets_on_target(self):
+        # Fidelity target: aiplayer.py:93-102
+        # When a shot hits an enemy tank, _on_target is set to True and
+        # the target is updated to the hit player's tank.
+        # Setup: AI number=1, enemy at players[0]. hit_tank=0 != ai._number=1
+        # so the hit branches into the target-update code (not self-hit branch).
+        _game, ai = self._make_game_and_ai()
+        ai._number = 1  # avoid self-hit branch (hit_tank=0 != ai._number=1)
+
+        class FakeEnemyTank:
+            _x = 3.0
+            _y = 0.0
+            _state = Tank.TANK_ALIVE
+
+            def alive(self):
+                return True
+
+        class FakeEnemyPlayer:
+            _number = 0
+
+            def get_tank(self):
+                return enemy_tank
+
+        enemy_tank = FakeEnemyTank()
+        enemy_player = FakeEnemyPlayer()
+        _game._players[0] = enemy_player
+
+        ai._shots_in_air = 1
+        # get_players() returns [enemy_player] → index 0 → hit_tank=0.
+        # hit_tank(0) != ai._number(1) → enters target-update branch.
+        ai.record_shot(3.0, 0.0, 0)
+
+        self.assertTrue(ai._on_target)
+        self.assertIs(ai._target_tank, enemy_tank)
+
+    def test_find_new_target_scores_plus_100_for_direct_los(self):
+        # Fidelity target: aiplayer.py:246-251
+        # An enemy with a clear line-of-sight (no terrain collision) scores
+        # +100. If also higher than the AI tank, scores an extra +50 and sets
+        # aim_directly to True.
+        _game, ai = self._make_game_and_ai()
+
+        class LoSLandscape:
+            def ground_collision(self, _x1, _y1, _x2, _y2):
+                return (False, 0.0, 0.0)
+
+        class FakeEnemyTank:
+            _x = 2.0
+            _y = 1.0
+            _state = Tank.TANK_ALIVE
+
+            def get_centre(self):
+                return (self._x, self._y, 0.1875)
+
+            def gun_launch_position(self):
+                return (0.0, 0.0)
+
+        enemy_tank = FakeEnemyTank()
+
+        class FakeEnemy:
+            def get_tank(self):
+                return enemy_tank
+
+        ai._tank._x = 0.0
+        ai._tank._y = 0.0
+
+        # Patch landscape to provide direct LoS.
+        _game.get_landscape = lambda: LoSLandscape()
+        _game._players[1] = FakeEnemy()
+
+        # AI needs gun_launch_position accessible.
+        ai._tank.gun_launch_position = lambda: (0.0, 0.0)
+
+        ai.find_new_target()
+
+        self.assertIs(ai._target_tank, enemy_tank)
+        # aim_directly should be True when enemy is higher
+        self.assertTrue(ai._aim_directly)
+
+
+class ExplosionFidelityTests(unittest.TestCase):
+    """
+    Fidelity target: src/gamesession.py explosion() — quadratic splash damage
+    falloff formula and direct-hit full-damage delivery.
+
+    User-visible invariants:
+    - A tank at the explosion centre (direct hit) always receives full damage.
+    - Tanks in the splash radius receive damage * (1 - dist² / max_dist²).
+    - Tanks outside the splash radius (squared_distance >= max_distance) receive
+      no damage.
+    - max_distance = (size + hit_range)², where hit_range = tank.get_centre()[2].
+
+    Required validation: Python reference regressions confirming every constant.
+    """
+
+    def _run_explosion(self, *, blast_x, blast_y, blast_size, damage,
+                       hit_tank_idx, tanks):
+        """
+        Run gamesession.explosion() and return the damage_calls list per tank.
+        """
+        from src.gamesession import GameSessionController
+
+        class FakeBlast:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        class FakeSoundEntity:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        class FakeGame:
+            _entity_list = []
+            _players = [None] * 8
+            _landscape = None
+
+            def add_entity(self, _e):
+                pass
+
+            def queue_network_event(self, *_a, **_k):
+                pass
+
+        game = FakeGame()
+        players_list = []
+        for idx, tank in enumerate(tanks):
+            class FakePlayer:
+                def __init__(self, t):
+                    self._tank = t
+
+                def get_tank(self):
+                    return self._tank
+
+                def defeat(self, _p):
+                    pass
+
+            fp = FakePlayer(tank)
+            game._players[idx] = fp
+            players_list.append(fp)
+
+        class FakePlayerRef:
+            def defeat(self, _p):
+                pass
+
+        session = GameSessionController(
+            human_player_factory=lambda *a, **k: None,
+            ai_player_factory=lambda *a, **k: None,
+            landscape_factory=lambda *a, **k: None,
+            quake_factory=lambda *a, **k: None,
+            blast_factory=lambda *a, **k: FakeBlast(*a, **k),
+            sound_entity_factory=lambda *a, **k: FakeSoundEntity(*a, **k),
+        )
+        session.explosion(
+            game, blast_x, blast_y, blast_size, damage, hit_tank_idx,
+            0, False, FakePlayerRef()
+        )
+        return [tank.damage_calls for tank in tanks]
+
+    def test_direct_hit_delivers_full_damage(self):
+        # Fidelity target: gamesession.py:95-97
+        # The tank at hit_tank_idx receives full damage without the splash falloff.
+        from tests.support import ExplosionTank
+
+        direct = ExplosionTank(x=0.0, y=0.0)
+        nearby = ExplosionTank(x=0.1, y=0.0)
+
+        results = self._run_explosion(
+            blast_x=0.0, blast_y=0.0, blast_size=0.3, damage=40,
+            hit_tank_idx=0, tanks=[direct, nearby]
+        )
+
+        self.assertEqual(results[0], [40])  # direct: full damage regardless of distance
+        # nearby is also within splash radius; its damage should be less than 40
+        if results[1]:
+            self.assertLess(results[1][0], 40)
+
+    def test_splash_damage_quadratic_falloff_formula(self):
+        # Fidelity target: gamesession.py:101-104
+        # scaled_damage = damage * (1.0 - squared_distance / max_distance)
+        # where max_distance = (size + hit_range)^2.
+        from tests.support import ExplosionTank
+
+        blast_x = 0.0
+        blast_y = 0.0
+        size = 0.3
+        damage = 40
+
+        # Place a tank at x=0.2 with the classic hit_range=0.1875.
+        hit_range = 0.1875
+        tank_x = 0.2
+        tank = ExplosionTank(x=tank_x, y=0.0, hit_range=hit_range)
+
+        results = self._run_explosion(
+            blast_x=blast_x, blast_y=blast_y, blast_size=size, damage=damage,
+            hit_tank_idx=-1, tanks=[tank]
+        )
+
+        squared_distance = tank_x ** 2  # y=0 so dist² = dx²
+        max_distance = (size + hit_range) ** 2
+        expected_damage = damage * (1.0 - squared_distance / max_distance)
+
+        self.assertEqual(len(results[0]), 1)
+        self.assertAlmostEqual(results[0][0], expected_damage, places=5)
+
+    def test_splash_damage_at_boundary_is_approximately_zero(self):
+        # Fidelity target: gamesession.py:102-103
+        # A tank positioned just at the edge of (size + hit_range) receives
+        # approximately 0 damage (the formula gives exactly 0 at the boundary).
+        from tests.support import ExplosionTank
+
+        size = 0.3
+        hit_range = 0.1875
+        # Place at exactly the boundary distance.
+        boundary_x = size + hit_range  # = 0.4875
+
+        tank = ExplosionTank(x=boundary_x, y=0.0, hit_range=hit_range)
+        results = self._run_explosion(
+            blast_x=0.0, blast_y=0.0, blast_size=size, damage=40,
+            hit_tank_idx=-1, tanks=[tank]
+        )
+
+        # At boundary: squared_distance == max_distance → damage = 0 → do_damage not called.
+        self.assertEqual(results[0], [])
+
+    def test_splash_damage_outside_radius_delivers_no_damage(self):
+        # Fidelity target: gamesession.py:102-103 — the < check.
+        # A tank beyond (size + hit_range) receives no damage at all.
+        from tests.support import ExplosionTank
+
+        tank = ExplosionTank(x=2.0, y=0.0)  # far outside any blast
+        results = self._run_explosion(
+            blast_x=0.0, blast_y=0.0, blast_size=0.3, damage=40,
+            hit_tank_idx=-1, tanks=[tank]
+        )
+
+        self.assertEqual(results[0], [])
+
+
 class PlayerAndSoundFidelityTests(unittest.TestCase):
     def test_end_round_matches_cpp_scoring_without_extra_post_round(self):
         game = DummyGameForTank(SETTINGS)

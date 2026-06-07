@@ -1,21 +1,21 @@
 extends SceneTree
 
-const LocalMatchScene := preload("res://scenes/local_match.tscn")
-const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
-const LocalMatchHud := preload("res://scripts/local_match_hud.gd")
-const LocalMatchShop := preload("res://scripts/local_match_shop.gd")
-const TankState := preload("res://scripts/tank_state.gd")
-const TerrainModel := preload("res://scripts/terrain_model.gd")
-const WeaponInventory := preload("res://scripts/weapon_inventory.gd")
-const SHUTDOWN_DRAIN_FRAMES := 8
+const LocalMatchScene = preload("res://scenes/local_match.tscn")
+const GroundfireTheme = preload("res://scripts/groundfire_theme.gd")
+const LocalMatchHud = preload("res://scripts/local_match_hud.gd")
+const LocalMatchShop = preload("res://scripts/local_match_shop.gd")
+const TankState = preload("res://scripts/tank_state.gd")
+const TerrainModel = preload("res://scripts/terrain_model.gd")
+const WeaponInventory = preload("res://scripts/weapon_inventory.gd")
+const SHUTDOWN_DRAIN_FRAMES = 8
 
 
 class FlatTerrain:
 	extends RefCounted
 
-	var ground_y := 100.0
-	var slope_angle := 0.0
-	var bounds := Vector2(30.0, 190.0)
+	var ground_y = 100.0
+	var slope_angle = 0.0
+	var bounds = Vector2(30.0, 190.0)
 
 	func height_at(_x: float) -> float:
 		return ground_y
@@ -33,9 +33,9 @@ class FlatTerrain:
 class SlopedTerrain:
 	extends FlatTerrain
 
-	var origin := Vector2(0.0, 100.0)
+	var origin = Vector2(0.0, 100.0)
 
-	func _init(origin_x := 0.0, origin_y := 100.0, angle_degrees := 0.0) -> void:
+	func _init(origin_x = 0.0, origin_y = 100.0, angle_degrees = 0.0) -> void:
 		origin = Vector2(origin_x, origin_y)
 		ground_y = origin_y
 		slope_angle = angle_degrees
@@ -50,12 +50,12 @@ class SlopedTerrain:
 class TrackStepTerrain:
 	extends FlatTerrain
 
-	var center_x := 100.0
-	var left_ground_y := 100.0
-	var mid_ground_y := 100.0
-	var right_ground_y := 100.0
+	var center_x = 100.0
+	var left_ground_y = 100.0
+	var mid_ground_y = 100.0
+	var right_ground_y = 100.0
 
-	func _init(origin_x := 100.0) -> void:
+	func _init(origin_x = 100.0) -> void:
 		center_x = origin_x
 
 	func height_at(_x: float) -> float:
@@ -81,16 +81,16 @@ func _init() -> void:
 
 func _run() -> void:
 	root.size = Vector2i(1024, 768)
-	var local_match := LocalMatchScene.instantiate()
+	var local_match = LocalMatchScene.instantiate()
 	local_match.setup({"total_rounds": 5})
 	root.add_child(local_match)
 	await process_frame
 	await process_frame
 
-	var direct_damage := int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(100.0, 100.0), 40, 50.0))
-	var half_radius_damage := int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(125.0, 100.0), 40, 50.0))
-	var edge_damage := int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(150.0, 100.0), 40, 50.0))
-	var beyond_damage := int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(151.0, 100.0), 40, 50.0))
+	var direct_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(100.0, 100.0), 40, 50.0))
+	var half_radius_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(125.0, 100.0), 40, 50.0))
+	var edge_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(150.0, 100.0), 40, 50.0))
+	var beyond_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(151.0, 100.0), 40, 50.0))
 
 	assert(direct_damage == 40)
 	assert(half_radius_damage == 30)
@@ -103,12 +103,12 @@ func _run() -> void:
 	enemy_tank.position = Vector2(240.0, 120.0)
 	var shell_death_audio: AudioStreamPlayer = local_match.get_node("ShellDeathAudio")
 	assert(shell_death_audio.stream != null)
-	var shell_death_stream := shell_death_audio.stream as AudioStreamWAV
+	var shell_death_stream = shell_death_audio.stream as AudioStreamWAV
 	assert(shell_death_stream != null)
 	assert(shell_death_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
 	var missile_death_audio: AudioStreamPlayer = local_match.get_node("MissileDeathAudio")
 	assert(missile_death_audio.stream != null)
-	var missile_death_stream := missile_death_audio.stream as AudioStreamWAV
+	var missile_death_stream = missile_death_audio.stream as AudioStreamWAV
 	assert(missile_death_stream != null)
 	assert(missile_death_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
 	assert(str(local_match.call("_segment_tank_hit_owner", Vector2(60.0, 102.0), Vector2(300.0, 102.0))) == "Player")
@@ -176,7 +176,7 @@ func _run() -> void:
 	assert(int(local_match.get("_enemy_score")) == 40)
 	_clear_explosions(local_match)
 
-	var full_roster_match := LocalMatchScene.instantiate()
+	var full_roster_match = LocalMatchScene.instantiate()
 	full_roster_match.setup({
 		"total_rounds": 5,
 		"roster": [
@@ -241,7 +241,7 @@ func _run() -> void:
 	assert(abs(Vector2(first_mirv_child.get("velocity", Vector2.ZERO)).y) < 0.01)
 	_clear_projectiles(local_match)
 
-	var inventory := WeaponInventory.new()
+	var inventory = WeaponInventory.new()
 	assert(inventory.select_by_name(WeaponInventory.MACHINE_GUN))
 	assert(inventory.ammo_for(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_ROUND_AMMO)
 	assert(inventory.consume_current())
@@ -263,7 +263,7 @@ func _run() -> void:
 	assert(abs(float(inventory.weapon_by_name(WeaponInventory.MISSILE).get("powered_speed", -1.0)) - WeaponInventory.MISSILE_CLASSIC_SPEED) < 0.01)
 	assert(inventory.select_by_name(WeaponInventory.MIRV))
 	assert(inventory.ammo_for(WeaponInventory.MIRV) == WeaponInventory.MIRV_ROUND_AMMO)
-	var depleted_inventory := WeaponInventory.new()
+	var depleted_inventory = WeaponInventory.new()
 	assert(depleted_inventory.select_by_name(WeaponInventory.MISSILE))
 	assert(depleted_inventory.ammo_for(WeaponInventory.NUKE) > 0)
 	assert(depleted_inventory.consume_current_amount(depleted_inventory.ammo_for(WeaponInventory.MISSILE)))
@@ -322,7 +322,7 @@ func _run() -> void:
 	assert(float(missile_projectile.get("angle_change", -1.0)) == 0.0)
 	var missile_flight_audio: AudioStreamPlayer = local_match.get_node("MissileFlightAudio")
 	assert(missile_flight_audio.stream != null)
-	var missile_flight_stream := missile_flight_audio.stream as AudioStreamWAV
+	var missile_flight_stream = missile_flight_audio.stream as AudioStreamWAV
 	assert(missile_flight_stream != null)
 	assert(missile_flight_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	assert(missile_flight_audio.playing)
@@ -345,7 +345,7 @@ func _run() -> void:
 	local_match.call("_update_projectiles", 0.1)
 	assert(not missile_flight_audio.playing)
 	_clear_projectiles(local_match)
-	var clamped_missile := {
+	var clamped_missile = {
 		"fuel": 1.0,
 		"angle": 45.0,
 		"angle_change": 490.0,
@@ -356,9 +356,9 @@ func _run() -> void:
 	var clamped_missile_velocity: Vector2 = local_match.call("_update_missile_projectile", clamped_missile, Vector2(120.0, 0.0), Vector2.ZERO, 1.0)
 	Input.action_release("gf_aim_left")
 	assert(abs(float(clamped_missile.get("angle_change", 0.0)) - 500.0) < 0.01)
-	var clamped_expected_speed := (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(deg_to_rad(float(clamped_missile.get("angle", 0.0))))) * TankState.GUN_POWER_PIXEL_SCALE
+	var clamped_expected_speed = (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(deg_to_rad(float(clamped_missile.get("angle", 0.0))))) * TankState.GUN_POWER_PIXEL_SCALE
 	assert(abs(clamped_missile_velocity.length() - clamped_expected_speed) < 0.01)
-	var recentered_missile := {
+	var recentered_missile = {
 		"fuel": 1.0,
 		"angle": 45.0,
 		"angle_change": 90.0,
@@ -370,7 +370,7 @@ func _run() -> void:
 	assert(abs(float(local_match.call("_short_angle_delta", 350.0, 10.0)) - 20.0) < 0.01)
 	assert(abs(float(local_match.call("_short_angle_delta", 10.0, 350.0)) + 20.0) < 0.01)
 
-	var low_speed_missile := {
+	var low_speed_missile = {
 		"weapon": {"name": "Missile", "kind": "missile", "powered_speed": 0.25},
 		"fuel": 1.0,
 		"angle": 0.0,
@@ -378,18 +378,18 @@ func _run() -> void:
 		"owner": "Player",
 	}
 	var low_speed_velocity: Vector2 = local_match.call("_update_missile_projectile", low_speed_missile, Vector2.ZERO, Vector2.ZERO, 0.1)
-	var low_speed_factor := (0.25 - cos(0.0)) * TankState.GUN_POWER_PIXEL_SCALE
+	var low_speed_factor = (0.25 - cos(0.0)) * TankState.GUN_POWER_PIXEL_SCALE
 	assert(low_speed_factor < 0.0)
 	assert(low_speed_velocity.distance_to(Vector2(0.0, -low_speed_factor)) < 0.01)
 
-	var exhausting_missile := {
+	var exhausting_missile = {
 		"weapon": {"name": "Missile", "kind": "missile", "powered_speed": WeaponInventory.MISSILE_CLASSIC_SPEED},
 		"fuel": 0.05,
 		"angle": 0.0,
 		"angle_change": 0.0,
 		"owner": "Player",
 	}
-	var missile_classic_pixel_speed := (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(0.0)) * TankState.GUN_POWER_PIXEL_SCALE
+	var missile_classic_pixel_speed = (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(0.0)) * TankState.GUN_POWER_PIXEL_SCALE
 	var exhausted_frame_velocity: Vector2 = local_match.call("_update_missile_projectile", exhausting_missile, Vector2.ZERO, Vector2.ZERO, 0.1)
 	assert(float(exhausting_missile.get("fuel", 0.0)) < 0.0)
 	assert(bool(exhausting_missile.get("fuel_exhausted_this_frame", false)))
@@ -462,7 +462,7 @@ func _run() -> void:
 	var machine_gun_projectiles: Array = local_match.get("_projectiles")
 	assert(machine_gun_projectiles.size() == 5)
 	var first_machine_gun_projectile: Dictionary = machine_gun_projectiles[0]
-	var fixed_machine_gun_speed := TankState.GUN_POWER_PIXEL_SCALE * WeaponInventory.MACHINE_GUN_CLASSIC_POWER * 5.8
+	var fixed_machine_gun_speed = TankState.GUN_POWER_PIXEL_SCALE * WeaponInventory.MACHINE_GUN_CLASSIC_POWER * 5.8
 	assert(str(first_machine_gun_projectile.get("kind", "")) == "machine_gun")
 	assert(Vector2(first_machine_gun_projectile.get("back_position", Vector2.ZERO)) == Vector2(320.0, 160.0))
 	assert(abs(Vector2(first_machine_gun_projectile.get("velocity", Vector2.ZERO)).y + fixed_machine_gun_speed) < 0.01)
@@ -471,11 +471,11 @@ func _run() -> void:
 	assert(abs(float(machine_gun_projectiles[4].get("delay", 0.0)) - 0.4) < 0.01)
 	var metal_hit_audio: AudioStreamPlayer = local_match.get_node("MetalHitAudio")
 	assert(metal_hit_audio.stream != null)
-	var metal_hit_stream := metal_hit_audio.stream as AudioStreamWAV
+	var metal_hit_stream = metal_hit_audio.stream as AudioStreamWAV
 	assert(metal_hit_stream != null)
 	assert(metal_hit_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
-	var enemy_health_before := int(enemy_tank.health)
-	var score_before := int(local_match.get("_score"))
+	var enemy_health_before = int(enemy_tank.health)
+	var score_before = int(local_match.get("_score"))
 	local_match.call("_apply_machine_gun_damage", first_machine_gun_projectile, "Enemy")
 	assert(int(enemy_tank.health) == enemy_health_before - 2)
 	assert(int(local_match.get("_score")) == score_before + 2)
@@ -494,12 +494,12 @@ func _run() -> void:
 	local_match.set("_machine_gun_ai_burst_remaining", 4)
 	local_match.call("_play_machine_gun_audio")
 	var lethal_machine_gun_audio: AudioStreamPlayer = local_match.get_node("MachineGunAudio")
-	var lethal_machine_gun_projectile := {
+	var lethal_machine_gun_projectile = {
 		"kind": "machine_gun",
 		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
 		"player_owned": true,
 	}
-	var pending_machine_gun_projectile := {"kind": "machine_gun", "expired": false}
+	var pending_machine_gun_projectile = {"kind": "machine_gun", "expired": false}
 	var lethal_machine_gun_projectiles: Array[Dictionary] = []
 	lethal_machine_gun_projectiles.append(lethal_machine_gun_projectile)
 	lethal_machine_gun_projectiles.append(pending_machine_gun_projectile)
@@ -530,10 +530,10 @@ func _run() -> void:
 	local_match.call("_update_projectiles", 0.05)
 	machine_gun_projectiles = local_match.get("_projectiles")
 	assert(machine_gun_projectiles.size() == 5)
-	var fixed_power_machine_gun_velocity := Vector2(-sin(deg_to_rad(30.0)), -cos(deg_to_rad(30.0))) * fixed_machine_gun_speed
-	var gravity_adjusted_machine_gun_velocity := fixed_power_machine_gun_velocity + Vector2(0.0, WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.05)
-	var expected_machine_gun_position := Vector2(320.0, 160.0) + fixed_power_machine_gun_velocity * 0.05 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.05 * 0.05)
-	var expected_machine_gun_back_position := Vector2(320.0, 160.0) + fixed_power_machine_gun_velocity * 0.04 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.04 * 0.04)
+	var fixed_power_machine_gun_velocity = Vector2(-sin(deg_to_rad(30.0)), -cos(deg_to_rad(30.0))) * fixed_machine_gun_speed
+	var gravity_adjusted_machine_gun_velocity = fixed_power_machine_gun_velocity + Vector2(0.0, WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.05)
+	var expected_machine_gun_position = Vector2(320.0, 160.0) + fixed_power_machine_gun_velocity * 0.05 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.05 * 0.05)
+	var expected_machine_gun_back_position = Vector2(320.0, 160.0) + fixed_power_machine_gun_velocity * 0.04 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.04 * 0.04)
 	assert(Vector2(machine_gun_projectiles[0].get("velocity", Vector2.ZERO)).distance_to(gravity_adjusted_machine_gun_velocity) < 0.01)
 	assert(Vector2(machine_gun_projectiles[0].get("position", Vector2.ZERO)).distance_to(expected_machine_gun_position) < 0.01)
 	assert(Vector2(machine_gun_projectiles[0].get("back_position", Vector2.ZERO)).distance_to(expected_machine_gun_back_position) < 0.01)
@@ -542,7 +542,7 @@ func _run() -> void:
 	assert(float(machine_gun_projectiles[1].get("delay", 0.0)) > 0.0)
 	_clear_projectiles(local_match)
 
-	var falling_machine_gun_projectile := {
+	var falling_machine_gun_projectile = {
 		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
 		"position": Vector2(600.0, 30.0),
 		"owner": "Player",
@@ -550,24 +550,24 @@ func _run() -> void:
 		"launch_position": Vector2(600.0, 30.0),
 		"launch_velocity": Vector2(12.0, -40.0),
 	}
-	var falling_machine_gun_velocity := Vector2(12.0, -40.0)
+	var falling_machine_gun_velocity = Vector2(12.0, -40.0)
 	local_match.call("_update_machine_gun_projectile", falling_machine_gun_projectile, Vector2(600.0, 30.0), falling_machine_gun_velocity, 0.25)
-	var expected_falling_machine_gun_velocity := falling_machine_gun_velocity + Vector2(0.0, WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.25)
-	var expected_falling_machine_gun_position := Vector2(600.0, 30.0) + falling_machine_gun_velocity * 0.25 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.25 * 0.25)
-	var expected_falling_machine_gun_back_position := Vector2(600.0, 30.0) + falling_machine_gun_velocity * 0.24 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.24 * 0.24)
+	var expected_falling_machine_gun_velocity = falling_machine_gun_velocity + Vector2(0.0, WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.25)
+	var expected_falling_machine_gun_position = Vector2(600.0, 30.0) + falling_machine_gun_velocity * 0.25 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.25 * 0.25)
+	var expected_falling_machine_gun_back_position = Vector2(600.0, 30.0) + falling_machine_gun_velocity * 0.24 + Vector2(0.0, 0.5 * WeaponInventory.MACHINE_GUN_TRACER_GRAVITY * 0.24 * 0.24)
 	assert(Vector2(falling_machine_gun_projectile.get("velocity", Vector2.ZERO)).distance_to(expected_falling_machine_gun_velocity) < 0.01)
 	assert(Vector2(falling_machine_gun_projectile.get("position", Vector2.ZERO)).distance_to(expected_falling_machine_gun_position) < 0.01)
 	assert(Vector2(falling_machine_gun_projectile.get("back_position", Vector2.ZERO)).distance_to(expected_falling_machine_gun_back_position) < 0.01)
 	assert(not bool(falling_machine_gun_projectile.get("expired", false)))
 
-	var delayed_machine_gun_projectile := {
+	var delayed_machine_gun_projectile = {
 		"delay": WeaponInventory.MACHINE_GUN_COOLDOWN,
 		"position": Vector2(320.0, 160.0),
 		"back_position": Vector2.ZERO,
 	}
 	assert(abs(float(local_match.call("_machine_gun_projectile_delta", delayed_machine_gun_projectile, WeaponInventory.MACHINE_GUN_COOLDOWN * 0.4))) < 0.01)
 	assert(abs(float(delayed_machine_gun_projectile.get("delay", 0.0)) - WeaponInventory.MACHINE_GUN_COOLDOWN * 0.6) < 0.01)
-	var remaining_machine_gun_delta := float(local_match.call("_machine_gun_projectile_delta", delayed_machine_gun_projectile, WeaponInventory.MACHINE_GUN_COOLDOWN))
+	var remaining_machine_gun_delta = float(local_match.call("_machine_gun_projectile_delta", delayed_machine_gun_projectile, WeaponInventory.MACHINE_GUN_COOLDOWN))
 	assert(abs(remaining_machine_gun_delta - WeaponInventory.MACHINE_GUN_COOLDOWN * 0.4) < 0.01)
 	assert(abs(float(delayed_machine_gun_projectile.get("delay", -1.0))) < 0.01)
 	assert(Vector2(delayed_machine_gun_projectile.get("back_position", Vector2.ZERO)) == Vector2(320.0, 160.0))
@@ -575,7 +575,7 @@ func _run() -> void:
 	var player_inventory: RefCounted = local_match.get("_inventory")
 	player_inventory.reset_round_ammo()
 	assert(player_inventory.select_by_name(WeaponInventory.MACHINE_GUN))
-	var held_machine_gun_ammo_before := int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
+	var held_machine_gun_ammo_before = int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
 	local_match.set("_phase", "aim")
 	local_match.call("_set_turn_index", 0)
 	Input.action_press("gf_fire")
@@ -583,7 +583,7 @@ func _run() -> void:
 	assert(bool(local_match.get("_machine_gun_active")))
 	var machine_gun_audio: AudioStreamPlayer = local_match.get_node("MachineGunAudio")
 	assert(machine_gun_audio.stream != null)
-	var machine_gun_stream := machine_gun_audio.stream as AudioStreamWAV
+	var machine_gun_stream = machine_gun_audio.stream as AudioStreamWAV
 	assert(machine_gun_stream != null)
 	assert(machine_gun_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	assert(machine_gun_audio.playing)
@@ -676,7 +676,7 @@ func _run() -> void:
 	assert(enemy_inventory.select_by_name(WeaponInventory.SHELL))
 	assert(int(local_match.call("_machine_gun_ai_burst_budget", ai_burst_weapon)) == 5)
 	assert(enemy_inventory.select_by_name(WeaponInventory.MACHINE_GUN))
-	var enemy_machine_gun_ammo_before := int(enemy_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
+	var enemy_machine_gun_ammo_before = int(enemy_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
 	local_match.call("_begin_enemy_machine_gun_fire", enemy_inventory.weapon_by_name(WeaponInventory.MACHINE_GUN))
 	assert(bool(local_match.get("_machine_gun_active")))
 	assert(not bool(local_match.get("_machine_gun_player_owned")))
@@ -719,8 +719,8 @@ func _run() -> void:
 	enemy_for_burst.health = TankState.TANK_MAX_HEALTH
 
 	var match_terrain: Variant = local_match.get("_terrain")
-	var tracer_x := 520.0
-	var tracer_ground_before := float(match_terrain.height_at(tracer_x))
+	var tracer_x = 520.0
+	var tracer_ground_before = float(match_terrain.height_at(tracer_x))
 	local_match.call(
 		"_fire_from",
 		Vector2(tracer_x, tracer_ground_before - 28.0),
@@ -745,7 +745,7 @@ func _run() -> void:
 	assert(float(local_match.call("_whiteout_alpha")) > 0.99)
 	var nuke_audio: AudioStreamPlayer = local_match.get_node("NukeAudio")
 	assert(nuke_audio.stream != null)
-	var nuke_stream := nuke_audio.stream as AudioStreamWAV
+	var nuke_stream = nuke_audio.stream as AudioStreamWAV
 	assert(nuke_stream != null)
 	assert(nuke_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
 	assert(nuke_audio.playing)
@@ -769,10 +769,10 @@ func _run() -> void:
 	assert(float(local_match.call("_wind_acceleration", 0.0)) == 4.0)
 	local_match.set("_wind", 8.8)
 	local_match.call("_shift_wind_for_turn")
-	var shifted_wind := float(local_match.get("_wind"))
+	var shifted_wind = float(local_match.get("_wind"))
 	assert(shifted_wind >= -9.0 and shifted_wind <= 9.0)
 
-	var hud := LocalMatchHud.new()
+	var hud = LocalMatchHud.new()
 	assert(int(hud.call("_weapon_icon_index", "Shell")) == 0)
 	assert(int(hud.call("_weapon_icon_index", "Nuke")) == 1)
 	assert(int(hud.call("_weapon_icon_index", "Machine Gun")) == 2)
@@ -838,7 +838,7 @@ func _run() -> void:
 
 	var jump_jets_audio: AudioStreamPlayer = local_match.get_node("JumpJetsAudio")
 	assert(jump_jets_audio.stream != null)
-	var jump_jets_stream := jump_jets_audio.stream as AudioStreamWAV
+	var jump_jets_stream = jump_jets_audio.stream as AudioStreamWAV
 	assert(jump_jets_stream != null)
 	assert(jump_jets_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	assert(not bool(local_match.get("_jump_jets_active")))
@@ -853,7 +853,7 @@ func _run() -> void:
 	local_match.call("_stop_jump_jets_audio")
 	assert(not bool(local_match.get("_jump_jets_active")))
 	assert(not jump_jets_audio.playing)
-	var jump_jets_tank := TankState.new()
+	var jump_jets_tank = TankState.new()
 	jump_jets_tank.fuel = 0.001
 	jump_jets_tank.state = TankState.STATE_ALIVE
 	assert(bool(local_match.call("_tank_can_boost", jump_jets_tank)))
@@ -866,7 +866,7 @@ func _run() -> void:
 	local_match.call("_play_weapon_launch_audio", "shell")
 	var fire_shell_audio: AudioStreamPlayer = local_match.get_node("FireShellAudio")
 	assert(fire_shell_audio.stream != null)
-	var fire_shell_stream := fire_shell_audio.stream as AudioStreamWAV
+	var fire_shell_stream = fire_shell_audio.stream as AudioStreamWAV
 	assert(fire_shell_stream != null)
 	assert(fire_shell_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
 	assert(fire_shell_audio.playing)
@@ -880,21 +880,21 @@ func _run() -> void:
 	local_match.call("_play_weapon_launch_audio", "missile")
 	var launch_missile_audio: AudioStreamPlayer = local_match.get_node("LaunchMissileAudio")
 	assert(launch_missile_audio.stream != null)
-	var launch_missile_stream := launch_missile_audio.stream as AudioStreamWAV
+	var launch_missile_stream = launch_missile_audio.stream as AudioStreamWAV
 	assert(launch_missile_stream != null)
 	assert(launch_missile_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
 	assert(launch_missile_audio.playing)
 	local_match.call("_stop_launch_missile_audio")
 	assert(not launch_missile_audio.playing)
 
-	var quake_x := 360.0
-	var before_quake_drop := float(match_terrain.height_at(quake_x))
+	var quake_x = 360.0
+	var before_quake_drop = float(match_terrain.height_at(quake_x))
 	local_match.set("_quake_countdown", -0.1)
 	local_match.call("_update_quake", 0.1)
 	assert(bool(local_match.get("_quake_active")))
 	var quake_audio: AudioStreamPlayer = local_match.get_node("QuakeAudio")
 	assert(quake_audio.stream != null)
-	var quake_stream := quake_audio.stream as AudioStreamWAV
+	var quake_stream = quake_audio.stream as AudioStreamWAV
 	assert(quake_stream != null)
 	assert(quake_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	assert(quake_audio.playing)
@@ -924,7 +924,7 @@ func _run() -> void:
 	assert(int(local_match.get("_enemy_score")) == 60)
 	assert(int(local_match.get("_credits")) == 92)
 	assert(local_match.get_node("ScoreOverlay").visible)
-	var score_reward_label := local_match.get("_score_reward_label") as Label
+	var score_reward_label = local_match.get("_score_reward_label") as Label
 	assert(score_reward_label.text == "Round credits +85  Credits 92")
 	var score_rows: Array = local_match.call("_score_rows_snapshot")
 	assert(score_rows.size() == 2)
@@ -936,36 +936,36 @@ func _run() -> void:
 	assert(str(Dictionary(score_defeated_icons[0]).get("owner", "")) == "Enemy")
 	assert(str(Dictionary(score_defeated_icons[0]).get("name", "")) == "Enemy")
 	assert(bool(Dictionary(score_defeated_icons[0]).get("leader", false)))
-	var score_rows_container := local_match.get("_score_rows_container") as VBoxContainer
-	var first_score_row := score_rows_container.get_child(1) as HBoxContainer
-	var score_player_panel := first_score_row.get_child(1) as PanelContainer
-	var score_round_panel := first_score_row.get_child(2) as PanelContainer
-	var score_total_panel := first_score_row.get_child(3) as PanelContainer
+	var score_rows_container = local_match.get("_score_rows_container") as VBoxContainer
+	var first_score_row = score_rows_container.get_child(1) as HBoxContainer
+	var score_player_panel = first_score_row.get_child(1) as PanelContainer
+	var score_round_panel = first_score_row.get_child(2) as PanelContainer
+	var score_total_panel = first_score_row.get_child(3) as PanelContainer
 	assert(score_player_panel.name == "ScorePlayerColumn")
 	assert(score_round_panel.name == "ScoreRoundColumn")
 	assert(score_total_panel.name == "ScoreTotalColumn")
-	var score_panel_style := score_player_panel.get_theme_stylebox("panel") as StyleBoxFlat
+	var score_panel_style = score_player_panel.get_theme_stylebox("panel") as StyleBoxFlat
 	assert(score_panel_style != null)
 	assert(score_panel_style.bg_color == Color("#00000080"))
-	var score_player_cell := score_player_panel.get_child(0) as HBoxContainer
-	var score_player_icon := score_player_cell.get_child(0) as Control
-	var score_player_tank := score_player_icon.get_node_or_null("ScorePlayerTank") as Polygon2D
+	var score_player_cell = score_player_panel.get_child(0) as HBoxContainer
+	var score_player_icon = score_player_cell.get_child(0) as Control
+	var score_player_tank = score_player_icon.get_node_or_null("ScorePlayerTank") as Polygon2D
 	var first_score_color: Color = Dictionary(score_rows[0]).get("color", Color.WHITE)
 	assert(score_player_tank != null)
 	assert(score_player_tank.polygon.size() == 4)
 	assert(score_player_tank.color == first_score_color)
-	var score_round_detail_cell := score_round_panel.get_child(0) as HBoxContainer
-	var score_defeated_icon := score_round_detail_cell.get_child(0) as Control
+	var score_round_detail_cell = score_round_panel.get_child(0) as HBoxContainer
+	var score_defeated_icon = score_round_detail_cell.get_child(0) as Control
 	assert(score_defeated_icon.get_node_or_null("DefeatedTank") != null)
 	assert(score_defeated_icon.get_node_or_null("LeaderPole") != null)
 	assert(score_defeated_icon.get_node_or_null("LeaderFlag") != null)
-	var score_detail_label := score_round_detail_cell.get_child(1) as Label
+	var score_detail_label = score_round_detail_cell.get_child(1) as Label
 	assert(score_detail_label.text == "Defeated Enemy leader +200, Survived +100")
-	var score_total_label := score_total_panel.get_child(0) as Label
+	var score_total_label = score_total_panel.get_child(0) as Label
 	assert(score_total_label.text == "340")
 	assert(score_total_label.get_theme_color("font_color") == Color.WHITE)
 	assert(str(Dictionary(score_rows[1]).get("rank", "")) == "2nd")
-	var score_shop_continue_button := local_match.get("_score_continue_button") as Button
+	var score_shop_continue_button = local_match.get("_score_continue_button") as Button
 	assert(score_shop_continue_button.text == "Continue to Shop")
 	assert(score_shop_continue_button.focus_neighbor_top == score_shop_continue_button.get_path())
 	assert(score_shop_continue_button.focus_neighbor_bottom == score_shop_continue_button.get_path())
@@ -984,7 +984,7 @@ func _run() -> void:
 	assert(bool(Dictionary(updated_leader_participants[0]).get("leader", false)))
 	assert(not bool(Dictionary(updated_leader_participants[1]).get("leader", true)))
 	assert(not local_match.get_node("ScoreOverlay").visible)
-	var match_shop_overlay := local_match.get("_shop_overlay") as Control
+	var match_shop_overlay = local_match.get("_shop_overlay") as Control
 	assert(match_shop_overlay.visible)
 	assert(abs(float(local_match.get("_shop_input_delay")) - 0.4) < 0.01)
 	assert(str(local_match.call("_shop_participant_name", local_match.call("_current_shop_participant_index"))) == "Player")
@@ -1000,8 +1000,8 @@ func _run() -> void:
 	assert(str(local_match.get("_message")).contains("Round 2 ready"))
 
 	var enemy_shop_inventory: RefCounted = local_match.get("_enemy_inventory") as RefCounted
-	var enemy_missile_before_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
-	var enemy_mirv_before_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV))
+	var enemy_missile_before_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
+	var enemy_mirv_before_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV))
 	local_match.set("_ai_difficulty", "normal")
 	local_match.call("_set_shop_credits", 1, 100)
 	local_match.call("_run_computer_shop_for_participant", 1)
@@ -1012,9 +1012,9 @@ func _run() -> void:
 	local_match.set("_ai_difficulty", "easy")
 	var easy_shop_priority: Array = local_match.call("_computer_shop_priority")
 	assert(str(easy_shop_priority[0]) == WeaponInventory.MACHINE_GUN)
-	var enemy_machine_gun_before_easy_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
-	var enemy_missile_before_easy_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
-	var enemy_fuel_reserve_before_easy_shop := float(enemy_tank.fuel_reserve)
+	var enemy_machine_gun_before_easy_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
+	var enemy_missile_before_easy_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
+	var enemy_fuel_reserve_before_easy_shop = float(enemy_tank.fuel_reserve)
 	local_match.call("_set_shop_credits", 1, 100)
 	local_match.call("_run_computer_shop_for_participant", 1)
 	assert(int(local_match.call("_shop_credits", 1)) == 0)
@@ -1026,11 +1026,11 @@ func _run() -> void:
 	local_match.set("_ai_difficulty", "hard")
 	var hard_shop_priority: Array = local_match.call("_computer_shop_priority")
 	assert(str(hard_shop_priority[0]) == WeaponInventory.NUKE)
-	var enemy_nuke_before_hard_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.NUKE))
-	var enemy_mirv_before_hard_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV))
-	var enemy_missile_before_hard_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
-	var enemy_machine_gun_before_hard_shop := int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
-	var enemy_fuel_reserve_before_hard_shop := float(enemy_tank.fuel_reserve)
+	var enemy_nuke_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.NUKE))
+	var enemy_mirv_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV))
+	var enemy_missile_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
+	var enemy_machine_gun_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
+	var enemy_fuel_reserve_before_hard_shop = float(enemy_tank.fuel_reserve)
 	local_match.call("_set_shop_credits", 1, 250)
 	local_match.call("_run_computer_shop_for_participant", 1)
 	assert(int(local_match.call("_shop_credits", 1)) == 0)
@@ -1051,7 +1051,7 @@ func _run() -> void:
 	local_match.set("_credits", 4)
 	local_match.call("_open_round_score", "Round Won", 100, "Player")
 	assert(abs(float(local_match.get("_score_continue_delay")) - 2.0) < 0.01)
-	var score_final_continue_button := local_match.get("_score_continue_button") as Button
+	var score_final_continue_button = local_match.get("_score_continue_button") as Button
 	assert(score_final_continue_button.text == "Continue to Final Result")
 	assert(score_final_continue_button.focus_neighbor_top == score_final_continue_button.get_path())
 	assert(score_final_continue_button.focus_neighbor_bottom == score_final_continue_button.get_path())
@@ -1062,24 +1062,24 @@ func _run() -> void:
 	assert(str(local_match.get("_phase")) == "winner")
 	assert(abs(float(local_match.get("_winner_continue_delay")) - 2.0) < 0.01)
 	assert(not local_match.get_node("ScoreOverlay").visible)
-	var winner_overlay := local_match.get_node("WinnerOverlay") as Control
+	var winner_overlay = local_match.get_node("WinnerOverlay") as Control
 	assert(winner_overlay.visible)
 	assert(not (winner_overlay is PanelContainer))
-	var winner_background_fill := winner_overlay.get_node("WinnerMenuBackgroundFill") as ColorRect
+	var winner_background_fill = winner_overlay.get_node("WinnerMenuBackgroundFill") as ColorRect
 	assert(winner_background_fill.color == GroundfireTheme.COLOR_BG)
 	assert(winner_background_fill.mouse_filter == Control.MOUSE_FILTER_IGNORE)
-	var winner_background := winner_overlay.get_node("WinnerMenuBackground") as TextureRect
+	var winner_background = winner_overlay.get_node("WinnerMenuBackground") as TextureRect
 	assert(winner_background.texture != null)
 	assert(winner_background.stretch_mode == TextureRect.STRETCH_TILE)
 	assert(winner_background.modulate == GroundfireTheme.COLOR_MENU_TILE_TINT)
 	assert(winner_background.mouse_filter == Control.MOUSE_FILTER_IGNORE)
-	var winner_background_tile_size := winner_background.texture.get_size()
+	var winner_background_tile_size = winner_background.texture.get_size()
 	assert(abs(winner_background.offset_left) < 0.01)
 	assert(abs(winner_background.offset_top) < 0.01)
 	assert(abs(winner_background.offset_right - float(winner_background_tile_size.x)) < 0.01)
 	assert(abs(winner_background.offset_bottom - float(winner_background_tile_size.y)) < 0.01)
 	local_match.call("_update_winner_background", 0.5)
-	var expected_winner_background_offset := Vector2(
+	var expected_winner_background_offset = Vector2(
 		float(int(0.5 * 0.1 * float(winner_background_tile_size.x))),
 		float(int(0.5 * 0.1 * float(winner_background_tile_size.y)))
 	)
@@ -1087,7 +1087,7 @@ func _run() -> void:
 	assert(abs(winner_background.offset_top + expected_winner_background_offset.y) < 0.01)
 	assert(abs((winner_background.offset_right - winner_background.offset_left) - float(winner_background_tile_size.x)) < 0.01)
 	assert(abs((winner_background.offset_bottom - winner_background.offset_top) - float(winner_background_tile_size.y)) < 0.01)
-	var winner_main_menu_button := local_match.get("_winner_main_menu_button") as Button
+	var winner_main_menu_button = local_match.get("_winner_main_menu_button") as Button
 	assert(not winner_main_menu_button.visible)
 	assert(winner_main_menu_button.focus_mode == Control.FOCUS_NONE)
 	assert(winner_main_menu_button.disabled)
@@ -1096,11 +1096,11 @@ func _run() -> void:
 	assert(not winner_main_menu_button.disabled)
 	assert(not winner_main_menu_button.visible)
 	assert(winner_main_menu_button.focus_mode == Control.FOCUS_NONE)
-	var winner_heading_label := local_match.get("_winner_heading_label") as Label
+	var winner_heading_label = local_match.get("_winner_heading_label") as Label
 	assert(winner_heading_label.text == "Final Result")
-	var winner_title_label := local_match.get("_winner_title_label") as Label
+	var winner_title_label = local_match.get("_winner_title_label") as Label
 	assert(winner_title_label.text == "We have a winner!")
-	var winner_summary_label := local_match.get("_winner_summary_label") as Label
+	var winner_summary_label = local_match.get("_winner_summary_label") as Label
 	assert(not winner_summary_label.visible)
 	assert(winner_summary_label.text == "")
 	var winner_rows: Array = local_match.call("_winner_rows_snapshot")
@@ -1127,30 +1127,30 @@ func _run() -> void:
 	assert(five_winner_card_rows.size() == 2)
 	assert(Array(five_winner_card_rows[0]).size() == 4)
 	assert(Array(five_winner_card_rows[1]).size() == 1)
-	var winner_cards_container := local_match.get("_winner_cards_container") as VBoxContainer
+	var winner_cards_container = local_match.get("_winner_cards_container") as VBoxContainer
 	assert(winner_cards_container.get_child_count() == 1)
-	var first_winner_row := winner_cards_container.get_child(0) as HBoxContainer
+	var first_winner_row = winner_cards_container.get_child(0) as HBoxContainer
 	assert(first_winner_row.alignment == BoxContainer.ALIGNMENT_CENTER)
 	assert(first_winner_row.get_child_count() == 1)
-	var first_winner_card := first_winner_row.get_child(0) as VBoxContainer
-	var first_winner_tank_chip := first_winner_card.get_child(0) as Control
-	var first_winner_tank_shape := first_winner_tank_chip.get_child(0) as Polygon2D
+	var first_winner_card = first_winner_row.get_child(0) as VBoxContainer
+	var first_winner_tank_chip = first_winner_card.get_child(0) as Control
+	var first_winner_tank_shape = first_winner_tank_chip.get_child(0) as Polygon2D
 	assert(first_winner_tank_shape.polygon.size() == 4)
 	assert(first_winner_tank_shape.color == Color(Dictionary(winner_cards[0]).get("color", Color.WHITE)))
-	var first_winner_letter_ring := first_winner_card.get_child(2) as Control
+	var first_winner_letter_ring = first_winner_card.get_child(2) as Control
 	assert(first_winner_letter_ring.name == "WinnerLetterRing")
 	assert(first_winner_letter_ring.get_child_count() == 7)
-	var first_winner_letter := first_winner_letter_ring.get_child(0) as Label
-	var second_winner_letter := first_winner_letter_ring.get_child(1) as Label
-	var last_winner_letter := first_winner_letter_ring.get_child(6) as Label
+	var first_winner_letter = first_winner_letter_ring.get_child(0) as Label
+	var second_winner_letter = first_winner_letter_ring.get_child(1) as Label
+	var last_winner_letter = first_winner_letter_ring.get_child(6) as Label
 	assert(first_winner_letter.text == "W")
 	assert(second_winner_letter.text == "i")
 	assert(last_winner_letter.text == "!")
 	assert(first_winner_letter.get_theme_color("font_color") == Color.WHITE)
-	var initial_winner_letter_rotation := first_winner_letter.rotation
+	var initial_winner_letter_rotation = first_winner_letter.rotation
 	local_match.call("_update_winner_spin", 0.25)
 	assert(abs(first_winner_letter.rotation - (initial_winner_letter_rotation - 1.0)) < 0.01)
-	var winner_rows_container := local_match.get("_winner_rows_container") as VBoxContainer
+	var winner_rows_container = local_match.get("_winner_rows_container") as VBoxContainer
 	assert(not winner_rows_container.visible)
 	assert(winner_rows_container.get_child_count() == 0)
 	local_match.set("_score", 300)
@@ -1163,11 +1163,11 @@ func _run() -> void:
 	var tied_winner_cards: Array = local_match.call("_winner_card_snapshots")
 	assert(tied_winner_cards.size() == 2)
 	assert(winner_cards_container.get_child_count() == 1)
-	var tied_winner_row := winner_cards_container.get_child(0) as HBoxContainer
+	var tied_winner_row = winner_cards_container.get_child(0) as HBoxContainer
 	assert(tied_winner_row.alignment == BoxContainer.ALIGNMENT_CENTER)
 	assert(tied_winner_row.get_child_count() == 2)
-	var tied_second_card := tied_winner_row.get_child(1) as VBoxContainer
-	var tied_second_letter_ring := tied_second_card.get_child(2) as Control
+	var tied_second_card = tied_winner_row.get_child(1) as VBoxContainer
+	var tied_second_letter_ring = tied_second_card.get_child(2) as Control
 	assert(tied_second_letter_ring.name == "WinnerLetterRing")
 	assert(tied_second_letter_ring.get_child_count() == 7)
 	winner_rows_container = local_match.get("_winner_rows_container") as VBoxContainer
@@ -1176,7 +1176,7 @@ func _run() -> void:
 	local_match.call("_hide_winner_overlay")
 	local_match.set("_round", 1)
 
-	var shop := LocalMatchShop.new()
+	var shop = LocalMatchShop.new()
 	assert(shop.call("_format_pack", 0) == "-")
 	assert(shop.call("_format_pack", 5) == "+5")
 	assert(Array(shop.call("_classic_catalog_rows")).is_empty())
@@ -1210,29 +1210,29 @@ func _run() -> void:
 		"message": "Shop focus check",
 	})
 	await process_frame
-	var shop_credits_label := shop.get("_credits_label") as Label
+	var shop_credits_label = shop.get("_credits_label") as Label
 	assert(shop_credits_label.text == "Player  Money $100  Fuel reserve 200%")
-	var shop_subtitle_label := shop.get("_subtitle_label") as Label
+	var shop_subtitle_label = shop.get("_subtitle_label") as Label
 	assert(shop_subtitle_label.text == "Round 2 of 5  Score 120  Reward 100")
-	var shop_weapon_list := shop.get("_weapon_list") as VBoxContainer
-	var first_catalog_row := shop_weapon_list.get_child(1) as HBoxContainer
-	var first_catalog_cost := first_catalog_row.get_child(0) as Label
+	var shop_weapon_list = shop.get("_weapon_list") as VBoxContainer
+	var first_catalog_row = shop_weapon_list.get_child(1) as HBoxContainer
+	var first_catalog_cost = first_catalog_row.get_child(0) as Label
 	assert(first_catalog_cost.text == "$50")
-	var first_catalog_item := first_catalog_row.get_child(1) as Label
+	var first_catalog_item = first_catalog_row.get_child(1) as Label
 	assert(str(first_catalog_item.text).begins_with("Machine Gun"))
-	var mirv_catalog_row := shop_weapon_list.get_child(3) as HBoxContainer
-	var mirv_catalog_item := mirv_catalog_row.get_child(1) as Label
+	var mirv_catalog_row = shop_weapon_list.get_child(3) as HBoxContainer
+	var mirv_catalog_item = mirv_catalog_row.get_child(1) as Label
 	assert(str(mirv_catalog_item.text).begins_with("Mirvs"))
-	var missile_catalog_row := shop_weapon_list.get_child(4) as HBoxContainer
-	var missile_catalog_item := missile_catalog_row.get_child(1) as Label
+	var missile_catalog_row = shop_weapon_list.get_child(4) as HBoxContainer
+	var missile_catalog_item = missile_catalog_row.get_child(1) as Label
 	assert(str(missile_catalog_item.text).begins_with("Missiles"))
-	var nuke_catalog_row := shop_weapon_list.get_child(5) as HBoxContainer
-	var nuke_catalog_item := nuke_catalog_row.get_child(1) as Label
+	var nuke_catalog_row = shop_weapon_list.get_child(5) as HBoxContainer
+	var nuke_catalog_item = nuke_catalog_row.get_child(1) as Label
 	assert(str(nuke_catalog_item.text).begins_with("Nukes"))
-	var first_locked_row := shop_weapon_list.get_child(6) as HBoxContainer
-	var first_locked_cost := first_locked_row.get_child(0) as Label
+	var first_locked_row = shop_weapon_list.get_child(6) as HBoxContainer
+	var first_locked_cost = first_locked_row.get_child(0) as Label
 	assert(first_locked_cost.text == "$50")
-	var first_locked_item := first_locked_row.get_child(1) as Label
+	var first_locked_item = first_locked_row.get_child(1) as Label
 	assert(str(first_locked_item.text).begins_with("Rolling Mines"))
 	var shop_focus_buttons: Array = shop.get("_focus_buttons")
 	assert(shop_focus_buttons.size() == 9)
@@ -1246,7 +1246,7 @@ func _run() -> void:
 	assert(first_shop_button.focus_neighbor_right == first_shop_button.get_path())
 	assert(second_shop_button.focus_neighbor_top == first_shop_button.get_path())
 	assert(second_shop_button.focus_neighbor_bottom == third_shop_button.get_path())
-	var shop_continue_button := shop.get("_continue_button") as Button
+	var shop_continue_button = shop.get("_continue_button") as Button
 	assert(shop_continue_button.text == "Done!")
 	var classic_rows: Array = shop.call("_classic_catalog_rows")
 	assert(classic_rows.size() == 10)
@@ -1271,7 +1271,7 @@ func _run() -> void:
 		"input_locked": true,
 	})
 	await process_frame
-	var locked_first_row := (shop.get("_weapon_list") as VBoxContainer).get_child(1) as HBoxContainer
+	var locked_first_row = (shop.get("_weapon_list") as VBoxContainer).get_child(1) as HBoxContainer
 	assert(bool((locked_first_row.get_child(2) as Button).disabled))
 	var locked_shop_buttons: Array = shop.get("_focus_buttons")
 	assert(bool((locked_shop_buttons[0] as Button).disabled))
@@ -1298,7 +1298,7 @@ func _run() -> void:
 		"message": "Shop focus restore",
 	})
 	await process_frame
-	var focused_shop_button := root.gui_get_focus_owner() as Button
+	var focused_shop_button = root.gui_get_focus_owner() as Button
 	assert(focused_shop_button != null)
 	assert(str(focused_shop_button.get_meta("shop_focus_name", "")) == "Missile")
 	await _free_node(shop)
@@ -1311,8 +1311,8 @@ func _run() -> void:
 	assert(abs(float(local_match.get("_shop_input_delay")) - 0.2) < 0.01)
 	local_match.call("_update_modal_activation", 0.2)
 	local_match.set("_credits", 50)
-	var active_fuel_before_buy := float(shop_player_tank.fuel)
-	var fuel_reserve_before_buy := float(shop_player_tank.fuel_reserve)
+	var active_fuel_before_buy = float(shop_player_tank.fuel)
+	var fuel_reserve_before_buy = float(shop_player_tank.fuel_reserve)
 	local_match.call("_buy_shop_weapon", "Jump Jet")
 	assert(int(local_match.get("_credits")) == 0)
 	assert(abs(float(shop_player_tank.fuel_reserve) - (fuel_reserve_before_buy + TankState.TANK_FUEL_PURCHASE_AMOUNT)) < 0.01)
@@ -1328,7 +1328,7 @@ func _run() -> void:
 	local_match.call("_update_modal_activation", 0.2)
 	local_match.set("_credits", 1000)
 	var classic_shop_inventory: RefCounted = local_match.get("_inventory")
-	var classic_shop_cases := [
+	var classic_shop_cases = [
 		{"name": WeaponInventory.ROLLING_MINES, "cost": 50, "pack": WeaponInventory.ROLLING_MINES_SHOP_PACK},
 		{"name": WeaponInventory.AIRSTRIKE, "cost": 100, "pack": WeaponInventory.AIRSTRIKE_SHOP_PACK},
 		{"name": WeaponInventory.DEATHS_HEAD, "cost": 200, "pack": WeaponInventory.DEATHS_HEAD_SHOP_PACK},
@@ -1336,42 +1336,42 @@ func _run() -> void:
 		{"name": WeaponInventory.CORBOMITE, "cost": 20, "pack": WeaponInventory.CORBOMITE_SHOP_PACK},
 	]
 	for shop_case in classic_shop_cases:
-		var item_name := str(Dictionary(shop_case).get("name", ""))
-		var item_cost := int(Dictionary(shop_case).get("cost", 0))
-		var item_pack := int(Dictionary(shop_case).get("pack", 0))
-		var credits_before_item_buy := int(local_match.get("_credits"))
-		var ammo_before_item_buy := int(classic_shop_inventory.ammo_for(item_name))
+		var item_name = str(Dictionary(shop_case).get("name", ""))
+		var item_cost = int(Dictionary(shop_case).get("cost", 0))
+		var item_pack = int(Dictionary(shop_case).get("pack", 0))
+		var credits_before_item_buy = int(local_match.get("_credits"))
+		var ammo_before_item_buy = int(classic_shop_inventory.ammo_for(item_name))
 		local_match.call("_buy_shop_weapon", item_name)
 		assert(int(local_match.get("_credits")) == credits_before_item_buy - item_cost)
 		assert(classic_shop_inventory.ammo_for(item_name) == ammo_before_item_buy + item_pack)
 		assert(str(local_match.get("_message")).contains("Bought %s ammo" % item_name))
 		local_match.call("_update_modal_activation", 0.2)
 	local_match.set("_credits", 19)
-	var corbomite_before_failed_buy := int(classic_shop_inventory.ammo_for(WeaponInventory.CORBOMITE))
+	var corbomite_before_failed_buy = int(classic_shop_inventory.ammo_for(WeaponInventory.CORBOMITE))
 	local_match.call("_buy_shop_weapon", WeaponInventory.CORBOMITE)
 	assert(int(local_match.get("_credits")) == 19)
 	assert(classic_shop_inventory.ammo_for(WeaponInventory.CORBOMITE) == corbomite_before_failed_buy)
 	assert(str(local_match.get("_message")) == "Need $20 for Corbomite.")
 	local_match.call("_update_modal_activation", 0.2)
 
-	var buy_inventory := WeaponInventory.new()
+	var buy_inventory = WeaponInventory.new()
 	assert(buy_inventory.select_by_name(WeaponInventory.MIRV))
-	var mirv_before_buy := int(buy_inventory.ammo_for(WeaponInventory.MIRV))
+	var mirv_before_buy = int(buy_inventory.ammo_for(WeaponInventory.MIRV))
 	assert(buy_inventory.add_ammo(WeaponInventory.MIRV) == mirv_before_buy + WeaponInventory.MIRV_SHOP_PACK)
-	var missile_before_buy := int(buy_inventory.ammo_for(WeaponInventory.MISSILE))
+	var missile_before_buy = int(buy_inventory.ammo_for(WeaponInventory.MISSILE))
 	assert(buy_inventory.add_ammo(WeaponInventory.MISSILE) == missile_before_buy + WeaponInventory.MISSILE_SHOP_PACK)
-	var rolling_mines_before_buy := int(buy_inventory.ammo_for(WeaponInventory.ROLLING_MINES))
+	var rolling_mines_before_buy = int(buy_inventory.ammo_for(WeaponInventory.ROLLING_MINES))
 	assert(buy_inventory.add_ammo(WeaponInventory.ROLLING_MINES) == rolling_mines_before_buy + WeaponInventory.ROLLING_MINES_SHOP_PACK)
-	var airstrike_before_buy := int(buy_inventory.ammo_for(WeaponInventory.AIRSTRIKE))
+	var airstrike_before_buy = int(buy_inventory.ammo_for(WeaponInventory.AIRSTRIKE))
 	assert(buy_inventory.add_ammo(WeaponInventory.AIRSTRIKE) == airstrike_before_buy + WeaponInventory.AIRSTRIKE_SHOP_PACK)
-	var deaths_head_before_buy := int(buy_inventory.ammo_for(WeaponInventory.DEATHS_HEAD))
+	var deaths_head_before_buy = int(buy_inventory.ammo_for(WeaponInventory.DEATHS_HEAD))
 	assert(buy_inventory.add_ammo(WeaponInventory.DEATHS_HEAD) == deaths_head_before_buy + WeaponInventory.DEATHS_HEAD_SHOP_PACK)
-	var hover_coil_before_buy := int(buy_inventory.ammo_for(WeaponInventory.HOVER_COIL))
+	var hover_coil_before_buy = int(buy_inventory.ammo_for(WeaponInventory.HOVER_COIL))
 	assert(buy_inventory.add_ammo(WeaponInventory.HOVER_COIL) == hover_coil_before_buy + WeaponInventory.HOVER_COIL_SHOP_PACK)
-	var corbomite_before_buy := int(buy_inventory.ammo_for(WeaponInventory.CORBOMITE))
+	var corbomite_before_buy = int(buy_inventory.ammo_for(WeaponInventory.CORBOMITE))
 	assert(buy_inventory.add_ammo(WeaponInventory.CORBOMITE) == corbomite_before_buy + WeaponInventory.CORBOMITE_SHOP_PACK)
 
-	var tank := TankState.new()
+	var tank = TankState.new()
 	assert(abs(tank.gun_angle - TankState.GUN_ANGLE_DEFAULT) < 0.01)
 	assert(abs(tank.gun_power - TankState.GUN_POWER_DEFAULT) < 0.01)
 	assert(tank.health == TankState.TANK_MAX_HEALTH)
@@ -1426,7 +1426,7 @@ func _run() -> void:
 	assert(abs(float(air_smoke.get("growth_rate", 0.0)) - TankState.GROUND_SMOKE_GROWTH_RATE) < 0.01)
 	assert(abs(float(air_smoke.get("fade_rate", 0.0)) - TankState.AIR_SMOKE_FADE_RATE) < 0.01)
 	assert(abs(float(tank.exhaust_time) + 0.05) < 0.01)
-	var boost_smoke_tank := TankState.new()
+	var boost_smoke_tank = TankState.new()
 	boost_smoke_tank.position = Vector2(240.0, 260.0)
 	boost_smoke_tank.tank_angle = 30.0
 	boost_smoke_tank.airborne_velocity = Vector2(12.0, -8.0)
@@ -1436,7 +1436,7 @@ func _run() -> void:
 	var boost_smoke_particles: Array = local_match.get("_smoke_particles")
 	assert(boost_smoke_particles.size() == 1)
 	var boost_smoke: Dictionary = boost_smoke_particles[0]
-	var expected_boost_smoke_velocity := Vector2(
+	var expected_boost_smoke_velocity = Vector2(
 		12.0 + sin(deg_to_rad(30.0)) * TankState.BOOST_SMOKE_VELOCITY * TankState.GUN_POWER_PIXEL_SCALE,
 		-8.0 - cos(deg_to_rad(30.0)) * TankState.BOOST_SMOKE_VELOCITY * TankState.GUN_POWER_PIXEL_SCALE
 	)
@@ -1456,7 +1456,7 @@ func _run() -> void:
 		"size": 0.25,
 		"rotation": 0.0,
 	})
-	var smoke_half_size := TankState.TANK_BODY_HALF_WIDTH * 0.25
+	var smoke_half_size = TankState.TANK_BODY_HALF_WIDTH * 0.25
 	assert(smoke_draw_points.size() == 4)
 	assert(smoke_draw_points[0].distance_to(Vector2(10.0 - smoke_half_size, 20.0 - smoke_half_size)) < 0.01)
 	assert(smoke_draw_points[2].distance_to(Vector2(10.0 + smoke_half_size, 20.0 + smoke_half_size)) < 0.01)
@@ -1464,7 +1464,7 @@ func _run() -> void:
 	assert(smoke_draw_uvs.size() == 4)
 	assert(smoke_draw_uvs[0] == Vector2.ZERO)
 	assert(smoke_draw_uvs[2] == Vector2(64.0, 64.0))
-	var shield_tank := TankState.new()
+	var shield_tank = TankState.new()
 	shield_tank.fuel = TankState.TANK_FULL_FUEL
 	shield_tank.fuel_reserve = TankState.TANK_FULL_FUEL
 	shield_tank.update_shield(true, 0.5)
@@ -1536,20 +1536,20 @@ func _run() -> void:
 	tank.position = Vector2(120.0, 80.0)
 	tank.tank_angle = 30.0
 	tank.gun_angle = -20.0
-	var tank_center := tank.tank_center()
-	var expected_tank_center := Vector2(
+	var tank_center = tank.tank_center()
+	var expected_tank_center = Vector2(
 		120.0 - sin(deg_to_rad(30.0)) * TankState.TANK_CENTER_OFFSET,
 		80.0 - cos(deg_to_rad(30.0)) * TankState.TANK_CENTER_OFFSET
 	)
 	assert(tank_center.distance_to(expected_tank_center) < 0.01)
-	var tank_launch_origin := tank.launch_origin()
-	var expected_launch_origin := expected_tank_center + Vector2(
+	var tank_launch_origin = tank.launch_origin()
+	var expected_launch_origin = expected_tank_center + Vector2(
 		-sin(deg_to_rad(-20.0)),
 		-cos(deg_to_rad(-20.0))
 	) * TankState.GUN_LAUNCH_OFFSET
 	assert(tank_launch_origin.distance_to(expected_launch_origin) < 0.01)
 	tank.gun_power = 10.0
-	var expected_arrow_direction := Vector2(
+	var expected_arrow_direction = Vector2(
 		-sin(deg_to_rad(-20.0)),
 		-cos(deg_to_rad(-20.0))
 	)
@@ -1557,13 +1557,13 @@ func _run() -> void:
 	var arrow_center: Vector2 = arrow_geometry.get("center", Vector2.ZERO)
 	var arrow_shaft_start: Vector2 = arrow_geometry.get("shaft_start", Vector2.ZERO)
 	var arrow_head_tip: Vector2 = arrow_geometry.get("head_tip", Vector2.ZERO)
-	var arrow_length := float(arrow_geometry.get("arrow_length", 0.0))
+	var arrow_length = float(arrow_geometry.get("arrow_length", 0.0))
 	var arrow_shaft_polygon: PackedVector2Array = arrow_geometry.get("shaft_polygon", PackedVector2Array())
 	var arrow_head_polygon: PackedVector2Array = arrow_geometry.get("head_polygon", PackedVector2Array())
-	var expected_arrow_start_offset := TankState.TANK_BODY_HALF_WIDTH * 1.5
-	var expected_arrow_length := TankState.TANK_BODY_HALF_WIDTH * 2.0 + tank.gun_power * TankState.TANK_BODY_HALF_WIDTH * 0.5
-	var expected_shaft_width := TankState.TANK_BODY_HALF_WIDTH * 0.8
-	var expected_head_width := TankState.TANK_BODY_HALF_WIDTH * 1.6
+	var expected_arrow_start_offset = TankState.TANK_BODY_HALF_WIDTH * 1.5
+	var expected_arrow_length = TankState.TANK_BODY_HALF_WIDTH * 2.0 + tank.gun_power * TankState.TANK_BODY_HALF_WIDTH * 0.5
+	var expected_shaft_width = TankState.TANK_BODY_HALF_WIDTH * 0.8
+	var expected_head_width = TankState.TANK_BODY_HALF_WIDTH * 1.6
 	assert(arrow_center.distance_to(expected_tank_center) < 0.01)
 	assert(abs(arrow_length - expected_arrow_length) < 0.01)
 	assert(arrow_shaft_start.distance_to(expected_tank_center + expected_arrow_direction * expected_arrow_start_offset) < 0.01)
@@ -1575,7 +1575,7 @@ func _run() -> void:
 	assert(abs(arrow_head_polygon[0].distance_to(arrow_head_polygon[2]) - expected_head_width) < 0.01)
 	tank.gun_angle = 0.0
 	tank.airborne_velocity = Vector2(12.0, -8.0)
-	var tank_launch_velocity := tank.launch_velocity(10.0, 4.2)
+	var tank_launch_velocity = tank.launch_velocity(10.0, 4.2)
 	assert(abs(tank_launch_velocity.x - 12.0) < 0.01)
 	assert(abs(tank_launch_velocity.y + 239.0) < 0.01)
 	tank.position = Vector2(120.0, 80.0)
@@ -1592,7 +1592,7 @@ func _run() -> void:
 	# The query y selects which stacked chunk is reachable; TerrainModel.height_at()
 	# still reports the highest surface, but move_to_ground can resolve a lower
 	# support when the query is already below the upper cap.
-	var stacked_ground_terrain := TerrainModel.new()
+	var stacked_ground_terrain: RefCounted = TerrainModel.new()
 	stacked_ground_terrain.set("_width", 70.0)
 	stacked_ground_terrain.set("_height", 120.0)
 	stacked_ground_terrain.set("_step", 70.0)
@@ -1622,7 +1622,7 @@ func _run() -> void:
 	assert(abs(float(stacked_ground_terrain.move_to_ground(35.0, 30.0)) - 20.0) < 0.01)
 	assert(abs(float(stacked_ground_terrain.move_to_ground(35.0, 50.0)) - 60.0) < 0.01)
 	assert(abs(float(stacked_ground_terrain.move_to_ground(35.0, 80.0)) - 60.0) < 0.01)
-	var stacked_landing_tank := TankState.new()
+	var stacked_landing_tank = TankState.new()
 	stacked_landing_tank.position = Vector2(35.0, 65.0)
 	stacked_landing_tank.airborne_velocity = Vector2.ZERO
 	stacked_landing_tank.on_ground = false
@@ -1630,8 +1630,8 @@ func _run() -> void:
 	assert(stacked_landing_tank.on_ground)
 	assert(abs(stacked_landing_tank.position.y - 60.0) < 0.01)
 
-	var track_step_terrain := TrackStepTerrain.new(100.0)
-	var track_alignment_tank := TankState.new()
+	var track_step_terrain = TrackStepTerrain.new(100.0)
+	var track_alignment_tank = TankState.new()
 	track_alignment_tank.position = Vector2(100.0, 100.0)
 	track_alignment_tank.tank_angle = 0.0
 	track_alignment_tank.on_ground = true
@@ -1640,7 +1640,7 @@ func _run() -> void:
 	assert(track_alignment_tank.on_ground)
 	assert(abs(track_alignment_tank.position.y - 100.0) < 0.01)
 	assert(abs(track_alignment_tank.tank_angle - 4.5) < 0.01)
-	var track_drop := 0.06 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+	var track_drop = 0.06 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
 	track_step_terrain.left_ground_y = 100.0 + track_drop
 	track_step_terrain.mid_ground_y = 100.0 + track_drop
 	track_step_terrain.right_ground_y = 100.0 + track_drop
@@ -1651,7 +1651,7 @@ func _run() -> void:
 	assert(not track_alignment_tank.on_ground)
 	assert(abs(track_alignment_tank.position.y - 100.0) < 0.01)
 
-	var terrain := TerrainModel.new()
+	var terrain: RefCounted = TerrainModel.new()
 	terrain.rebuild_with_seed(320.0, 240.0, 1401)
 	tank.position = Vector2(160.0, 20.0)
 	tank.tank_angle = 12.0
@@ -1663,7 +1663,7 @@ func _run() -> void:
 	assert(abs(tank.position.y - 19.95) < 0.01)
 	assert(abs(tank.tank_angle - 12.0) < 0.01)
 	assert(not tank.on_ground)
-	var flat_terrain := FlatTerrain.new()
+	var flat_terrain = FlatTerrain.new()
 	tank.position = Vector2(80.0, 100.0)
 	tank.airborne_velocity = Vector2.ZERO
 	tank.on_ground = true
@@ -1688,18 +1688,18 @@ func _run() -> void:
 	tank.state = TankState.STATE_ALIVE
 	tank.settle_on_terrain(flat_terrain, 1.0)
 	assert(abs(tank.position.x - 120.0) < 0.01)
-	var positive_slope_terrain := SlopedTerrain.new(120.0, 100.0, 31.0)
-	var passive_positive_delta := -TankState.TANK_MOVE_SPEED * (31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
-	var passive_positive_x := 120.0 + cos(deg_to_rad(31.0)) * passive_positive_delta
+	var positive_slope_terrain = SlopedTerrain.new(120.0, 100.0, 31.0)
+	var passive_positive_delta = -TankState.TANK_MOVE_SPEED * (31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
+	var passive_positive_x = 120.0 + cos(deg_to_rad(31.0)) * passive_positive_delta
 	tank.tank_angle = 31.0
 	tank.position = positive_slope_terrain.tank_position(120.0)
 	tank.settle_on_terrain(positive_slope_terrain, 1.0)
 	assert(abs(tank.position.x - passive_positive_x) < 0.01)
 	assert(abs(tank.position.y - positive_slope_terrain.height_at(passive_positive_x)) < 0.01)
 	assert(abs(tank.tank_angle - 31.0) < 0.01)
-	var negative_slope_terrain := SlopedTerrain.new(120.0, 100.0, -31.0)
-	var passive_negative_delta := -TankState.TANK_MOVE_SPEED * (-31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
-	var passive_negative_x := 120.0 + cos(deg_to_rad(-31.0)) * passive_negative_delta
+	var negative_slope_terrain = SlopedTerrain.new(120.0, 100.0, -31.0)
+	var passive_negative_delta = -TankState.TANK_MOVE_SPEED * (-31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
+	var passive_negative_x = 120.0 + cos(deg_to_rad(-31.0)) * passive_negative_delta
 	tank.tank_angle = -31.0
 	tank.position = negative_slope_terrain.tank_position(120.0)
 	tank.settle_on_terrain(negative_slope_terrain, 1.0)
@@ -1710,8 +1710,8 @@ func _run() -> void:
 	tank.fuel_reserve = 1.0
 	tank.on_ground = true
 	tank.position = positive_slope_terrain.tank_position(120.0)
-	var right_track_delta := TankState.TANK_MOVE_SPEED * (1.0 - 31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
-	var right_expected_x := 120.0 + cos(deg_to_rad(31.0)) * right_track_delta
+	var right_track_delta = TankState.TANK_MOVE_SPEED * (1.0 - 31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
+	var right_expected_x = 120.0 + cos(deg_to_rad(31.0)) * right_track_delta
 	tank.move_on_terrain(1.0, 1.0, positive_slope_terrain)
 	assert(abs(tank.position.x - right_expected_x) < 0.01)
 	assert(abs(tank.position.y - positive_slope_terrain.height_at(right_expected_x)) < 0.01)
@@ -1720,8 +1720,8 @@ func _run() -> void:
 	tank.position = positive_slope_terrain.tank_position(120.0)
 	tank.fuel = 1.0
 	tank.fuel_reserve = 1.0
-	var left_track_delta := TankState.TANK_MOVE_SPEED * (-1.0 - 31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
-	var left_expected_x := 120.0 + cos(deg_to_rad(31.0)) * left_track_delta
+	var left_track_delta = TankState.TANK_MOVE_SPEED * (-1.0 - 31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
+	var left_expected_x = 120.0 + cos(deg_to_rad(31.0)) * left_track_delta
 	tank.move_on_terrain(-1.0, 1.0, positive_slope_terrain)
 	assert(abs(tank.position.x - left_expected_x) < 0.01)
 	assert(abs(tank.position.y - positive_slope_terrain.height_at(left_expected_x)) < 0.01)
@@ -1740,11 +1740,11 @@ func _run() -> void:
 	tank.settle_on_terrain(flat_terrain, 0.1)
 	assert(abs(tank.position.x - 190.0) < 0.01)
 	assert(abs(tank.airborne_velocity.x) < 0.01)
-	var terrain_x := 160.0
-	var before_drop := float(terrain.height_at(terrain_x))
+	var terrain_x = 160.0
+	var before_drop = float(terrain.height_at(terrain_x))
 	terrain.drop_terrain(12.0)
-	var after_drop := float(terrain.height_at(terrain_x))
-	var floor_y := float(terrain.call("_world_height_to_screen", -7.0))
+	var after_drop = float(terrain.height_at(terrain_x))
+	var floor_y = float(terrain.call("_world_height_to_screen", -7.0))
 	assert(after_drop >= before_drop)
 	assert(after_drop <= floor_y + 0.01)
 	if before_drop + 12.0 < floor_y:
@@ -1752,7 +1752,7 @@ func _run() -> void:
 	terrain.drop_terrain(10000.0)
 	assert(abs(float(terrain.height_at(terrain_x)) - floor_y) < 0.01)
 
-	var min_land_clip_terrain := TerrainModel.new()
+	var min_land_clip_terrain: RefCounted = TerrainModel.new()
 	min_land_clip_terrain.set("_height", 100.0)
 	min_land_clip_terrain.set("_step", 10.0)
 	var deep_base_chunk: Dictionary = min_land_clip_terrain.call(
@@ -1765,7 +1765,7 @@ func _run() -> void:
 		Color.GRAY,
 		Color.BLACK
 	)
-	var min_land_screen_y := float(min_land_clip_terrain.call("_world_height_to_screen", TerrainModel.CLASSIC_MIN_LAND_HEIGHT))
+	var min_land_screen_y = float(min_land_clip_terrain.call("_world_height_to_screen", TerrainModel.CLASSIC_MIN_LAND_HEIGHT))
 	assert(int(min_land_clip_terrain.call("_bottom_blast_state_for_chunk_side", deep_base_chunk, true, Vector2(5.0, 60.0), 80.0, 0.0)) == 1)
 	min_land_clip_terrain.set("_chunks", [[deep_base_chunk]])
 	min_land_clip_terrain.call("_clip_slice", 0, Vector2(5.0, 40.0), 30.0)
@@ -1777,7 +1777,7 @@ func _run() -> void:
 	assert(abs(float(min_land_preserved_chunk.get("bottom_left", 0.0)) - 90.0) < 0.01)
 	assert(abs(float(min_land_preserved_chunk.get("bottom_right", 0.0)) - 90.0) < 0.01)
 
-	var support_cut_terrain := TerrainModel.new()
+	var support_cut_terrain: RefCounted = TerrainModel.new()
 	support_cut_terrain.set("_step", 10.0)
 	var supported_cap: Dictionary = support_cut_terrain.call(
 		"_make_chunk",
@@ -1809,7 +1809,7 @@ func _run() -> void:
 	assert(not bool(detached_cap.get("linked_to_next", true)))
 	assert(not bool(detached_base.get("falling", true)))
 
-	var inherited_motion_terrain := TerrainModel.new()
+	var inherited_motion_terrain: RefCounted = TerrainModel.new()
 	inherited_motion_terrain.set("_step", 10.0)
 	var falling_cap: Dictionary = inherited_motion_terrain.call(
 		"_make_chunk",
@@ -1846,7 +1846,7 @@ func _run() -> void:
 	assert(abs(float(inherited_base.get("wait", 0.0)) - 0.25) < 0.01)
 	assert(abs(float(inherited_base.get("speed", 0.0)) - 42.0) < 0.01)
 
-	var removed_link_terrain := TerrainModel.new()
+	var removed_link_terrain: RefCounted = TerrainModel.new()
 	removed_link_terrain.set("_step", 10.0)
 	var removable_cap: Dictionary = removed_link_terrain.call(
 		"_make_chunk",
@@ -1881,7 +1881,7 @@ func _run() -> void:
 	# removed linked cap promotes the cut into the following chunk, which is then
 	# clipped to the lower crater edge during the same pass instead of keeping the
 	# original pre-blast cap top.
-	var removed_link_cut_top_terrain := TerrainModel.new()
+	var removed_link_cut_top_terrain: RefCounted = TerrainModel.new()
 	removed_link_cut_top_terrain.set("_step", 10.0)
 	var removable_cut_cap: Dictionary = removed_link_cut_top_terrain.call(
 		"_make_chunk",
@@ -1908,7 +1908,7 @@ func _run() -> void:
 	var removed_link_cut_top_chunks: Array = removed_link_cut_top_terrain.get("_chunks")
 	assert(Array(removed_link_cut_top_chunks[0]).size() == 1)
 	var promoted_cut_base: Dictionary = Array(removed_link_cut_top_chunks[0])[0]
-	var expected_promoted_top := 20.0 + sqrt(175.0)
+	var expected_promoted_top = 20.0 + sqrt(175.0)
 	assert(abs(float(promoted_cut_base.get("top_left", 0.0)) - expected_promoted_top) < 0.01)
 	assert(abs(float(promoted_cut_base.get("top_right", 0.0)) - expected_promoted_top) < 0.01)
 	assert(abs(float(promoted_cut_base.get("top_left", 0.0)) - 10.0) > 0.5)
@@ -1916,7 +1916,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 280-288 (Python), the
 	# top_code in (3, 6, 7) branch. A blast that reaches only the left top edge
 	# lowers that edge to the crater boundary while preserving the opposite side.
-	var one_sided_top_cut_terrain := TerrainModel.new()
+	var one_sided_top_cut_terrain: RefCounted = TerrainModel.new()
 	one_sided_top_cut_terrain.set("_step", 10.0)
 	var one_sided_top_chunk: Dictionary = one_sided_top_cut_terrain.call(
 		"_make_chunk",
@@ -1942,7 +1942,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 285-288 (Python), the
 	# top_code in (9, 12, 13) branch. This mirrors the one-sided top-edge case
 	# on the right side.
-	var right_top_cut_terrain := TerrainModel.new()
+	var right_top_cut_terrain: RefCounted = TerrainModel.new()
 	right_top_cut_terrain.set("_step", 10.0)
 	var right_top_chunk: Dictionary = right_top_cut_terrain.call(
 		"_make_chunk",
@@ -1968,7 +1968,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 280-284 (Python), the
 	# top_code = 6 branch. Neither top endpoint is inside the blast, but the
 	# classic endpoint-code rule still cuts the left top edge.
-	var top_code_6_terrain := TerrainModel.new()
+	var top_code_6_terrain: RefCounted = TerrainModel.new()
 	top_code_6_terrain.set("_step", 10.0)
 	var top_code_6_chunk: Dictionary = top_code_6_terrain.call(
 		"_make_chunk",
@@ -1985,7 +1985,7 @@ func _run() -> void:
 	var top_code_6_chunks: Array = top_code_6_terrain.get("_chunks")
 	assert(Array(top_code_6_chunks[0]).size() == 1)
 	var top_code_6_result: Dictionary = Array(top_code_6_chunks[0])[0]
-	var expected_top_code_6_left := 20.0 + sqrt(11.0)
+	var expected_top_code_6_left = 20.0 + sqrt(11.0)
 	assert(abs(float(top_code_6_result.get("top_left", 0.0)) - expected_top_code_6_left) < 0.01)
 	assert(abs(float(top_code_6_result.get("top_right", 0.0)) - 30.0) < 0.01)
 	assert(abs(float(top_code_6_result.get("bottom_left", 0.0)) - 60.0) < 0.01)
@@ -1994,7 +1994,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 285-288 (Python), the
 	# top_code = 9 mirror of the endpoint-code top cut.
-	var top_code_9_terrain := TerrainModel.new()
+	var top_code_9_terrain: RefCounted = TerrainModel.new()
 	top_code_9_terrain.set("_step", 10.0)
 	var top_code_9_chunk: Dictionary = top_code_9_terrain.call(
 		"_make_chunk",
@@ -2011,7 +2011,7 @@ func _run() -> void:
 	var top_code_9_chunks: Array = top_code_9_terrain.get("_chunks")
 	assert(Array(top_code_9_chunks[0]).size() == 1)
 	var top_code_9_result: Dictionary = Array(top_code_9_chunks[0])[0]
-	var expected_top_code_9_right := 20.0 + sqrt(11.0)
+	var expected_top_code_9_right = 20.0 + sqrt(11.0)
 	assert(abs(float(top_code_9_result.get("top_left", 0.0)) - 30.0) < 0.01)
 	assert(abs(float(top_code_9_result.get("top_right", 0.0)) - expected_top_code_9_right) < 0.01)
 	assert(abs(float(top_code_9_result.get("bottom_left", 0.0)) - 60.0) < 0.01)
@@ -2020,7 +2020,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 291-298 (Python), the
 	# top_code = 11 case (state2 = 2, state1 = 3).
-	var top_code_11_terrain := TerrainModel.new()
+	var top_code_11_terrain: RefCounted = TerrainModel.new()
 	top_code_11_terrain.set("_step", 10.0)
 	var top_code_11_chunk: Dictionary = top_code_11_terrain.call(
 		"_make_chunk",
@@ -2037,8 +2037,8 @@ func _run() -> void:
 	var top_code_11_chunks: Array = top_code_11_terrain.get("_chunks")
 	assert(Array(top_code_11_chunks[0]).size() == 1)
 	var top_code_11_result: Dictionary = Array(top_code_11_chunks[0])[0]
-	var expected_top_code_11_left := 15.0 + sqrt(64.1601 - 4.0)
-	var expected_top_code_11_right := 15.0 + sqrt(64.1601 - 64.0)
+	var expected_top_code_11_left = 15.0 + sqrt(64.1601 - 4.0)
+	var expected_top_code_11_right = 15.0 + sqrt(64.1601 - 64.0)
 	assert(abs(float(top_code_11_result.get("top_left", 0.0)) - expected_top_code_11_left) < 0.01)
 	assert(abs(float(top_code_11_result.get("top_right", 0.0)) - expected_top_code_11_right) < 0.01)
 	assert(abs(float(top_code_11_result.get("bottom_left", 0.0)) - 60.0) < 0.01)
@@ -2047,7 +2047,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 291-298 (Python), the
 	# top_code = 14 case (state2 = 3, state1 = 2).
-	var top_code_14_terrain := TerrainModel.new()
+	var top_code_14_terrain: RefCounted = TerrainModel.new()
 	top_code_14_terrain.set("_step", 10.0)
 	var top_code_14_chunk: Dictionary = top_code_14_terrain.call(
 		"_make_chunk",
@@ -2064,8 +2064,8 @@ func _run() -> void:
 	var top_code_14_chunks: Array = top_code_14_terrain.get("_chunks")
 	assert(Array(top_code_14_chunks[0]).size() == 1)
 	var top_code_14_result: Dictionary = Array(top_code_14_chunks[0])[0]
-	var expected_top_code_14_left := 15.0 + sqrt(64.1601 - 64.0)
-	var expected_top_code_14_right := 15.0 + sqrt(64.1601 - 4.0)
+	var expected_top_code_14_left = 15.0 + sqrt(64.1601 - 64.0)
+	var expected_top_code_14_right = 15.0 + sqrt(64.1601 - 4.0)
 	assert(abs(float(top_code_14_result.get("top_left", 0.0)) - expected_top_code_14_left) < 0.01)
 	assert(abs(float(top_code_14_result.get("top_right", 0.0)) - expected_top_code_14_right) < 0.01)
 	assert(abs(float(top_code_14_result.get("bottom_left", 0.0)) - 60.0) < 0.01)
@@ -2075,7 +2075,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() plus Landscape.calculate_colour()
 	# (Python). Top and bottom cuts interpolate the changed edge colour along
 	# the original vertical gradient instead of keeping a flat fill colour.
-	var top_colour_cut_terrain := TerrainModel.new()
+	var top_colour_cut_terrain: RefCounted = TerrainModel.new()
 	top_colour_cut_terrain.set("_step", 10.0)
 	var top_colour_chunk: Dictionary = top_colour_cut_terrain.call(
 		"_make_chunk",
@@ -2095,7 +2095,7 @@ func _run() -> void:
 	assert(Color(top_colour_result.get("top_right_color", Color.TRANSPARENT)).is_equal_approx(Color.WHITE))
 	assert(Color(top_colour_result.get("bottom_left_color", Color.TRANSPARENT)).is_equal_approx(Color.BLACK))
 
-	var bottom_colour_cut_terrain := TerrainModel.new()
+	var bottom_colour_cut_terrain: RefCounted = TerrainModel.new()
 	bottom_colour_cut_terrain.set("_step", 10.0)
 	var bottom_colour_chunk: Dictionary = bottom_colour_cut_terrain.call(
 		"_make_chunk",
@@ -2118,7 +2118,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 291-298 (Python), the
 	# top_code in (11, 14, 15) branch. When both top edges are clipped, both
 	# move to the crater boundary while the bottom edge/resting state survives.
-	var two_sided_top_cut_terrain := TerrainModel.new()
+	var two_sided_top_cut_terrain: RefCounted = TerrainModel.new()
 	two_sided_top_cut_terrain.set("_step", 10.0)
 	var two_sided_top_chunk: Dictionary = two_sided_top_cut_terrain.call(
 		"_make_chunk",
@@ -2135,7 +2135,7 @@ func _run() -> void:
 	var two_sided_top_chunks: Array = two_sided_top_cut_terrain.get("_chunks")
 	assert(Array(two_sided_top_chunks[0]).size() == 1)
 	var two_sided_top_result: Dictionary = Array(two_sided_top_chunks[0])[0]
-	var expected_two_sided_top := 20.0 + sqrt(11.0)
+	var expected_two_sided_top = 20.0 + sqrt(11.0)
 	assert(abs(float(two_sided_top_result.get("top_left", 0.0)) - expected_two_sided_top) < 0.01)
 	assert(abs(float(two_sided_top_result.get("top_right", 0.0)) - expected_two_sided_top) < 0.01)
 	assert(abs(float(two_sided_top_result.get("bottom_left", 0.0)) - 60.0) < 0.01)
@@ -2145,7 +2145,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 280-288 and 408-415
 	# (Python). A top-only cut on a linked cap keeps the cap linked to its
 	# support because no bottom-code branch detaches the superblock.
-	var linked_left_top_cut_terrain := TerrainModel.new()
+	var linked_left_top_cut_terrain: RefCounted = TerrainModel.new()
 	linked_left_top_cut_terrain.set("_step", 10.0)
 	var linked_left_top_cap: Dictionary = linked_left_top_cut_terrain.call(
 		"_make_chunk",
@@ -2186,7 +2186,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 285-288 and 408-415
 	# (Python), the right-edge mirror of the linked top-only cut.
-	var linked_right_top_cut_terrain := TerrainModel.new()
+	var linked_right_top_cut_terrain: RefCounted = TerrainModel.new()
 	linked_right_top_cut_terrain.set("_step", 10.0)
 	var linked_right_top_cap: Dictionary = linked_right_top_cut_terrain.call(
 		"_make_chunk",
@@ -2230,7 +2230,7 @@ func _run() -> void:
 	# detaches a linked support, starts the cap falling, carries the old support
 	# motion to the base, and resolves the tangent/above right side through
 	# clip_height like the named Python reference regression.
-	var one_sided_bottom_cut_terrain := TerrainModel.new()
+	var one_sided_bottom_cut_terrain: RefCounted = TerrainModel.new()
 	one_sided_bottom_cut_terrain.set("_step", 10.0)
 	var one_sided_cap: Dictionary = one_sided_bottom_cut_terrain.call(
 		"_make_chunk",
@@ -2271,7 +2271,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 322-340 (Python), the
 	# bottom_code in (7, 13, 15) branch. When both lower edges are clipped,
 	# the linked support is detached and the cap enters the classic fall pause.
-	var two_sided_bottom_cut_terrain := TerrainModel.new()
+	var two_sided_bottom_cut_terrain: RefCounted = TerrainModel.new()
 	two_sided_bottom_cut_terrain.set("_step", 10.0)
 	var two_sided_cap: Dictionary = two_sided_bottom_cut_terrain.call(
 		"_make_chunk",
@@ -2299,7 +2299,7 @@ func _run() -> void:
 	assert(Array(two_sided_bottom_cut_chunks[0]).size() == 2)
 	var two_sided_result_cap: Dictionary = Array(two_sided_bottom_cut_chunks[0])[0]
 	var two_sided_result_base: Dictionary = Array(two_sided_bottom_cut_chunks[0])[1]
-	var expected_two_sided_bottom := 60.0 - sqrt(375.0)
+	var expected_two_sided_bottom = 60.0 - sqrt(375.0)
 	assert(abs(float(two_sided_result_cap.get("bottom_left", 0.0)) - expected_two_sided_bottom) < 0.01)
 	assert(abs(float(two_sided_result_cap.get("bottom_right", 0.0)) - expected_two_sided_bottom) < 0.01)
 	assert(not bool(two_sided_result_cap.get("linked_to_next", true)))
@@ -2314,7 +2314,7 @@ func _run() -> void:
 	# bottom_code = 15 case (state4 = 3, state3 = 3) without linked support.
 	# Both lower endpoints are clipped and the single unlinked chunk starts the
 	# classic fall pause.
-	var unlinked_bottom_code_15_terrain := TerrainModel.new()
+	var unlinked_bottom_code_15_terrain: RefCounted = TerrainModel.new()
 	unlinked_bottom_code_15_terrain.set("_step", 10.0)
 	var unlinked_bc15_chunk: Dictionary = unlinked_bottom_code_15_terrain.call(
 		"_make_chunk",
@@ -2331,7 +2331,7 @@ func _run() -> void:
 	var unlinked_bc15_chunks: Array = unlinked_bottom_code_15_terrain.get("_chunks")
 	assert(Array(unlinked_bc15_chunks[0]).size() == 1)
 	var unlinked_bc15_result: Dictionary = Array(unlinked_bc15_chunks[0])[0]
-	var expected_unlinked_bc15_bottom := 60.0 - sqrt(375.0)
+	var expected_unlinked_bc15_bottom = 60.0 - sqrt(375.0)
 	assert(abs(float(unlinked_bc15_result.get("bottom_left", 0.0)) - expected_unlinked_bc15_bottom) < 0.01)
 	assert(abs(float(unlinked_bc15_result.get("bottom_right", 0.0)) - expected_unlinked_bc15_bottom) < 0.01)
 	assert(not bool(unlinked_bc15_result.get("linked_to_next", true)))
@@ -2341,7 +2341,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 322-340 (Python), the
 	# bottom_code = 7 case (state4 = 1, state3 = 3) without linked support.
-	var unlinked_bottom_code_7_terrain := TerrainModel.new()
+	var unlinked_bottom_code_7_terrain: RefCounted = TerrainModel.new()
 	unlinked_bottom_code_7_terrain.set("_step", 10.0)
 	var unlinked_bc7_chunk: Dictionary = unlinked_bottom_code_7_terrain.call(
 		"_make_chunk",
@@ -2368,7 +2368,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 322-340 (Python), the
 	# bottom_code = 13 case (state4 = 3, state3 = 1) without linked support.
 	# This mirrors bottom_code = 7 on the opposite side.
-	var unlinked_bottom_code_13_terrain := TerrainModel.new()
+	var unlinked_bottom_code_13_terrain: RefCounted = TerrainModel.new()
 	unlinked_bottom_code_13_terrain.set("_step", 10.0)
 	var unlinked_bc13_chunk: Dictionary = unlinked_bottom_code_13_terrain.call(
 		"_make_chunk",
@@ -2395,7 +2395,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
 	# bottom_code in (6, 12, 14) branch without linked support. Cutting a
 	# non-linked chunk's bottom edge still starts that chunk falling.
-	var unlinked_right_bottom_cut_terrain := TerrainModel.new()
+	var unlinked_right_bottom_cut_terrain: RefCounted = TerrainModel.new()
 	unlinked_right_bottom_cut_terrain.set("_step", 10.0)
 	var unlinked_right_bottom_chunk: Dictionary = unlinked_right_bottom_cut_terrain.call(
 		"_make_chunk",
@@ -2422,7 +2422,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 342-359 (Python), the
 	# bottom_code in (3, 9, 11) branch without linked support. This mirrors the
 	# right-bottom non-linked fall-start case.
-	var unlinked_left_bottom_cut_terrain := TerrainModel.new()
+	var unlinked_left_bottom_cut_terrain: RefCounted = TerrainModel.new()
 	unlinked_left_bottom_cut_terrain.set("_step", 10.0)
 	var unlinked_left_bottom_chunk: Dictionary = unlinked_left_bottom_cut_terrain.call(
 		"_make_chunk",
@@ -2448,7 +2448,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
 	# bottom_code = 6 case (state4 = 1, state3 = 2).
-	var bottom_code_6_terrain := TerrainModel.new()
+	var bottom_code_6_terrain: RefCounted = TerrainModel.new()
 	bottom_code_6_terrain.set("_step", 10.0)
 	var bc6_cap: Dictionary = bottom_code_6_terrain.call(
 		"_make_chunk",
@@ -2484,7 +2484,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
 	# bottom_code = 6 case (state4 = 1, state3 = 2) without linked support.
 	# The above-blast left bottom edge is preserved when no support is linked.
-	var unlinked_bottom_code_6_terrain := TerrainModel.new()
+	var unlinked_bottom_code_6_terrain: RefCounted = TerrainModel.new()
 	unlinked_bottom_code_6_terrain.set("_step", 10.0)
 	var unlinked_bc6_chunk: Dictionary = unlinked_bottom_code_6_terrain.call(
 		"_make_chunk",
@@ -2512,7 +2512,7 @@ func _run() -> void:
 	# bottom_code = 3 case (state4 = 0, state3 = 3) without linked support.
 	# Only the left bottom is clipped; the horizontally out-of-range right
 	# bottom remains unchanged while the chunk starts the classic fall pause.
-	var bottom_code_3_terrain := TerrainModel.new()
+	var bottom_code_3_terrain: RefCounted = TerrainModel.new()
 	bottom_code_3_terrain.set("_step", 10.0)
 	var bc3_chunk: Dictionary = bottom_code_3_terrain.call(
 		"_make_chunk",
@@ -2539,7 +2539,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
 	# bottom_code = 12 case (state4 = 3, state3 = 0). Only the right bottom
 	# is clipped; the horizontally out-of-range left bottom remains.
-	var bottom_code_12_terrain := TerrainModel.new()
+	var bottom_code_12_terrain: RefCounted = TerrainModel.new()
 	bottom_code_12_terrain.set("_step", 10.0)
 	var bc12_chunk: Dictionary = bottom_code_12_terrain.call(
 		"_make_chunk",
@@ -2564,7 +2564,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
 	# bottom_code = 14 case (state4 = 3, state3 = 2) without linked support.
 	# The above-blast left bottom edge stays untouched unless support is linked.
-	var bottom_code_14_terrain := TerrainModel.new()
+	var bottom_code_14_terrain: RefCounted = TerrainModel.new()
 	bottom_code_14_terrain.set("_step", 10.0)
 	var bc14_chunk: Dictionary = bottom_code_14_terrain.call(
 		"_make_chunk",
@@ -2592,7 +2592,7 @@ func _run() -> void:
 	# bottom_code = 11 case (state4 = 2, state3 = 3) without linked support.
 	# This mirrors bottom_code = 14: the above-blast opposite bottom edge stays
 	# untouched unless support is linked.
-	var bottom_code_11_terrain := TerrainModel.new()
+	var bottom_code_11_terrain: RefCounted = TerrainModel.new()
 	bottom_code_11_terrain.set("_step", 10.0)
 	var bc11_chunk: Dictionary = bottom_code_11_terrain.call(
 		"_make_chunk",
@@ -2619,7 +2619,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 280-410 (Python). A thin
 	# linked cap removed by a one-sided right-edge crater promotes the untouched
 	# left top and clipped right top onto the support chunk.
-	var one_sided_removed_linked_cap_terrain := TerrainModel.new()
+	var one_sided_removed_linked_cap_terrain: RefCounted = TerrainModel.new()
 	one_sided_removed_linked_cap_terrain.set("_step", 10.0)
 	var one_sided_removed_cap: Dictionary = one_sided_removed_linked_cap_terrain.call(
 		"_make_chunk",
@@ -2656,7 +2656,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 303-321 and 408-415
 	# (Python). Removing an already-falling linked cap promotes the clipped top
 	# to the support chunk and carries the old superblock wait/speed with it.
-	var falling_removed_linked_cap_terrain := TerrainModel.new()
+	var falling_removed_linked_cap_terrain: RefCounted = TerrainModel.new()
 	falling_removed_linked_cap_terrain.set("_step", 10.0)
 	var falling_removed_cap: Dictionary = falling_removed_linked_cap_terrain.call(
 		"_make_chunk",
@@ -2697,7 +2697,7 @@ func _run() -> void:
 	# one-sided crater fully consumes only the right edge of a linked cap while
 	# the opposite left edge remains tall, Python still deletes the cap and
 	# promotes the surviving left top plus clipped right top to the support.
-	var surviving_side_removed_cap_terrain := TerrainModel.new()
+	var surviving_side_removed_cap_terrain: RefCounted = TerrainModel.new()
 	surviving_side_removed_cap_terrain.set("_step", 10.0)
 	var surviving_side_removed_cap: Dictionary = surviving_side_removed_cap_terrain.call(
 		"_make_chunk",
@@ -2735,7 +2735,7 @@ func _run() -> void:
 	# mirrors the right-edge removed linked cap case: a thin cap removed by a
 	# one-sided left-edge crater promotes the clipped left top and untouched
 	# right top onto the support chunk.
-	var left_sided_removed_linked_cap_terrain := TerrainModel.new()
+	var left_sided_removed_linked_cap_terrain: RefCounted = TerrainModel.new()
 	left_sided_removed_linked_cap_terrain.set("_step", 10.0)
 	var left_sided_removed_cap: Dictionary = left_sided_removed_linked_cap_terrain.call(
 		"_make_chunk",
@@ -2772,7 +2772,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 342-359 and 408-415
 	# (Python). This mirrors the falling removed linked cap motion propagation
 	# for a left-edge crater.
-	var left_falling_removed_linked_cap_terrain := TerrainModel.new()
+	var left_falling_removed_linked_cap_terrain: RefCounted = TerrainModel.new()
 	left_falling_removed_linked_cap_terrain.set("_step", 10.0)
 	var left_falling_removed_cap: Dictionary = left_falling_removed_linked_cap_terrain.call(
 		"_make_chunk",
@@ -2813,7 +2813,7 @@ func _run() -> void:
 	# mirrors the surviving-side removal case: a left-edge crater can delete a
 	# linked cap even when the right edge remains tall, promoting both final tops
 	# onto the support chunk.
-	var surviving_right_removed_cap_terrain := TerrainModel.new()
+	var surviving_right_removed_cap_terrain: RefCounted = TerrainModel.new()
 	surviving_right_removed_cap_terrain.set("_step", 10.0)
 	var surviving_right_removed_cap: Dictionary = surviving_right_removed_cap_terrain.call(
 		"_make_chunk",
@@ -2849,7 +2849,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 342-356 (Python), the
 	# bottom_code = 9 case (state4 = 2, state3 = 1).
-	var bottom_code_9_terrain := TerrainModel.new()
+	var bottom_code_9_terrain: RefCounted = TerrainModel.new()
 	bottom_code_9_terrain.set("_step", 10.0)
 	var bc9_cap: Dictionary = bottom_code_9_terrain.call(
 		"_make_chunk",
@@ -2885,7 +2885,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 342-359 (Python), the
 	# bottom_code = 9 case (state4 = 2, state3 = 1) without linked support.
 	# This mirrors unlinked bottom_code = 6 on the left side.
-	var unlinked_bottom_code_9_terrain := TerrainModel.new()
+	var unlinked_bottom_code_9_terrain: RefCounted = TerrainModel.new()
 	unlinked_bottom_code_9_terrain.set("_step", 10.0)
 	var unlinked_bc9_chunk: Dictionary = unlinked_bottom_code_9_terrain.call(
 		"_make_chunk",
@@ -2909,7 +2909,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_bc9_result.get("wait", 0.0)) - 0.1) < 0.01)
 	assert(abs(float(unlinked_bc9_result.get("speed", -1.0))) < 0.01)
 
-	var skipped_linked_terrain := TerrainModel.new()
+	var skipped_linked_terrain: RefCounted = TerrainModel.new()
 	skipped_linked_terrain.set("_step", 10.0)
 	var skipped_cap: Dictionary = skipped_linked_terrain.call(
 		"_make_chunk",
@@ -2943,7 +2943,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 270-275 (Python). The
 	# linked-superblock edge-graze skip advances over the entire linked chain,
 	# preserving a cap, connector, and support unchanged.
-	var skipped_chain_terrain := TerrainModel.new()
+	var skipped_chain_terrain: RefCounted = TerrainModel.new()
 	skipped_chain_terrain.set("_step", 10.0)
 	var skipped_chain_cap: Dictionary = skipped_chain_terrain.call(
 		"_make_chunk",
@@ -2995,7 +2995,7 @@ func _run() -> void:
 	assert(not bool(preserved_chain_base.get("linked_to_next", true)))
 	assert(not bool(preserved_chain_base.get("falling", true)))
 
-	var skipped_left_linked_terrain := TerrainModel.new()
+	var skipped_left_linked_terrain: RefCounted = TerrainModel.new()
 	skipped_left_linked_terrain.set("_step", 10.0)
 	var skipped_left_cap: Dictionary = skipped_left_linked_terrain.call(
 		"_make_chunk",
@@ -3033,7 +3033,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 270-275 (Python). The
 	# multi-chunk chain skip is mirrored for a left-edge graze.
-	var skipped_left_chain_terrain := TerrainModel.new()
+	var skipped_left_chain_terrain: RefCounted = TerrainModel.new()
 	skipped_left_chain_terrain.set("_step", 10.0)
 	var skipped_left_chain_cap: Dictionary = skipped_left_chain_terrain.call(
 		"_make_chunk",
@@ -3085,7 +3085,7 @@ func _run() -> void:
 	assert(not bool(preserved_left_chain_base.get("linked_to_next", true)))
 	assert(not bool(preserved_left_chain_base.get("falling", true)))
 
-	var asymmetric_split_terrain := TerrainModel.new()
+	var asymmetric_split_terrain: RefCounted = TerrainModel.new()
 	asymmetric_split_terrain.set("_step", 10.0)
 	var asymmetric_chunk: Dictionary = asymmetric_split_terrain.call(
 		"_make_chunk",
@@ -3108,7 +3108,7 @@ func _run() -> void:
 	assert(abs(float(asymmetric_result.get("bottom_right", 0.0)) - 30.0) < 0.01)
 	assert(not bool(asymmetric_result.get("falling", true)))
 
-	var mirrored_middle_graze_terrain := TerrainModel.new()
+	var mirrored_middle_graze_terrain: RefCounted = TerrainModel.new()
 	mirrored_middle_graze_terrain.set("_step", 10.0)
 	var mirrored_middle_graze_chunk: Dictionary = mirrored_middle_graze_terrain.call(
 		"_make_chunk",
@@ -3134,7 +3134,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 361-407 (Python). Splitting
 	# an already-falling chunk starts the detached upper cap on a fresh fall pause
 	# while the lower remainder keeps the source falling wait/speed.
-	var falling_split_terrain := TerrainModel.new()
+	var falling_split_terrain: RefCounted = TerrainModel.new()
 	falling_split_terrain.set("_step", 10.0)
 	var falling_split_chunk: Dictionary = falling_split_terrain.call(
 		"_make_chunk",
@@ -3165,7 +3165,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 361-407 and 408-415
 	# (Python). Splitting a linked cap detaches the upper piece while the lower
 	# remainder stays linked to the support chunk below it.
-	var linked_split_terrain := TerrainModel.new()
+	var linked_split_terrain: RefCounted = TerrainModel.new()
 	linked_split_terrain.set("_step", 10.0)
 	var linked_split_cap: Dictionary = linked_split_terrain.call(
 		"_make_chunk",
@@ -3194,8 +3194,8 @@ func _run() -> void:
 	var linked_split_upper: Dictionary = Array(linked_split_chunks[0])[0]
 	var linked_split_lower: Dictionary = Array(linked_split_chunks[0])[1]
 	var linked_split_support: Dictionary = Array(linked_split_chunks[0])[2]
-	var expected_linked_split_top_cut := 20.0 - sqrt(24.0)
-	var expected_linked_split_bottom_cut := 20.0 + sqrt(24.0)
+	var expected_linked_split_top_cut = 20.0 - sqrt(24.0)
+	var expected_linked_split_bottom_cut = 20.0 + sqrt(24.0)
 	assert(abs(float(linked_split_upper.get("top_left", 0.0)) - 10.0) < 0.01)
 	assert(abs(float(linked_split_upper.get("bottom_left", 0.0)) - expected_linked_split_top_cut) < 0.01)
 	assert(not bool(linked_split_upper.get("linked_to_next", true)))
@@ -3214,7 +3214,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.clip_slice() lines 361-407 (Python). Splitting
 	# a linked support chunk starts the superblock leader's fall pause while both
 	# support remainders themselves stay individually non-falling.
-	var linked_support_split_terrain := TerrainModel.new()
+	var linked_support_split_terrain: RefCounted = TerrainModel.new()
 	linked_support_split_terrain.set("_step", 10.0)
 	var linked_support_split_cap: Dictionary = linked_support_split_terrain.call(
 		"_make_chunk",
@@ -3243,8 +3243,8 @@ func _run() -> void:
 	var linked_support_split_result_cap: Dictionary = Array(linked_support_split_chunks[0])[0]
 	var linked_support_split_upper: Dictionary = Array(linked_support_split_chunks[0])[1]
 	var linked_support_split_lower: Dictionary = Array(linked_support_split_chunks[0])[2]
-	var expected_linked_support_split_top_cut := 55.0 - sqrt(24.0)
-	var expected_linked_support_split_bottom_cut := 55.0 + sqrt(24.0)
+	var expected_linked_support_split_top_cut = 55.0 - sqrt(24.0)
+	var expected_linked_support_split_bottom_cut = 55.0 + sqrt(24.0)
 	assert(abs(float(linked_support_split_result_cap.get("top_left", 0.0)) - 10.0) < 0.01)
 	assert(abs(float(linked_support_split_result_cap.get("bottom_left", 0.0)) - 40.0) < 0.01)
 	assert(bool(linked_support_split_result_cap.get("linked_to_next", false)))
@@ -3268,7 +3268,7 @@ func _run() -> void:
 	# the support under an already-falling linked cap keeps the cap's old motion,
 	# leaves the upper support remainder resting, and hands old wait/speed to the
 	# lower support remainder.
-	var falling_linked_support_split_terrain := TerrainModel.new()
+	var falling_linked_support_split_terrain: RefCounted = TerrainModel.new()
 	falling_linked_support_split_terrain.set("_step", 10.0)
 	var falling_linked_support_split_cap: Dictionary = falling_linked_support_split_terrain.call(
 		"_make_chunk",
@@ -3324,7 +3324,7 @@ func _run() -> void:
 	# for a split linked support is copied from the superblock leader, not from
 	# the support chunk being cut. The lower remainder inherits the falling cap's
 	# wait/speed even when the support itself was still marked resting.
-	var leader_motion_support_split_terrain := TerrainModel.new()
+	var leader_motion_support_split_terrain: RefCounted = TerrainModel.new()
 	leader_motion_support_split_terrain.set("_step", 10.0)
 	var leader_motion_support_split_cap: Dictionary = leader_motion_support_split_terrain.call(
 		"_make_chunk",
@@ -3380,7 +3380,7 @@ func _run() -> void:
 	# (Python). Splitting an already-falling linked cap starts the detached
 	# upper piece on a fresh fall pause while the lower linked remainder keeps
 	# the old superblock motion.
-	var falling_linked_split_terrain := TerrainModel.new()
+	var falling_linked_split_terrain: RefCounted = TerrainModel.new()
 	falling_linked_split_terrain.set("_step", 10.0)
 	var falling_linked_split_cap: Dictionary = falling_linked_split_terrain.call(
 		"_make_chunk",
@@ -3424,7 +3424,7 @@ func _run() -> void:
 	assert(abs(float(falling_linked_split_lower.get("speed", 0.0)) - 42.0) < 0.01)
 	assert(not bool(falling_linked_split_support.get("falling", true)))
 
-	var falling_terrain := TerrainModel.new()
+	var falling_terrain: RefCounted = TerrainModel.new()
 	falling_terrain.set("_height", 100.0)
 	falling_terrain.set("_fall_acceleration", 0.0)
 	var falling_chunk: Dictionary = falling_terrain.call(
@@ -3467,7 +3467,7 @@ func _run() -> void:
 	assert(abs(float(moved_chunk["bottom_right"]) - 60.0) < 0.01)
 	assert(bool(moved_chunk.get("falling", false)))
 
-	var falling_support_terrain := TerrainModel.new()
+	var falling_support_terrain: RefCounted = TerrainModel.new()
 	falling_support_terrain.set("_height", 120.0)
 	falling_support_terrain.set("_fall_acceleration", 0.0)
 	var falling_upper: Dictionary = falling_support_terrain.call(
@@ -3518,7 +3518,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.update() lines 169-188 (Python). A uniform
 	# chunk that lands on a still-falling support merges into that support and
 	# preserves the support's falling wait/speed, even if the support colour differs.
-	var falling_merge_support_terrain := TerrainModel.new()
+	var falling_merge_support_terrain: RefCounted = TerrainModel.new()
 	falling_merge_support_terrain.set("_height", 120.0)
 	falling_merge_support_terrain.set("_fall_acceleration", 0.0)
 	var falling_merge_upper: Dictionary = falling_merge_support_terrain.call(
@@ -3560,7 +3560,7 @@ func _run() -> void:
 	assert(abs(float(falling_merge_result.get("wait", 0.0)) - 0.25) < 0.01)
 	assert(abs(float(falling_merge_result.get("speed", 0.0)) - 42.0) < 0.01)
 
-	var linked_support_terrain := TerrainModel.new()
+	var linked_support_terrain: RefCounted = TerrainModel.new()
 	linked_support_terrain.set("_height", 140.0)
 	linked_support_terrain.set("_fall_acceleration", 0.0)
 	var linked_upper: Dictionary = linked_support_terrain.call(
@@ -3615,7 +3615,7 @@ func _run() -> void:
 	assert(abs(float(linked_lower_after_second.get("top_left", 0.0)) - 55.0) < 0.01)
 	assert(abs(float(linked_deep_after_second.get("top_left", 0.0)) - 75.0) < 0.01)
 
-	var merge_landing_terrain := TerrainModel.new()
+	var merge_landing_terrain: RefCounted = TerrainModel.new()
 	merge_landing_terrain.set("_height", 120.0)
 	merge_landing_terrain.set("_fall_acceleration", 0.0)
 	var merge_upper: Dictionary = merge_landing_terrain.call(
@@ -3656,7 +3656,7 @@ func _run() -> void:
 	# superblock) is merged into the lower chunk and deleted; the lower chunk's top edge
 	# is raised to the connector's top, and the cap (superblock leader) inherits the
 	# resting state (falling=false, speed=0, wait=0) from the lower chunk.
-	var multi_merge_terrain := TerrainModel.new()
+	var multi_merge_terrain: RefCounted = TerrainModel.new()
 	multi_merge_terrain.set("_height", 120.0)
 	multi_merge_terrain.set("_fall_acceleration", 0.0)
 	# cap: top of superblock, linked to connector, falling with speed=60.
@@ -3721,7 +3721,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.update() lines 177-188 (Python). If the lower
 	# support is still falling, a uniform connector still merges into it and the
 	# linked superblock leader inherits the support wait/speed.
-	var multi_falling_merge_terrain := TerrainModel.new()
+	var multi_falling_merge_terrain: RefCounted = TerrainModel.new()
 	multi_falling_merge_terrain.set("_height", 120.0)
 	multi_falling_merge_terrain.set("_fall_acceleration", 0.0)
 	var multi_falling_merge_cap: Dictionary = multi_falling_merge_terrain.call(
@@ -3786,7 +3786,7 @@ func _run() -> void:
 	#   - falling_chunk["linked_to_next"] is set to true
 	#   - the superblock leader inherits the lower chunk's motion: falling=false, speed=0.0, wait=0.0
 	# This stops the fall cleanly without merging and without leaving the chunk falling forever.
-	var non_merge_terrain := TerrainModel.new()
+	var non_merge_terrain: RefCounted = TerrainModel.new()
 	non_merge_terrain.set("_height", 120.0)
 	non_merge_terrain.set("_fall_acceleration", 0.0)
 		# falling chunk: top and bottom colours differ, excluding the classic merge path.
@@ -3838,7 +3838,7 @@ func _run() -> void:
 	# Fidelity target: Landscape.update() lines 170-198 (Python). The classic
 	# merge branch requires exact Colour equality, so near-uniform colours must
 	# still use the non-merge link-and-inherit path.
-	var near_uniform_terrain := TerrainModel.new()
+	var near_uniform_terrain: RefCounted = TerrainModel.new()
 	near_uniform_terrain.set("_height", 120.0)
 	near_uniform_terrain.set("_fall_acceleration", 0.0)
 	var near_uniform_falling: Dictionary = near_uniform_terrain.call(
@@ -3879,7 +3879,7 @@ func _run() -> void:
 	# chunk still has positive wait, the tick only subtracts wait and defers all
 	# movement/acceleration until the next frame, preserving the current speed even
 	# if the wait crosses below zero.
-	var waiting_fall_terrain := TerrainModel.new()
+	var waiting_fall_terrain: RefCounted = TerrainModel.new()
 	waiting_fall_terrain.set("_height", 100.0)
 	waiting_fall_terrain.set("_fall_acceleration", 10.0)
 	var waiting_fall_chunk: Dictionary = waiting_fall_terrain.call(
@@ -3910,7 +3910,7 @@ func _run() -> void:
 	assert(abs(float(waiting_after_move.get("bottom_left", 0.0)) - 34.2) < 0.01)
 	assert(abs(float(waiting_after_move.get("speed", 0.0)) - 43.0) < 0.01)
 
-	var accelerating_terrain := TerrainModel.new()
+	var accelerating_terrain: RefCounted = TerrainModel.new()
 	accelerating_terrain.set("_height", 100.0)
 	accelerating_terrain.set("_fall_acceleration", 100.0)
 	var accelerating_chunk: Dictionary = accelerating_terrain.call(
@@ -3943,7 +3943,7 @@ func _run() -> void:
 	# It splits the chunk into an upper piece and a lower piece.
 	# The upper piece (part_index == 0) starts falling (wait = 0.1), while the
 	# lower piece (part_index == 1) does not start falling (wait = 0.0).
-	var split_terrain := TerrainModel.new()
+	var split_terrain: RefCounted = TerrainModel.new()
 	split_terrain.set("_height", 768.0)
 	split_terrain.set("_step", 0.05)
 	split_terrain.set("_fall_pause", 0.1)
@@ -3958,8 +3958,8 @@ func _run() -> void:
 		Color.WHITE
 	)
 	split_terrain.set("_chunks", [[split_chunk]])
-	var blast_center := Vector2(0.025, 400.0)
-	var blast_radius := 50.0
+	var blast_center = Vector2(0.025, 400.0)
+	var blast_radius = 50.0
 	split_terrain.call("_clip_slice", 0, blast_center, blast_radius)
 	var split_chunks: Array = split_terrain.get("_chunks")
 	var result_slice: Array = Array(split_chunks[0])
@@ -3980,7 +3980,7 @@ func _run() -> void:
 	# If a tiny blast intersects the middle of only one vertical slice edge
 	# but neither the top nor bottom endpoint is inside the blast, the classic
 	# endpoint-code clipping path leaves the chunk unchanged.
-	var middle_graze_left_terrain := TerrainModel.new()
+	var middle_graze_left_terrain: RefCounted = TerrainModel.new()
 	middle_graze_left_terrain.set("_step", 10.0)
 	var mg_left_chunk: Dictionary = middle_graze_left_terrain.call(
 		"_make_chunk",
@@ -4005,7 +4005,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 280-407 (Python).
 	# This is the right-edge mirror of the one-sided middle crater graze.
-	var middle_graze_right_terrain := TerrainModel.new()
+	var middle_graze_right_terrain: RefCounted = TerrainModel.new()
 	middle_graze_right_terrain.set("_step", 10.0)
 	var mg_right_chunk: Dictionary = middle_graze_right_terrain.call(
 		"_make_chunk",
@@ -4030,7 +4030,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 270-275 (Python).
 	# A left-bottom edge graze advances over the linked superblock without detaching or clipping it.
-	var left_graze_skip_terrain := TerrainModel.new()
+	var left_graze_skip_terrain: RefCounted = TerrainModel.new()
 	left_graze_skip_terrain.set("_step", 10.0)
 	var left_graze_cap: Dictionary = left_graze_skip_terrain.call(
 		"_make_chunk",
@@ -4067,7 +4067,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 270-275 (Python).
 	# A right-edge graze against the cap leaves the cap, connector, and final support intact.
-	var right_graze_chain_terrain := TerrainModel.new()
+	var right_graze_chain_terrain: RefCounted = TerrainModel.new()
 	right_graze_chain_terrain.set("_step", 10.0)
 	var right_graze_cap: Dictionary = right_graze_chain_terrain.call(
 		"_make_chunk",
@@ -4115,7 +4115,7 @@ func _run() -> void:
 
 	# Fidelity target: Landscape.clip_slice() lines 342-359 (Python).
 	# A one-sided bottom cut on a linked chunk detaches its support.
-	var one_sided_linked_bottom_cut_terrain := TerrainModel.new()
+	var one_sided_linked_bottom_cut_terrain: RefCounted = TerrainModel.new()
 	one_sided_linked_bottom_cut_terrain.set("_step", 10.0)
 	var osc_cap: Dictionary = one_sided_linked_bottom_cut_terrain.call(
 		"_make_chunk",
@@ -4149,9 +4149,9 @@ func _run() -> void:
 
 	# Regression tests for Phase 2 weapons
 	# 1. Rolling Mines
-	var rolling_mine_weapon := {"name": "Rolling Mines", "kind": "rolling_mine", "damage": 30, "blast": 36.0, "speed": 4.0}
+	var rolling_mine_weapon = {"name": "Rolling Mines", "kind": "rolling_mine", "damage": 30, "blast": 36.0, "speed": 4.0}
 	_clear_projectiles(local_match)
-	var rolling_mine_start_y := float(local_match.get("_terrain").height_at(100.0)) - 10.0
+	var rolling_mine_start_y = float(local_match.get("_terrain").height_at(100.0)) - 10.0
 	local_match.call(
 		"_fire_weapon",
 		Vector2(100.0, rolling_mine_start_y),
@@ -4175,9 +4175,9 @@ func _run() -> void:
 	assert(abs(float(roll_proj.get("roll_speed", 0.0))) > 0.0)
 
 	# 2. Airstrike
-	var airstrike_weapon := {"name": "Airstrike", "kind": "airstrike", "damage": 40, "blast": 40.0, "speed": 4.5}
+	var airstrike_weapon = {"name": "Airstrike", "kind": "airstrike", "damage": 40, "blast": 40.0, "speed": 4.5}
 	_clear_projectiles(local_match)
-	var airstrike_proj := {
+	var airstrike_proj = {
 		"position": Vector2(120.0, 300.0),
 		"previous_position": Vector2(120.0, 290.0),
 		"velocity": Vector2(0.0, 100.0),
@@ -4196,7 +4196,7 @@ func _run() -> void:
 	_clear_projectiles(local_match)
 
 	# 3. Death's Head
-	var deaths_head_weapon := {"name": "Death's Head", "kind": "deaths_head", "damage": 25, "blast": 30.0, "speed": 3.8, "fragments": 8, "spread": 0.35}
+	var deaths_head_weapon = {"name": "Death's Head", "kind": "deaths_head", "damage": 25, "blast": 30.0, "speed": 3.8, "fragments": 8, "spread": 0.35}
 	_clear_projectiles(local_match)
 	local_match.call(
 		"_fire_weapon",
@@ -4214,8 +4214,8 @@ func _run() -> void:
 	_clear_projectiles(local_match)
 
 	# 4. Hover Coil
-	var hover_coil_weapon := {"name": "Hover Coil", "kind": "hover_coil", "damage": 0, "blast": 0.0, "speed": 4.0}
-	var hover_proj := {
+	var hover_coil_weapon = {"name": "Hover Coil", "kind": "hover_coil", "damage": 0, "blast": 0.0, "speed": 4.0}
+	var hover_proj = {
 		"position": enemy_tank.position,
 		"previous_position": enemy_tank.position,
 		"velocity": Vector2.ZERO,
@@ -4232,7 +4232,7 @@ func _run() -> void:
 	enemy_tank.on_ground = true
 
 	# 5. Corbomite
-	var corbomite_weapon := {"name": "Corbomite", "kind": "corbomite", "damage": 0, "blast": 0.0, "speed": 0.0}
+	var corbomite_weapon = {"name": "Corbomite", "kind": "corbomite", "damage": 0, "blast": 0.0, "speed": 0.0}
 	local_match.set("_phase", "aim")
 	local_match.call("_set_turn_index", 0)
 	var p_inventory: RefCounted = local_match.get("_inventory")
@@ -4245,9 +4245,82 @@ func _run() -> void:
 	player_tank.corbomite_active = false
 	player_tank.shield_active = false
 
+	# --- Fidelity assertions: Wind model invariants ---
+	# Fidelity target: local_match.gd _wind_acceleration()
+	# The wind acceleration at age=0 must equal the base _wind value (gust sin
+	# term is 0 when _wind_gust=0, which may not hold for all seeds, so we just
+	# check the value is clamped to [WIND_MIN, WIND_MAX]).
+	var wind_accel_at_zero: float = float(local_match.call("_wind_acceleration", 0.0))
+	assert(wind_accel_at_zero >= -9.0 and wind_accel_at_zero <= 9.0,
+		"Wind acceleration must stay within [WIND_MIN, WIND_MAX]")
+	# Wind with a zero gust should equal base wind at age 0:
+	local_match.set("_wind", 3.0)
+	local_match.set("_wind_gust", 0.0)
+	var wind_age0_no_gust: float = float(local_match.call("_wind_acceleration", 0.0))
+	assert(abs(wind_age0_no_gust - 3.0) < 0.01,
+		"Wind acceleration at age=0 must equal base wind when gust is 0")
+
+	# Wind with a nonzero gust should differ over time:
+	local_match.set("_wind_gust", 1.5)
+	var wind_age0: float = float(local_match.call("_wind_acceleration", 0.0))
+	var wind_age1: float = float(local_match.call("_wind_acceleration", 1.0))
+	assert(abs(wind_age1 - wind_age0) > 0.001,
+		"Wind acceleration must include time-varying gust modulation")
+
+	# --- Fidelity assertions: AI trajectory simulation ---
+	# Fidelity target: local_match.gd _simulate_ai_shell_miss()
+	# The AI shell simulation must return a finite miss distance when shooting
+	# at a visible target. Miss = INF only if trajectory never gets close.
+	player_tank.position = Vector2(200.0, 200.0)
+	enemy_tank.position = Vector2(600.0, 200.0)
+	var shell_weapon: Dictionary = WeaponInventory.WEAPONS[0]
+	var sim_miss: float = float(local_match.call(
+		"_simulate_ai_shell_miss",
+		Vector2(200.0, 200.0),   # origin
+		-45.0,                   # angle_degrees (leftward)
+		14.0,                    # power
+		Vector2(600.0, 200.0),   # target
+		shell_weapon
+	))
+	assert(sim_miss < INF, "_simulate_ai_shell_miss must return a finite distance")
+	assert(sim_miss >= 0.0, "_simulate_ai_shell_miss must return a non-negative distance")
+
+	# --- Fidelity assertions: AI choose_ai_shot structure ---
+	# Fidelity target: local_match.gd _choose_ai_shot()
+	# The returned shot dict must include angle, power, and miss fields.
+	local_match.set("_phase", "aim")
+	local_match.call("_set_turn_index", 0)
+	player_tank.position = Vector2(200.0, 200.0)
+	enemy_tank.position = Vector2(700.0, 200.0)
+	var ai_shot: Dictionary = local_match.call("_choose_ai_shot")
+	assert(ai_shot.has("angle"), "_choose_ai_shot must return an 'angle' key")
+	assert(ai_shot.has("power"), "_choose_ai_shot must return a 'power' key")
+	assert(ai_shot.has("miss"), "_choose_ai_shot must return a 'miss' key")
+	var shot_angle: float = float(ai_shot.get("angle", 0.0))
+	var shot_power: float = float(ai_shot.get("power", 0.0))
+	assert(shot_angle >= TankState.GUN_ANGLE_MIN and shot_angle <= TankState.GUN_ANGLE_MAX,
+		"AI shot angle must be within gun angle bounds")
+	assert(shot_power >= TankState.GUN_POWER_MIN and shot_power <= TankState.GUN_POWER_MAX,
+		"AI shot power must be within gun power bounds")
+
+	# --- Fidelity assertions: Explosion damage with hit_range offset ---
+	# Fidelity target: local_match.gd _splash_damage()
+	# The splash formula uses distance_squared / radius_squared. At exactly half
+	# the radius, damage_multiplier = 1 - (0.5)^2 = 0.75, giving 30 for damage=40.
+	# Godot's splash radius is stored in screen pixels (e.g., Shell blast=48px).
+	# We verify the formula: splash at distance=0 (center) gives full damage,
+	# at the boundary gives 0.
+	var center_damage: int = int(local_match.call("_splash_damage",
+		Vector2(100.0, 100.0), Vector2(100.0, 100.0), 40, 48.0))
+	assert(center_damage == 40, "Splash at center must return full damage")
+	var beyond_range_damage: int = int(local_match.call("_splash_damage",
+		Vector2(100.0, 100.0), Vector2(200.0, 100.0), 40, 48.0))
+	assert(beyond_range_damage == 0, "Splash beyond radius must return 0 damage")
+
 	await _free_node(local_match)
 	await _drain_frames(SHUTDOWN_DRAIN_FRAMES)
 	quit(0)
+
 
 
 func _free_node(node: Node) -> void:
