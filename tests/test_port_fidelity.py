@@ -2043,5 +2043,173 @@ class ScoreMenuFidelityTests(unittest.TestCase):
         
         self.assertEqual(state, GameState.WINNER_MENU)
 
+class PlayerMenuFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class FakeSettings:
+            def get_float(self, sec, key, default): return default
+            
+        class FakeControls:
+            def __init__(self):
+                self.commands = {}
+            def get_command(self, idx, cmd):
+                return self.commands.get((idx, cmd), False)
+
+        class FakeInterface:
+            def get_mouse_pos(self): return (0.0, 0.0)
+            def get_mouse_clicked(self, b): return False
+
+        class FakeGame:
+            def __init__(self):
+                self.settings = FakeSettings()
+                self.controls = FakeControls()
+                self.interface = FakeInterface()
+                self.players_added = []
+                self.num_rounds = 0
+            def get_settings(self): return self.settings
+            def get_controls(self): return self.controls
+            def add_player(self, ctrl, name, colour):
+                self.players_added.append((ctrl, name, colour))
+            def set_num_of_rounds(self, rounds):
+                self.num_rounds = rounds
+                
+            def get_font(self): return None
+            def get_interface(self): return self.interface
+            def get_graphics(self): return None
+            def get_sound(self): return None
+            def get_ui(self): return None
+            
+        self.game = FakeGame()
+
+    def test_player_menu_requires_two_players_to_start(self):
+        from src.playermenu import PlayerMenu
+        class MockPlayerMenu(PlayerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockPlayerMenu(self.game)
+        # Button is disabled initially
+        self.assertTrue(menu._start_button._disabled)
+        
+        # Add player 1
+        menu._players[0].add_button.enable(True)
+        menu._players[0].add_button.update = lambda: True
+        menu.update(0.1)
+        # Only 1 player joined, start is still disabled
+        self.assertTrue(menu._start_button._disabled)
+        
+        # Add player 2
+        menu._players[0].add_button.update = lambda: False
+        menu._players[1].add_button.enable(True)
+        menu._players[1].add_button.update = lambda: True
+        menu.update(0.1)
+        # 2 players joined, start is enabled
+        self.assertFalse(menu._start_button._disabled)
+
+    def test_player_menu_adds_player_on_global_fire_input(self):
+        from src.playermenu import PlayerMenu
+        from src.player import Player
+        class MockPlayerMenu(PlayerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockPlayerMenu(self.game)
+        self.assertEqual(menu._players_joined, 0)
+        
+        # Simulate fire on Controller 3
+        self.game.controls.commands[(3, Player.CMD_FIRE)] = True
+        menu.update(0.1)
+        
+        self.assertEqual(menu._players_joined, 1)
+        self.assertTrue(menu._players[0].enabled)
+        # Should assign to controller 3
+        self.assertEqual(menu._players[0].controller.get_option(), 3)
+        # Default is Human
+        self.assertEqual(menu._players[0].human_ai_selector.get_option(), 0)
+
+    def test_player_menu_resolves_controller_conflicts_automatically(self):
+        from src.playermenu import PlayerMenu
+        class MockPlayerMenu(PlayerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockPlayerMenu(self.game)
+        
+        # Set P1 to human, controller 0
+        menu._players[0].enabled = True
+        menu._players[0].human_ai_selector.set_option(0)
+        menu._players[0].controller.set_option(0)
+        
+        # Set P2 to human, try to set to controller 0. It should push P2 to 1.
+        menu._players[1].enabled = True
+        menu._players[1].human_ai_selector.set_option(0)
+        menu._players[1].controller.set_option(0)
+        
+        # We call _select_available_controller on P2 moving direction 1
+        menu._select_available_controller(1, 1)
+        
+        self.assertEqual(menu._players[1].controller.get_option(), 1)
+        
+        # If P3 tries to be 1, it should push to 2
+        menu._players[2].enabled = True
+        menu._players[2].human_ai_selector.set_option(0)
+        menu._players[2].controller.set_option(1)
+        menu._select_available_controller(2, 1)
+        self.assertEqual(menu._players[2].controller.get_option(), 2)
+
+    def test_player_menu_computer_players_do_not_cause_controller_conflicts(self):
+        from src.playermenu import PlayerMenu
+        class MockPlayerMenu(PlayerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockPlayerMenu(self.game)
+        
+        # Set P1 to Computer (option 1), controller 0
+        menu._players[0].enabled = True
+        menu._players[0].human_ai_selector.set_option(1)
+        menu._players[0].controller.set_option(0)
+        
+        # Set P2 to human, controller 0
+        menu._players[1].enabled = True
+        menu._players[1].human_ai_selector.set_option(0)
+        menu._players[1].controller.set_option(0)
+        
+        menu._select_available_controller(1, 1)
+        
+        # Since P1 is Computer, P2 is allowed to use controller 0!
+        self.assertEqual(menu._players[1].controller.get_option(), 0)
+
+    def test_player_menu_start_creates_players_and_transitions_state(self):
+        from src.playermenu import PlayerMenu
+        from src.common import GameState
+        class MockPlayerMenu(PlayerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockPlayerMenu(self.game)
+        
+        menu._players[0].enabled = True
+        menu._players[0].human_ai_selector.set_option(0)
+        menu._players[0].controller.set_option(2) # Controller 2
+        menu._players[0].name = "P1"
+        
+        menu._players[1].enabled = True
+        menu._players[1].human_ai_selector.set_option(1) # Computer
+        menu._players[1].name = "P2_AI"
+        
+        # Simulate clicking start
+        menu._start_button.enable(True)
+        menu._start_button.update = lambda: True
+        
+        # Set rounds to 10 (selector index 1 means (1 + 1)*5 = 10)
+        menu._number_of_rounds.set_option(1)
+        
+        state = menu.update(0.1)
+        self.assertEqual(state, GameState.ROUND_STARTING)
+        self.assertEqual(self.game.num_rounds, 10)
+        
+        # Player 0 was human (ctrl 2)
+        self.assertEqual(self.game.players_added[0][0], 2)
+        self.assertEqual(self.game.players_added[0][1], "P1")
+        
+        # Player 1 was computer (ctrl -1)
+        self.assertEqual(self.game.players_added[1][0], -1)
+        self.assertEqual(self.game.players_added[1][1], "P2_AI")
+
 if __name__ == "__main__":
     unittest.main()
