@@ -45,6 +45,12 @@ gateway_log="$tmp_dir/gateway.log"
 auth_gateway_log="$tmp_dir/auth-gateway.log"
 session_gateway_log="$tmp_dir/session-gateway.log"
 full_gateway_log="$tmp_dir/full-gateway.log"
+gateway_server_log="$tmp_dir/gateway-server.log"
+auth_gateway_server_log="$tmp_dir/auth-gateway-server.log"
+session_gateway_server_log="$tmp_dir/session-gateway-server.log"
+full_gateway_server_log="$tmp_dir/full-gateway-server.log"
+closed_gateway_server_log="$tmp_dir/closed-gateway-server.log"
+banned_gateway_server_log="$tmp_dir/banned-gateway-server.log"
 full_gateway_holder_log="$tmp_dir/full-gateway-holder.log"
 full_gateway_ready="$tmp_dir/full-gateway-holder.ready"
 closed_gateway_log="$tmp_dir/closed-gateway.log"
@@ -61,6 +67,16 @@ reserve_port() {
 import socket
 
 with socket.socket() as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+}
+
+reserve_udp_port() {
+    "$PYTHON_BIN" - <<'PY'
+import socket
+
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     sock.bind(("127.0.0.1", 0))
     print(sock.getsockname()[1])
 PY
@@ -141,10 +157,22 @@ session_gateway_port=$(reserve_port)
 full_gateway_port=$(reserve_port)
 closed_gateway_port=$(reserve_port)
 banned_gateway_port=$(reserve_port)
+gateway_udp_port=$(reserve_udp_port)
+auth_gateway_udp_port=$(reserve_udp_port)
+session_gateway_udp_port=$(reserve_udp_port)
+full_gateway_udp_port=$(reserve_udp_port)
+closed_gateway_udp_port=$(reserve_udp_port)
+banned_gateway_udp_port=$(reserve_udp_port)
 
 cleanup() {
     for pid in \
         "${server_pid:-}" \
+        "${gateway_server_pid:-}" \
+        "${auth_gateway_server_pid:-}" \
+        "${session_gateway_server_pid:-}" \
+        "${full_gateway_server_pid:-}" \
+        "${closed_gateway_server_pid:-}" \
+        "${banned_gateway_server_pid:-}" \
         "${gateway_pid:-}" \
         "${auth_gateway_pid:-}" \
         "${session_gateway_pid:-}" \
@@ -239,39 +267,87 @@ server.serve_forever()
 PY
 server_pid=$!
 
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+    --host 127.0.0.1 \
+    --port "$gateway_udp_port" \
+    --no-discovery >"$gateway_server_log" 2>&1 &
+gateway_server_pid=$!
+
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+    --host 127.0.0.1 \
+    --port "$auth_gateway_udp_port" \
+    --no-discovery >"$auth_gateway_server_log" 2>&1 &
+auth_gateway_server_pid=$!
+
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+    --host 127.0.0.1 \
+    --port "$session_gateway_udp_port" \
+    --no-discovery >"$session_gateway_server_log" 2>&1 &
+session_gateway_server_pid=$!
+
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+    --host 127.0.0.1 \
+    --port "$full_gateway_udp_port" \
+    --no-discovery >"$full_gateway_server_log" 2>&1 &
+full_gateway_server_pid=$!
+
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+    --host 127.0.0.1 \
+    --port "$closed_gateway_udp_port" \
+    --no-discovery >"$closed_gateway_server_log" 2>&1 &
+closed_gateway_server_pid=$!
+
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+    --host 127.0.0.1 \
+    --port "$banned_gateway_udp_port" \
+    --no-discovery >"$banned_gateway_server_log" 2>&1 &
+banned_gateway_server_pid=$!
+
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$gateway_port" \
+    --udp-host 127.0.0.1 \
+    --udp-port "$gateway_udp_port" \
     --password qa-secret >"$gateway_log" 2>&1 &
 gateway_pid=$!
 
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$auth_gateway_port" \
+    --udp-host 127.0.0.1 \
+    --udp-port "$auth_gateway_udp_port" \
     --auth-token qa-token >"$auth_gateway_log" 2>&1 &
 auth_gateway_pid=$!
 
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$session_gateway_port" \
+    --udp-host 127.0.0.1 \
+    --udp-port "$session_gateway_udp_port" \
     --session-secret qa-session-secret >"$session_gateway_log" 2>&1 &
 session_gateway_pid=$!
 
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$full_gateway_port" \
+    --udp-host 127.0.0.1 \
+    --udp-port "$full_gateway_udp_port" \
     --max-players 1 >"$full_gateway_log" 2>&1 &
 full_gateway_pid=$!
 
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$closed_gateway_port" \
+    --udp-host 127.0.0.1 \
+    --udp-port "$closed_gateway_udp_port" \
     --closed >"$closed_gateway_log" 2>&1 &
 closed_gateway_pid=$!
 
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$banned_gateway_port" \
+    --udp-host 127.0.0.1 \
+    --udp-port "$banned_gateway_udp_port" \
     --ban-player GodotPlayer >"$banned_gateway_log" 2>&1 &
 banned_gateway_pid=$!
 
@@ -378,7 +454,6 @@ headers, pending = response.split(b"\r\n\r\n", 1)
 if b"101 Switching Protocols" not in headers or accept.encode("ascii") not in headers:
     raise SystemExit(f"unexpected handshake response: {headers!r}")
 
-read_frame(sock)
 write_frame(sock, {"type": "hello", "protocol": 1, "client": "browser-qa-holder"})
 read_frame(sock)
 write_frame(sock, {"type": "join", "protocol": 1, "player_name": "SlotHolder", "password": ""})

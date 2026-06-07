@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   caddy:
     image: caddy:alpine
@@ -18,7 +16,22 @@ services:
 
   directory:
     build: .
-    command: ["python", "-m", "groundfire_net.directory_service", "--host", "0.0.0.0", "--port", "27880", "--session-secret", "${SESSION_SECRET:-changeme_for_prod}"]
+    command:
+      [
+        "python",
+        "-m",
+        "groundfire_net.directory_service",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "27880",
+        "--session-secret",
+        "${SESSION_SECRET:-changeme_for_prod}",
+        "--gateway-endpoint",
+        "${GROUNDFIRE_PUBLIC_GATEWAY_ENDPOINT:-wss://play.groundfire.net/gateway}",
+        "--session-token-url",
+        "${GROUNDFIRE_PUBLIC_SESSION_TOKEN_URL:-https://play.groundfire.net/directory/session-token.json}",
+      ]
     environment:
       - PYTHONUNBUFFERED=1
       - GROUNDFIRE_DIRECTORY_REQUIRE_GITHUB_OAUTH=1
@@ -26,14 +39,32 @@ services:
 
   server:
     build: .
-    command: ["python", "-m", "src.groundfire.server", "--host", "0.0.0.0", "--port", "27015", "--directory", "http://directory:27880"]
+    command:
+      ["python", "-m", "src.groundfire.server", "--host", "0.0.0.0", "--port", "27015", "--no-discovery"]
     environment:
       - PYTHONUNBUFFERED=1
     restart: always
 
   gateway:
     build: .
-    command: ["python", "-m", "groundfire_net.websocket_gateway", "--host", "0.0.0.0", "--port", "27080", "--session-secret", "${SESSION_SECRET:-changeme_for_prod}", "--max-players", "100", "--udp-host", "server", "--udp-port", "27015"]
+    command:
+      [
+        "python",
+        "-m",
+        "groundfire_net.websocket_gateway",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "27080",
+        "--session-secret",
+        "${SESSION_SECRET:-changeme_for_prod}",
+        "--max-players",
+        "100",
+        "--udp-host",
+        "server",
+        "--udp-port",
+        "27015",
+      ]
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:

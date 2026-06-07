@@ -4,6 +4,8 @@ import argparse
 import hashlib
 import json
 import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, replace
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -205,7 +207,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-github-oauth",
         action="store_true",
         default=_environment_bool("GROUNDFIRE_DIRECTORY_REQUIRE_GITHUB_OAUTH", False),
-        help="Enforce that /session-token.json requests provide a valid GitHub OAuth token in the Authorization header.",
+        help=(
+            "Enforce that /session-token.json requests provide a valid GitHub OAuth token "
+            "in the Authorization header."
+        ),
     )
     return parser
 
@@ -330,7 +335,11 @@ def _handler_for_config(config: DirectoryServiceConfig) -> type[BaseHTTPRequestH
                     return
                 github_token = auth_header[7:].strip()
                 if not _verify_github_token(github_token, player_name):
-                    self._send_session_error(HTTPStatus.FORBIDDEN, "invalid_github_token_or_username", send_body=send_body)
+                    self._send_session_error(
+                        HTTPStatus.FORBIDDEN,
+                        "invalid_github_token_or_username",
+                        send_body=send_body,
+                    )
                     return
 
             token = generate_join_token(
@@ -539,8 +548,6 @@ def _is_valid_http_endpoint(endpoint: str) -> bool:
 
 
 def _verify_github_token(token: str, expected_username: str) -> bool:
-    import urllib.request
-    import urllib.error
     req = urllib.request.Request("https://api.github.com/user")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("User-Agent", "Groundfire-Directory/1.0")

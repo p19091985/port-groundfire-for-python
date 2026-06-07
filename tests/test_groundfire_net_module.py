@@ -13,6 +13,17 @@ from tempfile import TemporaryDirectory
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from src.groundfire.network.codec import decode_message, encode_message
+from src.groundfire.network.messages import (
+    ClientCommandEnvelope,
+    HelloRequest,
+    JoinAccept,
+    JoinRequest,
+    ServerSnapshotEnvelope,
+)
+from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
+from src.groundfire.sim.world import ReplicatedEntityState
+
 from groundfire_net import (
     DirectoryServiceConfig,
     JsonDataclassCodec,
@@ -37,6 +48,7 @@ from groundfire_net.websocket_gateway import (
     MIN_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
     SESSION_TOKEN_VERSION,
+    GatewayJoinRegistry,
     WebSocketGateway,
     WebSocketGatewaySession,
     build_parser,
@@ -482,6 +494,78 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertFalse(validate_join_token(token, "session-secret", "Bob", now=1005))
         self.assertFalse(validate_join_token(tampered, "session-secret", "Alice", now=1005))
 
+    def test_websocket_gateway_session_enforces_join_policy_and_releases_slots(self):
+        registry = GatewayJoinRegistry(max_players=1)
+        first = WebSocketGatewaySession(required_password="secret", join_registry=registry)
+        second = WebSocketGatewaySession(required_password="secret", join_registry=registry)
+
+        self.assertEqual(first.prepare_join({"player_name": "Alice", "password": "wrong"})["message"], "invalid_password")
+        self.assertIsNone(first.prepare_join({"player_name": "Alice", "password": "secret"}))
+        self.assertEqual(first._player_number, 1)
+        self.assertEqual(first.hello_response()["players_connected"], 1)
+        self.assertEqual(
+            second.prepare_join({"player_name": "Bob", "password": "secret"})["message"],
+            "server_full",
+        )
+
+        first.confirm_join(1, session_id="test-session", session_token="session-token")
+        first.close()
+
+        self.assertIsNone(second.prepare_join({"player_name": "Bob", "password": "secret"}))
+        self.assertEqual(second._player_number, 1)
+
+    def test_websocket_gateway_session_accepts_signed_expiring_auth_token(self):
+        token = generate_join_token("session-secret", "Alice", ttl_seconds=60)
+        wrong_player_token = generate_join_token("session-secret", "Bob", ttl_seconds=60)
+        expired_token = generate_join_token("session-secret", "Alice", ttl_seconds=-1)
+        session = WebSocketGatewaySession(session_secret="session-secret")
+
+        self.assertTrue(session.hello_response()["auth_required"])
+        self.assertEqual(session.hello_response()["auth_token_mode"], "signed")
+        self.assertEqual(session.prepare_join({"player_name": "Alice"})["message"], "authentication_failed")
+        self.assertEqual(
+            session.prepare_join({"player_name": "Alice", "auth_token": wrong_player_token})["message"],
+            "authentication_failed",
+        )
+        self.assertEqual(
+            session.prepare_join({"player_name": "Alice", "auth_token": expired_token})["message"],
+            "authentication_failed",
+        )
+        self.assertIsNone(session.prepare_join({"player_name": "Alice", "auth_token": token}))
+        self.assertEqual(session.player_name, "Alice")
+
+    def test_websocket_gateway_speaks_contract_over_real_frames_and_udp_proxy(self):
+        messages, udp_messages = asyncio.run(_exercise_websocket_gateway_over_tcp())
+
+        hello, rejected, joined, input_response, pong, disconnect = messages
+
+        self.assertEqual(hello["type"], "hello")
+        self.assertTrue(hello["password_required"])
+        self.assertEqual(hello["server"], "python-websocket-proxy")
+        self.assertEqual(rejected["type"], "error")
+        self.assertEqual(rejected["message"], "invalid_password")
+        self.assertEqual(joined["type"], "snapshot")
+        self.assertEqual(joined["state"]["status"], "joined")
+        self.assertEqual(joined["state"]["player_name"], "GodotPlayer")
+        self.assertEqual(joined["state"]["player_number"], 1)
+        self.assertEqual(joined["state"]["match_snapshot"]["players"][0]["name"], "GodotPlayer")
+        self.assertEqual(input_response["sequence"], 3)
+        self.assertTrue(input_response["state"]["last_input"]["move_right"])
+        self.assertEqual(input_response["state"]["match_snapshot"]["players"][0]["acknowledged_command_sequence"], 3)
+        self.assertEqual(pong["type"], "pong")
+        self.assertEqual(pong["sequence"], 4)
+        self.assertEqual(disconnect["type"], "disconnect")
+        self.assertEqual(disconnect["reason"], "test_done")
+
+        self.assertTrue(any(isinstance(message, HelloRequest) for message in udp_messages))
+        join_requests = [message for message in udp_messages if isinstance(message, JoinRequest)]
+        command_envelopes = [message for message in udp_messages if isinstance(message, ClientCommandEnvelope)]
+        self.assertEqual(join_requests[0].player_name, "GodotPlayer")
+        self.assertEqual(join_requests[0].password, "secret")
+        self.assertIsNone(join_requests[0].requested_slot)
+        self.assertEqual(command_envelopes[0].client_sequence, 3)
+        self.assertEqual(command_envelopes[0].acknowledged_snapshot_sequence, 1)
+        self.assertEqual(command_envelopes[0].commands, {"move_right": True, "shield": False})
 
     def test_websocket_gateway_parser_exposes_optional_password(self):
         args = build_parser().parse_args([
@@ -575,14 +659,53 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertIn("match_snapshot", doc)
 
 
-async def _exercise_websocket_gateway_over_tcp() -> list[dict]:
-    gateway = WebSocketGateway(password="secret")
+class _FakeGroundfireUdpProtocol(asyncio.DatagramProtocol):
+    def __init__(self):
+        self.messages: list[object] = []
+        self.transport = None
+
+    def connection_made(self, transport) -> None:
+        self.transport = transport
+
+    def datagram_received(self, data: bytes, addr) -> None:
+        message = decode_message(data)
+        self.messages.append(message)
+        if self.transport is None:
+            return
+        if isinstance(message, JoinRequest):
+            self.transport.sendto(
+                encode_message(JoinAccept(session_id="test-session", player_number=1, session_token="session-token")),
+                addr,
+            )
+            self.transport.sendto(encode_message(_snapshot_envelope("GodotPlayer", snapshot_sequence=1)), addr)
+        elif isinstance(message, ClientCommandEnvelope):
+            self.transport.sendto(
+                encode_message(
+                    _snapshot_envelope(
+                        "GodotPlayer",
+                        snapshot_sequence=2,
+                        acknowledged_command_sequence=message.client_sequence,
+                    )
+                ),
+                addr,
+            )
+
+
+async def _exercise_websocket_gateway_over_tcp() -> tuple[list[dict], list[object]]:
+    loop = asyncio.get_running_loop()
+    udp_transport, udp_protocol = await loop.create_datagram_endpoint(
+        lambda: _FakeGroundfireUdpProtocol(),
+        local_addr=("127.0.0.1", 0),
+    )
+    udp_host, udp_port = udp_transport.get_extra_info("sockname")[:2]
+    fake_udp = udp_protocol
+    gateway = WebSocketGateway(password="secret", udp_host=udp_host, udp_port=udp_port)
     server = await asyncio.start_server(gateway._handle_client, gateway.host, 0)
     host, port = server.sockets[0].getsockname()[:2]
     reader, writer = await asyncio.open_connection(host, port)
     try:
         await _send_websocket_handshake(reader, writer, host, port)
-        messages = [await _read_server_message(reader)]
+        messages = []
         for message in (
             {"type": "hello", "protocol": 1, "client": "godot"},
             {"type": "join", "protocol": 1, "player_name": "GodotPlayer", "password": "wrong"},
@@ -593,12 +716,58 @@ async def _exercise_websocket_gateway_over_tcp() -> list[dict]:
         ):
             await _write_client_message(writer, message)
             messages.append(await _read_server_message(reader))
-        return messages
+        return messages, list(fake_udp.messages)
     finally:
         writer.close()
         await writer.wait_closed()
         server.close()
         await server.wait_closed()
+        udp_transport.close()
+
+
+def _snapshot_envelope(
+    player_name: str,
+    *,
+    snapshot_sequence: int,
+    acknowledged_command_sequence: int = 0,
+) -> ServerSnapshotEnvelope:
+    snapshot = MatchSnapshot(
+        authority="server",
+        game_phase="online",
+        current_round=1,
+        num_rounds=10,
+        simulation_tick=snapshot_sequence,
+        players=(
+            ReplicatedPlayerState(
+                player_number=1,
+                name=player_name,
+                connected=True,
+                tank_entity_id=7,
+                acknowledged_command_sequence=acknowledged_command_sequence,
+                acknowledged_snapshot_sequence=snapshot_sequence,
+            ),
+        ),
+        entities=(
+            ReplicatedEntityState(
+                entity_id=7,
+                entity_type="tank",
+                position=(-4.0 + snapshot_sequence, 3.0),
+                owner_player=1,
+                payload={"health": 100},
+            ),
+        ),
+        seed=1,
+        world_width=20.0,
+        terrain_revision=snapshot_sequence,
+        terrain_profile=(1.0, 1.5, 2.0),
+    )
+    return ServerSnapshotEnvelope(
+        session_id="test-session",
+        snapshot_sequence=snapshot_sequence,
+        simulation_tick=snapshot_sequence,
+        acknowledged_command_sequences={1: acknowledged_command_sequence},
+        snapshot=snapshot,
+    )
 
 
 async def _send_websocket_handshake(

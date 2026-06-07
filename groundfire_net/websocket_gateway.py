@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import contextlib
 import hashlib
 import hmac
 import json
@@ -62,6 +63,17 @@ class GatewayJoinRegistry:
         self._sync_active_players()
         return player_number
 
+    def reserve_player_number(self, player_number: int) -> bool:
+        if player_number <= 0:
+            return False
+        if player_number in self._occupied_player_numbers:
+            return True
+        if self.max_players > 0 and len(self._occupied_player_numbers) >= self.max_players:
+            return False
+        self._occupied_player_numbers.add(player_number)
+        self._sync_active_players()
+        return True
+
     def release_slot(self, player_number: int | None = None) -> None:
         if player_number is None:
             if self._occupied_player_numbers:
@@ -95,100 +107,83 @@ class WebSocketGatewaySession:
     player_name: str = "Guest"
     last_input: dict = field(default_factory=dict)
     last_input_sequence: int = 0
+    acknowledged_snapshot_sequence: int | None = None
+    server_session_id: str = ""
+    server_session_token: str = ""
 
-    def snapshot(self, *, status: str) -> dict[str, Any]:
-        payload = self.simulation.snapshot(status=status)
-        payload["state"].update(self.join_registry.metadata())
-        return payload
+    def hello_response(self, *, server_name: str = "python-websocket-proxy") -> dict[str, Any]:
+        return {
+            "type": "hello",
+            "protocol": PROTOCOL_VERSION,
+            "min_protocol": MIN_PROTOCOL_VERSION,
+            "max_protocol": MAX_PROTOCOL_VERSION,
+            "supported_protocols": list(SUPPORTED_PROTOCOL_VERSIONS),
+            "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
+            "event_schema": EVENT_SCHEMA_VERSION,
+            "password_required": bool(self.required_password),
+            "auth_required": bool(self.required_auth_token or self.session_secret),
+            "auth_token_mode": _auth_token_mode(self.required_auth_token, self.session_secret),
+            "joins_open": not self.joins_closed,
+            "ban_enforced": bool(self.banned_players),
+            **self.join_registry.metadata(),
+            "server": server_name,
+        }
 
-    def handle_text(self, payload: str) -> list[dict[str, Any]]:
-        try:
-            message = json.loads(payload)
-        except json.JSONDecodeError:
-            return [_error("invalid_json")]
-        if not isinstance(message, dict):
-            return [_error("invalid_message")]
-        protocol_error = _validate_protocol(message)
-        if protocol_error is not None:
-            return [protocol_error]
+    def prepare_join(self, message: dict[str, Any]) -> dict[str, Any] | None:
+        if self.joins_closed:
+            return _error("server_closed")
+        player_name = str(message.get("player_name", "Guest"))
+        if _normalized_player_name(player_name) in self.banned_players:
+            return _error("banned")
+        if not _auth_token_is_authorized(
+            str(message.get("auth_token", "")),
+            required_auth_token=self.required_auth_token,
+            session_secret=self.session_secret,
+            player_name=player_name,
+        ):
+            return _error("authentication_failed")
+        if self.required_password and str(message.get("password", "")) != self.required_password:
+            return _error("invalid_password")
+        if not self._joined and self._player_number <= 0:
+            player_number = self.join_registry.acquire_player_number()
+            if player_number <= 0:
+                return _error("server_full", **self.join_registry.metadata())
+            self._player_number = player_number
+        self.player_name = player_name
+        return None
 
-        message_type = str(message.get("type", ""))
-        shape_error = _validate_message_shape(message_type, message)
-        if shape_error is not None:
-            return [shape_error]
+    def confirm_join(self, player_number: int, *, session_id: str, session_token: str) -> None:
+        if self._player_number != player_number:
+            if self._player_number > 0:
+                self.join_registry.release_slot(self._player_number)
+            if not self.join_registry.reserve_player_number(player_number):
+                self.join_registry.acquire_slot()
+        self._player_number = player_number
+        self.server_session_id = session_id
+        self.server_session_token = session_token
+        self._joined = True
 
-        if message_type == "hello":
-            return [
-                {
-                    "type": "hello",
-                    "protocol": PROTOCOL_VERSION,
-                    "min_protocol": MIN_PROTOCOL_VERSION,
-                    "max_protocol": MAX_PROTOCOL_VERSION,
-                    "supported_protocols": list(SUPPORTED_PROTOCOL_VERSIONS),
-                    "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
-                    "event_schema": EVENT_SCHEMA_VERSION,
-                    "password_required": bool(self.required_password),
-                    "auth_required": bool(self.required_auth_token or self.session_secret),
-                    "auth_token_mode": _auth_token_mode(self.required_auth_token, self.session_secret),
-                    "joins_open": not self.joins_closed,
-                    "ban_enforced": bool(self.banned_players),
-                    **self.join_registry.metadata(),
-                    "server": "python-websocket-gateway",
-                }
-            ]
-        if message_type == "join":
-            if self.joins_closed:
-                return [_error("server_closed")]
-            player_name = str(message.get("player_name", self.simulation.player_name))
-            if _normalized_player_name(player_name) in self.banned_players:
-                return [_error("banned")]
-            if not _auth_token_is_authorized(
-                str(message.get("auth_token", "")),
-                required_auth_token=self.required_auth_token,
-                session_secret=self.session_secret,
-                player_name=player_name,
-            ):
-                return [_error("authentication_failed")]
-            if self.required_password and str(message.get("password", "")) != self.required_password:
-                return [_error("invalid_password")]
-            if not self._joined:
-                player_number = self.join_registry.acquire_player_number()
-                if player_number <= 0:
-                    return [_error("server_full", **self.join_registry.metadata())]
-                self._player_number = player_number
-                self.simulation.player_number = player_number
-                self._joined = True
-            elif self._player_number > 0:
-                self.simulation.player_number = self._player_number
-            self.simulation.join(player_name)
-            return [self.snapshot(status="joined")]
-        if message_type == "input":
-            if not self._joined:
-                return [_error("not_joined")]
-            sequence = int(message.get("sequence", self.simulation.sequence + 1))
-            command = message.get("command", {})
-            self.simulation.apply_input(sequence, command if isinstance(command, dict) else {})
-            return [self.snapshot(status="input")]
-        if message_type == "ping":
-            return [
-                {
-                    "type": "pong",
-                    "protocol": PROTOCOL_VERSION,
-                    "sequence": int(message.get("sequence", 0)),
-                    "client_time_msec": int(message.get("client_time_msec", 0)),
-                    "server_time_msec": int(time.time() * 1000),
-                }
-            ]
-        if message_type == "disconnect":
-            self.close()
-            return [
-                {
-                    "type": "disconnect",
-                    "protocol": PROTOCOL_VERSION,
-                    "reason": str(message.get("reason", "client_disconnect")),
-                }
-            ]
-        return [_error("unknown_type", received_type=message_type)]
+    def reject_join(self) -> None:
+        if self._joined or self._player_number <= 0:
+            return
+        self.join_registry.release_slot(self._player_number)
+        self._player_number = 0
+
+    def record_input(self, sequence: int, command: dict[str, Any]) -> None:
+        self.last_input_sequence = sequence
+        self.last_input = dict(command)
+
+    def disconnect_notice(self, reason: str):
+        if not self._joined or self._player_number <= 0 or not self.server_session_token:
+            return None
+        from src.groundfire.network.messages import DisconnectNotice
+
+        return DisconnectNotice(
+            session_id=self.server_session_id or "web",
+            player_number=self._player_number,
+            session_token=self.server_session_token,
+            reason=reason,
+        )
 
     def close(self) -> None:
         if not self._joined:
@@ -229,7 +224,6 @@ class WebSocketGateway:
         async with server:
             await server.serve_forever()
 
-
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         session = WebSocketGatewaySession(
             required_password=self.password,
@@ -239,58 +233,61 @@ class WebSocketGateway:
             joins_closed=self.closed,
             banned_players=self.banned_players,
         )
-        ws_queue = asyncio.Queue()
+        ws_queue: asyncio.Queue[object] = asyncio.Queue()
 
         class UdpProxyProtocol(asyncio.DatagramProtocol):
-            def connection_made(self, transport):
-                pass
-            def datagram_received(self, data, addr):
+            def datagram_received(self, data: bytes, addr) -> None:
                 from src.groundfire.network.codec import decode_message
+
                 try:
                     msg = decode_message(data)
                     ws_queue.put_nowait(msg)
                 except Exception:
                     pass
-            def error_received(self, exc):
-                pass
-            def connection_lost(self, exc):
-                pass
 
         loop = asyncio.get_running_loop()
-        transport, protocol = await loop.create_datagram_endpoint(
-            lambda: UdpProxyProtocol(),
-            remote_addr=(self.udp_host, self.udp_port)
+        transport, _protocol = await loop.create_datagram_endpoint(
+            lambda: UdpProxyProtocol(), remote_addr=(self.udp_host, self.udp_port)
         )
 
-        async def udp_to_ws_loop():
-            from src.groundfire.network.messages import JoinAccept, JoinReject, ServerSnapshotEnvelope
+        async def udp_to_ws_loop() -> None:
+            from src.groundfire.network.messages import HelloAccept, JoinAccept, JoinReject, ServerSnapshotEnvelope
+
             while True:
                 msg = await ws_queue.get()
+                if isinstance(msg, HelloAccept):
+                    continue
                 if isinstance(msg, ServerSnapshotEnvelope):
+                    session.acknowledged_snapshot_sequence = msg.snapshot_sequence
+                    state = {
+                        "status": "joined",
+                        "player_name": session.player_name,
+                        "player_number": session._player_number,
+                        "joined": True,
+                        "last_input": session.last_input,
+                        "server_time_msec": int(time.time() * 1000),
+                        "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
+                        "event_schema": EVENT_SCHEMA_VERSION,
+                        "match_snapshot": to_plain(msg.snapshot),
+                        "terrain_patches": [to_plain(patch) for patch in msg.terrain_patches],
+                        "events": [_version_event(event) for event in msg.events],
+                    }
+                    state.update(session.join_registry.metadata())
                     response = {
                         "type": "snapshot",
                         "protocol": PROTOCOL_VERSION,
                         "sequence": session.last_input_sequence,
-                        "state": {
-                            "status": "joined",
-                            "player_name": session.player_name,
-                            "player_number": session._player_number,
-                            "joined": True,
-                            "last_input": session.last_input,
-                            "server_time_msec": int(time.time() * 1000),
-                            "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
-                            "event_schema": EVENT_SCHEMA_VERSION,
-                            "match_snapshot": to_plain(msg.snapshot),
-                            "terrain_patches": [to_plain(patch) for patch in msg.terrain_patches],
-                            "events": [_version_event(event) for event in msg.events],
-                        }
+                        "state": state,
                     }
-                    response["state"].update(session.join_registry.metadata())
                     await _write_text(writer, json.dumps(response, separators=(",", ":")))
                 elif isinstance(msg, JoinAccept):
-                    session._joined = True
-                    session._player_number = msg.player_number
+                    session.confirm_join(
+                        msg.player_number,
+                        session_id=msg.session_id,
+                        session_token=msg.session_token,
+                    )
                 elif isinstance(msg, JoinReject):
+                    session.reject_join()
                     await _write_text(writer, json.dumps(_error(msg.reason), separators=(",", ":")))
                     writer.close()
 
@@ -298,84 +295,68 @@ class WebSocketGateway:
 
         try:
             await _accept_handshake(reader, writer)
-            
+
             from src.groundfire.network.codec import encode_message
             from src.groundfire.network.messages import ClientCommandEnvelope, HelloRequest, JoinRequest
-            
+
             while not reader.at_eof():
                 payload = await _read_frame(reader)
                 if payload is None:
                     break
-                
+
                 try:
                     message = json.loads(payload)
                 except json.JSONDecodeError:
                     await _write_text(writer, json.dumps(_error("invalid_json"), separators=(",", ":")))
                     continue
-                    
+                if not isinstance(message, dict):
+                    await _write_text(writer, json.dumps(_error("invalid_message"), separators=(",", ":")))
+                    continue
+                protocol_error = _validate_protocol(message)
+                if protocol_error is not None:
+                    await _write_text(writer, json.dumps(protocol_error, separators=(",", ":")))
+                    continue
                 message_type = str(message.get("type", ""))
-                
+                shape_error = _validate_message_shape(message_type, message)
+                if shape_error is not None:
+                    await _write_text(writer, json.dumps(shape_error, separators=(",", ":")))
+                    continue
+
                 if message_type == "hello":
-                    # Send hello to UDP server just to wake it up or log it, but proxy returns standard JSON immediately
-                    transport.sendto(encode_message(HelloRequest(player_name="WebGuest")))
-                    response = {
-                        "type": "hello",
-                        "protocol": PROTOCOL_VERSION,
-                        "min_protocol": MIN_PROTOCOL_VERSION,
-                        "max_protocol": MAX_PROTOCOL_VERSION,
-                        "supported_protocols": list(SUPPORTED_PROTOCOL_VERSIONS),
-                        "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
-                        "event_schema": EVENT_SCHEMA_VERSION,
-                        "password_required": bool(session.required_password),
-                        "auth_required": bool(session.required_auth_token or session.session_secret),
-                        "auth_token_mode": _auth_token_mode(session.required_auth_token, session.session_secret),
-                        "joins_open": not session.joins_closed,
-                        "ban_enforced": bool(session.banned_players),
-                        **session.join_registry.metadata(),
-                        "server": "python-websocket-proxy",
-                    }
-                    await _write_text(writer, json.dumps(response, separators=(",", ":")))
-                
+                    transport.sendto(encode_message(HelloRequest(player_name=session.player_name)))
+                    await _write_text(
+                        writer,
+                        json.dumps(session.hello_response(server_name="python-websocket-proxy"), separators=(",", ":")),
+                    )
+
                 elif message_type == "join":
-                    if session.joins_closed:
-                        await _write_text(writer, json.dumps(_error("server_closed"), separators=(",", ":")))
+                    join_error = session.prepare_join(message)
+                    if join_error is not None:
+                        await _write_text(writer, json.dumps(join_error, separators=(",", ":")))
                         continue
-                    
-                    player_name = str(message.get("player_name", "Guest"))
-                    if _normalized_player_name(player_name) in session.banned_players:
-                        await _write_text(writer, json.dumps(_error("banned"), separators=(",", ":")))
-                        continue
-                    
-                    if not _auth_token_is_authorized(
-                        str(message.get("auth_token", "")),
-                        required_auth_token=session.required_auth_token,
-                        session_secret=session.session_secret,
-                        player_name=player_name,
-                    ):
-                        await _write_text(writer, json.dumps(_error("authentication_failed"), separators=(",", ":")))
-                        continue
-                        
-                    if session.required_password and str(message.get("password", "")) != session.required_password:
-                        await _write_text(writer, json.dumps(_error("invalid_password"), separators=(",", ":")))
-                        continue
-                    
-                    session.player_name = player_name
-                    transport.sendto(encode_message(JoinRequest(player_name=player_name)))
-                
+                    transport.sendto(
+                        encode_message(
+                            JoinRequest(
+                                player_name=session.player_name,
+                                requested_slot=None,
+                                password=str(message.get("password", "")),
+                            )
+                        )
+                    )
+
                 elif message_type == "input":
                     if not session._joined:
                         await _write_text(writer, json.dumps(_error("not_joined"), separators=(",", ":")))
                         continue
-                        
-                    sequence = int(message.get("sequence", session.last_input_sequence + 1))
+                    sequence = int(message["sequence"])
                     command = message.get("command", {})
                     if isinstance(command, dict):
-                        session.last_input_sequence = sequence
-                        session.last_input = command
+                        session.record_input(sequence, command)
                         env = ClientCommandEnvelope(
                             session_id="web",
                             player_number=session._player_number,
                             client_sequence=sequence,
+                            acknowledged_snapshot_sequence=session.acknowledged_snapshot_sequence,
                             simulation_tick=0,
                             issued_at=time.time(),
                             source="websocket",
@@ -383,7 +364,7 @@ class WebSocketGateway:
                             protocol_version=PROTOCOL_VERSION,
                         )
                         transport.sendto(encode_message(env))
-                
+
                 elif message_type == "ping":
                     response = {
                         "type": "pong",
@@ -393,11 +374,34 @@ class WebSocketGateway:
                         "server_time_msec": int(time.time() * 1000),
                     }
                     await _write_text(writer, json.dumps(response, separators=(",", ":")))
-                    
+
                 elif message_type == "disconnect":
+                    await _write_text(
+                        writer,
+                        json.dumps(
+                            {
+                                "type": "disconnect",
+                                "protocol": PROTOCOL_VERSION,
+                                "reason": str(message.get("reason", "client_disconnect")),
+                            },
+                            separators=(",", ":"),
+                        ),
+                    )
                     break
+                else:
+                    await _write_text(
+                        writer,
+                        json.dumps(_error("unknown_type", received_type=message_type), separators=(",", ":")),
+                    )
         finally:
+            from src.groundfire.network.codec import encode_message
+
+            disconnect_notice = session.disconnect_notice("websocket_closed")
+            if disconnect_notice is not None:
+                transport.sendto(encode_message(disconnect_notice))
             udp_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await udp_task
             transport.close()
             session.close()
             writer.close()
