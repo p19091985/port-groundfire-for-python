@@ -1744,5 +1744,136 @@ class ShopMenuEconomyFidelityTests(unittest.TestCase):
         state2 = shop.update(0.0)
         self.assertEqual(state2, GameState.ROUND_STARTING)
 
+class WinnerMenuFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class FakeGame:
+            def __init__(self):
+                self.players = [None] * 8
+                self.has_humans = True
+                self.players_deleted = False
+            def get_players(self): return self.players
+            def get_num_of_players(self): return len(self.players)
+            def are_human_players(self): return self.has_humans
+            def delete_players(self): self.players_deleted = True
+            
+            def get_font(self): return None
+            def get_interface(self): return None
+            def get_graphics(self): return None
+            def get_sound(self): return None
+            def get_ui(self): return None
+            
+        self.game = FakeGame()
+        
+        class MockPlayer:
+            def __init__(self, name, score):
+                self.name = name
+                self._score = score
+                self.commands = [False] * 11
+            def get_score(self): return self._score
+            def get_command(self, cmd): return self.commands[cmd]
+            
+        self.MockPlayer = MockPlayer
+
+    def test_winner_menu_identifies_single_winner(self):
+        from src.winnermenu import WinnerMenu
+        
+        self.game.players[0] = self.MockPlayer("P1", 100)
+        self.game.players[1] = self.MockPlayer("P2", 200)
+        self.game.players[2] = self.MockPlayer("P3", 150)
+        
+        menu = WinnerMenu(self.game)
+        
+        self.assertFalse(menu._is_draw)
+        self.assertEqual(len(menu._winners), 1)
+        self.assertEqual(menu._winners[0].name, "P2")
+
+    def test_winner_menu_identifies_tie_between_multiple_players(self):
+        from src.winnermenu import WinnerMenu
+        
+        self.game.players[0] = self.MockPlayer("P1", 200)
+        self.game.players[1] = self.MockPlayer("P2", 200)
+        self.game.players[2] = self.MockPlayer("P3", 150)
+        
+        menu = WinnerMenu(self.game)
+        
+        self.assertTrue(menu._is_draw)
+        self.assertEqual(len(menu._winners), 2)
+        self.assertEqual(menu._winners[0].name, "P1")
+        self.assertEqual(menu._winners[1].name, "P2")
+
+    def test_winner_menu_activation_delay_is_2_seconds_for_humans_and_4_for_computers(self):
+        from src.winnermenu import WinnerMenu
+        
+        self.game.has_humans = True
+        menu_human = WinnerMenu(self.game)
+        self.assertEqual(menu_human._time_till_active, 2.0)
+        
+        self.game.has_humans = False
+        menu_cpu = WinnerMenu(self.game)
+        self.assertEqual(menu_cpu._time_till_active, 4.0)
+
+    def test_winner_menu_ignores_input_before_activation_delay(self):
+        from src.winnermenu import WinnerMenu
+        from src.player import Player
+        from src.common import GameState
+        
+        self.game.players[0] = self.MockPlayer("P1", 100)
+        self.game.players[0].commands[Player.CMD_FIRE] = True
+        
+        class MockWinnerMenu(WinnerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockWinnerMenu(self.game)
+        
+        # We pass 1.0 time, delay becomes 1.0 (since it starts at 2.0)
+        state = menu.update(1.0)
+        
+        self.assertEqual(state, GameState.CURRENT_STATE)
+        self.assertFalse(self.game.players_deleted)
+
+    def test_winner_menu_computer_only_match_auto_exits_after_delay(self):
+        from src.winnermenu import WinnerMenu
+        from src.common import GameState
+        
+        self.game.has_humans = False
+        
+        class MockWinnerMenu(WinnerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockWinnerMenu(self.game)
+        
+        # Passes 4.0 seconds, delay goes <= 0, returns CURRENT_STATE
+        state = menu.update(4.0)
+        self.assertEqual(state, GameState.CURRENT_STATE)
+        
+        # Next frame it triggers MAIN_MENU
+        state2 = menu.update(0.0)
+        self.assertEqual(state2, GameState.MAIN_MENU)
+        self.assertTrue(self.game.players_deleted)
+
+    def test_winner_menu_human_match_requires_fire_input_to_exit(self):
+        from src.winnermenu import WinnerMenu
+        from src.player import Player
+        from src.common import GameState
+        
+        self.game.players[0] = self.MockPlayer("P1", 100)
+        self.game.has_humans = True
+        
+        class MockWinnerMenu(WinnerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockWinnerMenu(self.game)
+        
+        # Pass 2.0 seconds, delay goes <= 0. No FIRE input.
+        state1 = menu.update(2.0)
+        self.assertEqual(state1, GameState.CURRENT_STATE)
+        self.assertFalse(self.game.players_deleted)
+        
+        # Now press FIRE
+        self.game.players[0].commands[Player.CMD_FIRE] = True
+        state2 = menu.update(0.0)
+        self.assertEqual(state2, GameState.MAIN_MENU)
+        self.assertTrue(self.game.players_deleted)
+
 if __name__ == "__main__":
     unittest.main()
