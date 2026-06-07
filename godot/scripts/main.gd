@@ -29,9 +29,9 @@ const MENU_LOGO_MAX_WIDTH := 920.0
 const MENU_BUTTON_MIN_SIZE := Vector2(259.0, 34.0)
 const MENU_BUTTON_MAX_SIZE := Vector2(414.0, 56.0)
 const MENU_CONTENT_MAX_WIDTH := 920.0
-const MENU_CLASSIC_TOP_SPACER := 150.0
-const MENU_CLASSIC_COPY_SPACER := 80.0
-const MENU_CLASSIC_PANEL_SPACER := 6.0
+const MENU_CLASSIC_TOP_SPACER := 140.0
+const MENU_CLASSIC_COPY_SPACER := 70.0
+const MENU_CLASSIC_PANEL_SPACER := 16.0
 const MENU_CLASSIC_PANEL_SIZE := Vector2(718.0, 208.0)
 const MENU_CLASSIC_BUTTON_SIZE := Vector2(410.0, 41.0)
 const MENU_CLASSIC_BUTTON_FONT_SIZE := 30
@@ -246,7 +246,7 @@ func _show_main_menu() -> void:
 
 	var menu := VBoxContainer.new()
 	menu.alignment = BoxContainer.ALIGNMENT_BEGIN
-	menu.add_theme_constant_override("separation", 10)
+	menu.add_theme_constant_override("separation", 14)
 	panel.add_child(menu)
 	var menu_buttons: Array[Button] = []
 	menu_buttons.append(_add_classic_button_to(menu, "Start Game", _show_local_match_setup))

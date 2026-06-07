@@ -259,7 +259,7 @@ func _add_header(text: String, column_index: int) -> void:
 	var label := Label.new()
 	label.text = text
 	label.custom_minimum_size = Vector2(_column_width(column_index), TABLE_HEADER_HEIGHT)
-	GroundfireTheme.apply_label(label, 16, GroundfireTheme.COLOR_WARN)
+	GroundfireTheme.apply_label(label, 16, GroundfireTheme.COLOR_TEXT)
 	cell.add_child(label)
 
 

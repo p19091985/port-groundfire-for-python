@@ -2,8 +2,8 @@ extends RefCounted
 
 const COLOR_BG := Color("#365e79")
 const COLOR_MENU_TILE_TINT := Color("#66b3e6")
-const COLOR_PANEL := Color("#00000091")
-const COLOR_PANEL_SOFT := Color("#00000078")
+const COLOR_PANEL := Color("#000000a0")
+const COLOR_PANEL_SOFT := Color("#00000080")
 const COLOR_FIELD := Color("#000000aa")
 const COLOR_LINE := Color("#994c00")
 const COLOR_ACCENT := Color("#994c00")
@@ -91,7 +91,7 @@ static func modal_backdrop_style() -> StyleBoxFlat:
 static func row_style(selected := false, hover := false) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	if selected:
-		style.bg_color = Color("#994c0087")
+		style.bg_color = COLOR_ACCENT
 	elif hover:
 		style.bg_color = Color("#994c0050")
 	else:
