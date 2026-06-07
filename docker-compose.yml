@@ -1,20 +1,36 @@
 version: '3.8'
 
 services:
+  caddy:
+    image: caddy:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./build/web_export:/srv/web_export
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - directory
+      - gateway
+
   directory:
     build: .
     command: ["python", "-m", "groundfire_net.directory_service", "--host", "0.0.0.0", "--port", "27880", "--session-secret", "${SESSION_SECRET:-changeme_for_prod}"]
-    ports:
-      - "27880:27880"
     environment:
       - PYTHONUNBUFFERED=1
+      - GROUNDFIRE_DIRECTORY_REQUIRE_GITHUB_OAUTH=1
     restart: always
 
   gateway:
     build: .
     command: ["python", "-m", "groundfire_net.websocket_gateway", "--host", "0.0.0.0", "--port", "27080", "--session-secret", "${SESSION_SECRET:-changeme_for_prod}", "--max-players", "100"]
-    ports:
-      - "27080:27080"
     environment:
       - PYTHONUNBUFFERED=1
     restart: always
+
+volumes:
+  caddy_data:
+  caddy_config:

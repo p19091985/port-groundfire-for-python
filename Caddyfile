@@ -1,0 +1,26 @@
+play.groundfire.net {
+    # Serve the static web export at the root
+    root * /srv/web_export
+    file_server
+    
+    # Configure cache control headers for Godot Web Export
+    header / {
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Embedder-Policy "require-corp"
+        Cache-Control "public, max-age=3600"
+    }
+    header /*.wasm {
+        Cache-Control "public, max-age=31536000, immutable"
+    }
+    
+    # Route the directory service
+    handle /directory/* {
+        uri strip_prefix /directory
+        reverse_proxy directory:27880
+    }
+    
+    # Route the WebSocket gateway
+    handle /gateway {
+        reverse_proxy gateway:27080
+    }
+}

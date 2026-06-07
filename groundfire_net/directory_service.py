@@ -42,6 +42,7 @@ class DirectoryServiceConfig:
     session_token_ttl: int = DEFAULT_SESSION_TOKEN_TTL_SECONDS
     session_token_url: str = ""
     allow_static_auth_tokens: bool = False
+    require_github_oauth: bool = False
 
 
 def load_directory_payload(config: DirectoryServiceConfig) -> dict[str, Any]:
@@ -200,6 +201,12 @@ def build_parser() -> argparse.ArgumentParser:
             "use session_token_url and /session-token.json instead."
         ),
     )
+    parser.add_argument(
+        "--require-github-oauth",
+        action="store_true",
+        default=_environment_bool("GROUNDFIRE_DIRECTORY_REQUIRE_GITHUB_OAUTH", False),
+        help="Enforce that /session-token.json requests provide a valid GitHub OAuth token in the Authorization header.",
+    )
     return parser
 
 
@@ -232,6 +239,7 @@ def main(argv: list[str] | None = None) -> int:
         session_token_ttl=args.session_token_ttl,
         session_token_url=args.session_token_url,
         allow_static_auth_tokens=args.allow_static_auth_tokens,
+        require_github_oauth=args.require_github_oauth,
     )
     serve_forever(config)
     return 0
@@ -314,6 +322,17 @@ def _handler_for_config(config: DirectoryServiceConfig) -> type[BaseHTTPRequestH
             if not player_name:
                 self._send_session_error(HTTPStatus.BAD_REQUEST, "missing_player_name", send_body=send_body)
                 return
+            
+            if config.require_github_oauth:
+                auth_header = self.headers.get("Authorization", "")
+                if not auth_header.lower().startswith("bearer "):
+                    self._send_session_error(HTTPStatus.UNAUTHORIZED, "missing_oauth_token", send_body=send_body)
+                    return
+                github_token = auth_header[7:].strip()
+                if not _verify_github_token(github_token, player_name):
+                    self._send_session_error(HTTPStatus.FORBIDDEN, "invalid_github_token_or_username", send_body=send_body)
+                    return
+
             token = generate_join_token(
                 config.session_secret,
                 player_name,
@@ -517,6 +536,22 @@ def _is_valid_online_endpoint(endpoint: str) -> bool:
 
 def _is_valid_http_endpoint(endpoint: str) -> bool:
     return endpoint.startswith(("http://", "https://"))
+
+
+def _verify_github_token(token: str, expected_username: str) -> bool:
+    import urllib.request
+    import urllib.error
+    req = urllib.request.Request("https://api.github.com/user")
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("User-Agent", "Groundfire-Directory/1.0")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.getcode() == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                return str(data.get("login", "")).lower() == expected_username.lower()
+    except (urllib.error.URLError, json.JSONDecodeError, OSError):
+        pass
+    return False
 
 
 def _environment_bool(name: str, default: bool) -> bool:
