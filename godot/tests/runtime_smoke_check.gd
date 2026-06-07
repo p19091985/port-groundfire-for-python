@@ -113,7 +113,7 @@ func _check_main_menu_and_options() -> void:
 	assert(find_servers.focus_neighbor_right == find_servers.get_path())
 	_assert_classic_text_effect(start_local)
 	_assert_classic_text_effect(version_label)
-	assert(start_local.get_theme_color("font_hover_color") == GroundfireTheme.COLOR_WARN)
+	_assert_classic_hover_color(start_local)
 	if not OS.has_feature("web"):
 		assert(_has_button(main, "Dedicated Server"))
 		main.set("_dedicated_gateway_host", "0.0.0.0")
@@ -337,7 +337,7 @@ func _check_main_menu_and_options() -> void:
 	_assert_classic_text_effect(classic_resolution)
 	_assert_classic_text_effect(set_controls)
 	_assert_classic_text_effect(resolution_label)
-	assert(set_controls.get_theme_color("font_hover_color") == GroundfireTheme.COLOR_WARN)
+	_assert_classic_hover_color(set_controls)
 	assert(classic_resolution.focus_neighbor_bottom == screen_mode.get_path())
 	assert(screen_mode.focus_neighbor_top == classic_resolution.get_path())
 	assert(screen_mode.focus_neighbor_bottom == set_controls.get_path())
@@ -701,8 +701,18 @@ func _assert_arg_pair(args: PackedStringArray, arg_name: String, expected_value:
 
 
 func _assert_classic_text_effect(control: Control) -> void:
+	if control.has_method("uses_classic_font_atlas"):
+		assert(control.call("uses_classic_font_atlas"))
+		return
 	assert(control.get_theme_color("font_shadow_color") == GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR)
 	assert(control.get_theme_color("font_outline_color") == GroundfireTheme.CLASSIC_TEXT_OUTLINE_COLOR)
 	assert(control.get_theme_constant("shadow_offset_x") == GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_X)
 	assert(control.get_theme_constant("shadow_offset_y") == GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_Y)
 	assert(control.get_theme_constant("outline_size") == GroundfireTheme.CLASSIC_TEXT_OUTLINE_SIZE)
+
+
+func _assert_classic_hover_color(control: Control) -> void:
+	if control.has_method("classic_hover_color"):
+		assert(control.call("classic_hover_color") == GroundfireTheme.COLOR_WARN)
+		return
+	assert(control.get_theme_color("font_hover_color") == GroundfireTheme.COLOR_WARN)

@@ -9,9 +9,12 @@ const WeaponInventory := preload("res://scripts/weapon_inventory.gd")
 const QUAKE_SOUND := preload("res://assets/quake.wav")
 const JUMP_JETS_SOUND := preload("res://assets/jumpjets.wav")
 const FIRE_SHELL_SOUND := preload("res://assets/fireshell.wav")
+const SHELL_DEATH_SOUND := preload("res://assets/shelldeath.wav")
 const LAUNCH_MISSILE_SOUND := preload("res://assets/launchmissile.wav")
 const MISSILE_FLIGHT_SOUND := preload("res://assets/missile.wav")
+const MISSILE_DEATH_SOUND := preload("res://assets/missiledeath.wav")
 const MACHINE_GUN_SOUND := preload("res://assets/machinegun.wav")
+const METAL_HIT_SOUND := preload("res://assets/metal.wav")
 const NUKE_SOUND := preload("res://assets/nuke.wav")
 const SMOKE_TEXTURE := preload("res://assets/smoke.png")
 const MENU_TILE := preload("res://assets/menuback.png")
@@ -187,9 +190,12 @@ var _winner_background_scroll := 0.0
 var _quake_audio: AudioStreamPlayer
 var _jump_jets_audio: AudioStreamPlayer
 var _fire_shell_audio: AudioStreamPlayer
+var _shell_death_audio: AudioStreamPlayer
 var _launch_missile_audio: AudioStreamPlayer
 var _missile_flight_audio: AudioStreamPlayer
+var _missile_death_audio: AudioStreamPlayer
 var _machine_gun_audio: AudioStreamPlayer
+var _metal_hit_audio: AudioStreamPlayer
 var _nuke_audio: AudioStreamPlayer
 var _shutting_down := false
 
@@ -601,9 +607,12 @@ func _ready() -> void:
 	_build_quake_audio()
 	_build_jump_jets_audio()
 	_build_fire_shell_audio()
+	_build_shell_death_audio()
 	_build_launch_missile_audio()
 	_build_missile_flight_audio()
+	_build_missile_death_audio()
 	_build_machine_gun_audio()
+	_build_metal_hit_audio()
 	_build_nuke_audio()
 	_build_pause_overlay()
 	_build_score_overlay()
@@ -1029,6 +1038,16 @@ func _build_fire_shell_audio() -> void:
 	add_child(_fire_shell_audio)
 
 
+func _build_shell_death_audio() -> void:
+	_shell_death_audio = AudioStreamPlayer.new()
+	_shell_death_audio.name = "ShellDeathAudio"
+	var shell_death_stream := SHELL_DEATH_SOUND.duplicate()
+	if shell_death_stream is AudioStreamWAV:
+		shell_death_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED
+	_shell_death_audio.stream = shell_death_stream
+	add_child(_shell_death_audio)
+
+
 func _build_launch_missile_audio() -> void:
 	_launch_missile_audio = AudioStreamPlayer.new()
 	_launch_missile_audio.name = "LaunchMissileAudio"
@@ -1049,6 +1068,16 @@ func _build_missile_flight_audio() -> void:
 	add_child(_missile_flight_audio)
 
 
+func _build_missile_death_audio() -> void:
+	_missile_death_audio = AudioStreamPlayer.new()
+	_missile_death_audio.name = "MissileDeathAudio"
+	var missile_death_stream := MISSILE_DEATH_SOUND.duplicate()
+	if missile_death_stream is AudioStreamWAV:
+		missile_death_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED
+	_missile_death_audio.stream = missile_death_stream
+	add_child(_missile_death_audio)
+
+
 func _build_machine_gun_audio() -> void:
 	_machine_gun_audio = AudioStreamPlayer.new()
 	_machine_gun_audio.name = "MachineGunAudio"
@@ -1057,6 +1086,16 @@ func _build_machine_gun_audio() -> void:
 		machine_gun_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	_machine_gun_audio.stream = machine_gun_stream
 	add_child(_machine_gun_audio)
+
+
+func _build_metal_hit_audio() -> void:
+	_metal_hit_audio = AudioStreamPlayer.new()
+	_metal_hit_audio.name = "MetalHitAudio"
+	var metal_hit_stream := METAL_HIT_SOUND.duplicate()
+	if metal_hit_stream is AudioStreamWAV:
+		metal_hit_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED
+	_metal_hit_audio.stream = metal_hit_stream
+	add_child(_metal_hit_audio)
 
 
 func _build_nuke_audio() -> void:
@@ -1097,16 +1136,22 @@ func _set_paused(value: bool, focus_resume := true) -> void:
 			_play_jump_jets_audio()
 	if _fire_shell_audio != null:
 		_fire_shell_audio.stream_paused = value
+	if _shell_death_audio != null:
+		_shell_death_audio.stream_paused = value
 	if _launch_missile_audio != null:
 		_launch_missile_audio.stream_paused = value
 	if _missile_flight_audio != null:
 		_missile_flight_audio.stream_paused = value
 		if not value and _has_fueled_missile_projectile():
 			_play_missile_flight_audio()
+	if _missile_death_audio != null:
+		_missile_death_audio.stream_paused = value
 	if _machine_gun_audio != null:
 		_machine_gun_audio.stream_paused = value
 		if not value and _machine_gun_active and _machine_gun_fire_held:
 			_play_machine_gun_audio()
+	if _metal_hit_audio != null:
+		_metal_hit_audio.stream_paused = value
 	if _nuke_audio != null:
 		_nuke_audio.stream_paused = value
 	_message = "Paused." if value else "Match resumed."
@@ -1122,9 +1167,12 @@ func _restart_round() -> void:
 	_stop_jump_jets_audio()
 	_reset_machine_gun_fire()
 	_stop_fire_shell_audio()
+	_stop_shell_death_audio()
 	_stop_launch_missile_audio()
 	_stop_missile_flight_audio()
+	_stop_missile_death_audio()
 	_stop_nuke_audio()
+	_stop_metal_hit_audio()
 	_projectiles.clear()
 	_explosions.clear()
 	_smoke_particles.clear()
@@ -1859,6 +1907,7 @@ func _apply_machine_gun_damage(projectile: Dictionary, target_owner: String) -> 
 	var damage: int = max(0, int(weapon.get("damage", 2)))
 	if damage <= 0:
 		return
+	_play_metal_hit_audio()
 	var killed := bool(target.apply_damage(damage))
 	var owner := str(projectile.get("owner", _owner_from_player_owned(bool(projectile.get("player_owned", true)))))
 	if owner != target_owner:
@@ -2149,7 +2198,9 @@ func _apply_explosion(position: Vector2, projectile: Dictionary, direct_hit_owne
 	var blast_radius := float(weapon.get("blast", 48.0))
 	_last_shot_owner = owner
 	_last_shot_player_owned = owner == TURN_PLAYER
-	_spawn_explosion(position, blast_radius, _weapon_white_out(weapon))
+	var white_out := _weapon_white_out(weapon)
+	_play_explosion_death_audio(kind, white_out)
+	_spawn_explosion(position, blast_radius, white_out)
 	var total_other_damage := 0
 	for index in range(_participants.size()):
 		if not _participant_is_alive(index):
@@ -2211,6 +2262,15 @@ func _damage_after_tank_shield(tank: RefCounted, amount: int) -> int:
 
 func _weapon_white_out(weapon: Dictionary) -> bool:
 	return bool(weapon.get("white_out", str(weapon.get("kind", "")) == "nuke"))
+
+
+func _play_explosion_death_audio(kind: String, white_out: bool) -> void:
+	if white_out:
+		return
+	if kind == "missile":
+		_play_missile_death_audio()
+	else:
+		_play_shell_death_audio()
 
 
 func _after_explosion() -> void:
@@ -3541,9 +3601,12 @@ func _prepare_for_shutdown() -> void:
 	_release_audio_stream(_quake_audio)
 	_release_audio_stream(_jump_jets_audio)
 	_release_audio_stream(_fire_shell_audio)
+	_release_audio_stream(_shell_death_audio)
 	_release_audio_stream(_launch_missile_audio)
 	_release_audio_stream(_missile_flight_audio)
+	_release_audio_stream(_missile_death_audio)
 	_release_audio_stream(_machine_gun_audio)
+	_release_audio_stream(_metal_hit_audio)
 	_release_audio_stream(_nuke_audio)
 
 
@@ -3551,9 +3614,12 @@ func _stop_all_audio() -> void:
 	_stop_quake_audio()
 	_stop_jump_jets_audio()
 	_stop_fire_shell_audio()
+	_stop_shell_death_audio()
 	_stop_launch_missile_audio()
 	_stop_missile_flight_audio()
+	_stop_missile_death_audio()
 	_stop_machine_gun_audio()
+	_stop_metal_hit_audio()
 	_stop_nuke_audio()
 
 
@@ -3596,6 +3662,18 @@ func _stop_fire_shell_audio() -> void:
 		_fire_shell_audio.stop()
 
 
+func _play_shell_death_audio() -> void:
+	if _shell_death_audio == null or _is_paused:
+		return
+	_shell_death_audio.stop()
+	_shell_death_audio.play()
+
+
+func _stop_shell_death_audio() -> void:
+	if _shell_death_audio != null and _shell_death_audio.playing:
+		_shell_death_audio.stop()
+
+
 func _play_launch_missile_audio() -> void:
 	if _launch_missile_audio == null or _is_paused:
 		return
@@ -3618,6 +3696,18 @@ func _play_missile_flight_audio() -> void:
 func _stop_missile_flight_audio() -> void:
 	if _missile_flight_audio != null and _missile_flight_audio.playing:
 		_missile_flight_audio.stop()
+
+
+func _play_missile_death_audio() -> void:
+	if _missile_death_audio == null or _is_paused:
+		return
+	_missile_death_audio.stop()
+	_missile_death_audio.play()
+
+
+func _stop_missile_death_audio() -> void:
+	if _missile_death_audio != null and _missile_death_audio.playing:
+		_missile_death_audio.stop()
 
 
 func _sync_missile_flight_audio() -> void:
@@ -3644,6 +3734,18 @@ func _play_machine_gun_audio() -> void:
 func _stop_machine_gun_audio() -> void:
 	if _machine_gun_audio != null and _machine_gun_audio.playing:
 		_machine_gun_audio.stop()
+
+
+func _play_metal_hit_audio() -> void:
+	if _metal_hit_audio == null or _is_paused:
+		return
+	_metal_hit_audio.stop()
+	_metal_hit_audio.play()
+
+
+func _stop_metal_hit_audio() -> void:
+	if _metal_hit_audio != null and _metal_hit_audio.playing:
+		_metal_hit_audio.stop()
 
 
 func _play_nuke_audio() -> void:

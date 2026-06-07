@@ -126,6 +126,8 @@ static func apply_classic_button(button: Button, font_size := 16) -> void:
 	button.add_theme_color_override("font_hover_pressed_color", COLOR_WARN)
 	button.add_theme_color_override("font_disabled_color", BUTTON_FONT_DISABLED)
 	button.add_theme_font_size_override("font_size", font_size)
+	if button.has_method("set_classic_font_colours"):
+		button.call("set_classic_font_colours", COLOR_TEXT, COLOR_WARN, BUTTON_FONT_DISABLED)
 	apply_classic_text_effect(button)
 
 
@@ -133,6 +135,8 @@ static func apply_label(label: Label, size := 16, color := COLOR_TEXT, classic_s
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
 	if classic_shadow:
+		if label.has_method("set_classic_font_color"):
+			label.call("set_classic_font_color", color)
 		apply_classic_text_effect(label)
 
 

@@ -29,6 +29,11 @@ const TANK_PASSIVE_SLIDE_THRESHOLD := 30.0
 const TANK_BODY_HALF_WIDTH := 26.0
 const TANK_CENTER_OFFSET := TANK_BODY_HALF_WIDTH * 0.5
 const GUN_LAUNCH_OFFSET := TANK_BODY_HALF_WIDTH * 1.2
+const TANK_CLASSIC_WORLD_PIXEL_SCALE := TANK_BODY_HALF_WIDTH / 0.25
+const TANK_TRACK_HALF_WIDTH := TANK_BODY_HALF_WIDTH * 0.5
+const TANK_TRACK_AIRBORNE_THRESHOLD := 0.05 * TANK_CLASSIC_WORLD_PIXEL_SCALE
+const TANK_TRACK_MAX_REL_DISPLACEMENT := 0.1 * TANK_CLASSIC_WORLD_PIXEL_SCALE
+const TANK_TRACK_ANGLE_SCALE := 75.0 / TANK_CLASSIC_WORLD_PIXEL_SCALE
 const SHIELD_DAMAGE_MULTIPLIER := 0.5
 const SHIELD_FUEL_USAGE_RATE := 0.12
 const GROUND_SMOKE_RELEASE_TIME := 1.0
@@ -90,6 +95,7 @@ func reset_round(x: float, terrain: RefCounted, label: String, color: Color) -> 
 
 
 func settle_on_terrain(terrain: RefCounted, delta := 0.0) -> void:
+	var classic_track_aligned := false
 	if hover_time > 0.0:
 		hover_time -= delta
 		if hover_time < 0.0:
@@ -117,15 +123,24 @@ func settle_on_terrain(terrain: RefCounted, delta := 0.0) -> void:
 			airborne_velocity = Vector2.ZERO
 			on_ground = true
 	else:
-		var ground_position := _ground_position_for_query(terrain, position.x, position.y)
-		if ground_position.y > position.y + TANK_GROUND_DETACH_THRESHOLD:
-			on_ground = false
+		if terrain.has_method("move_to_ground"):
+			_apply_passive_slope_slide(delta, terrain, tank_angle)
+			classic_track_aligned = true
+			_apply_classic_track_ground_alignment(terrain, false)
 		else:
-			position = ground_position
-			_apply_passive_slope_slide(delta, terrain, terrain.slope_angle_at(position.x))
+			var ground_position := _ground_position_for_query(terrain, position.x, position.y)
+			if ground_position.y > position.y + TANK_GROUND_DETACH_THRESHOLD:
+				on_ground = false
+			else:
+				position = ground_position
+				_apply_passive_slope_slide(delta, terrain, terrain.slope_angle_at(position.x))
 	_constrain_to_terrain_bounds(terrain)
 	if on_ground:
-		tank_angle = terrain.slope_angle_at(position.x)
+		if terrain.has_method("move_to_ground"):
+			if not classic_track_aligned:
+				_apply_classic_track_ground_alignment(terrain, false)
+		else:
+			tank_angle = terrain.slope_angle_at(position.x)
 
 
 func move_on_terrain(direction: float, delta: float, terrain: RefCounted) -> void:
@@ -148,6 +163,73 @@ func _apply_passive_slope_slide(delta: float, terrain: RefCounted, ground_angle:
 	var slide_speed: float = TANK_MOVE_SPEED * (abs(ground_angle) / TANK_SLOPE_DRAG_SCALE)
 	var horizontal_delta: float = cos(deg_to_rad(ground_angle)) * slide_speed * delta
 	position = _ground_position_for_query(terrain, position.x - sign(ground_angle) * horizontal_delta, position.y)
+
+
+func _classic_track_ground_alignment(terrain: RefCounted, boosting := false) -> Dictionary:
+	var radians := deg_to_rad(tank_angle)
+	var cos_a := cos(radians)
+	var sin_a := sin(radians)
+	var left_query := Vector2(
+		position.x - TANK_TRACK_HALF_WIDTH * cos_a,
+		position.y - TANK_TRACK_HALF_WIDTH * sin_a
+	)
+	var right_query := Vector2(
+		position.x + TANK_TRACK_HALF_WIDTH * cos_a,
+		position.y + TANK_TRACK_HALF_WIDTH * sin_a
+	)
+	var mid_query := position
+	var left_screen_disp: float = _ground_position_for_query(terrain, left_query.x, left_query.y).y - left_query.y
+	var right_screen_disp: float = _ground_position_for_query(terrain, right_query.x, right_query.y).y - right_query.y
+	var mid_screen_disp: float = _ground_position_for_query(terrain, mid_query.x, mid_query.y).y - mid_query.y
+	var left_disp := -left_screen_disp
+	var right_disp := -right_screen_disp
+	var mid_disp := -mid_screen_disp
+	var relative_disp := 0.0
+	var max_disp := 0.0
+	if mid_disp > left_disp and mid_disp > right_disp:
+		if left_disp > right_disp:
+			relative_disp = left_disp - mid_disp
+		else:
+			relative_disp = mid_disp - right_disp
+		max_disp = mid_disp
+	elif right_disp > left_disp:
+		if (right_disp - left_disp) > (2.0 * (right_disp - mid_disp)):
+			relative_disp = mid_disp - right_disp
+		else:
+			relative_disp = left_disp - right_disp
+		max_disp = right_disp
+	else:
+		if (left_disp - right_disp) > (2.0 * (left_disp - mid_disp)):
+			relative_disp = mid_disp - right_disp
+		else:
+			relative_disp = left_disp - right_disp
+		max_disp = left_disp
+	var airborne := max_disp < -TANK_TRACK_AIRBORNE_THRESHOLD or (boosting and max_disp <= 0.0)
+	return {
+		"airborne": airborne,
+		"screen_shift": -max_disp,
+		"relative_displacement": relative_disp,
+		"left_displacement": left_disp,
+		"right_displacement": right_disp,
+		"mid_displacement": mid_disp,
+	}
+
+
+func _apply_classic_track_ground_alignment(terrain: RefCounted, boosting := false) -> bool:
+	var alignment := _classic_track_ground_alignment(terrain, boosting)
+	if bool(alignment.get("airborne", false)):
+		on_ground = false
+		return false
+	position.y += float(alignment.get("screen_shift", 0.0))
+	var rel_disp := clampf(
+		float(alignment.get("relative_displacement", 0.0)),
+		-TANK_TRACK_MAX_REL_DISPLACEMENT,
+		TANK_TRACK_MAX_REL_DISPLACEMENT
+	)
+	tank_angle += rel_disp * TANK_TRACK_ANGLE_SCALE
+	on_ground = true
+	airborne_velocity = Vector2.ZERO
+	return true
 
 
 func _ground_position_for_query(terrain: RefCounted, x: float, query_y: float) -> Vector2:

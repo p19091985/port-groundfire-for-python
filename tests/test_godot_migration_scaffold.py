@@ -12,9 +12,9 @@ def test_godot_project_declares_main_scene_and_platform_autoload():
     assert 'run/main_scene="res://scenes/main.tscn"' in project
     assert 'config/server_directory_url=""' in project
     assert 'config/server_directory_environment="dev"' in project
-    assert 'config/server_directory_url_dev=""' in project
-    assert 'config/server_directory_url_staging=""' in project
-    assert 'config/server_directory_url_production=""' in project
+    assert 'config/server_directory_url_dev="http://127.0.0.1:27880/servers.json"' in project
+    assert 'config/server_directory_url_staging="https://staging.groundfire.net/directory/servers.json"' in project
+    assert 'config/server_directory_url_production="https://play.groundfire.net/directory/servers.json"' in project
     assert 'PlatformCapabilities="*res://scripts/platform_capabilities.gd"' in project
     assert 'renderer/rendering_method="gl_compatibility"' in project
     assert "gf_aim_left" in project
@@ -31,9 +31,12 @@ def test_godot_project_declares_main_scene_and_platform_autoload():
     assert (GODOT_ROOT / "assets" / "menuback.png").exists()
     assert (GODOT_ROOT / "assets" / "jumpjets.wav").exists()
     assert (GODOT_ROOT / "assets" / "fireshell.wav").exists()
+    assert (GODOT_ROOT / "assets" / "shelldeath.wav").exists()
     assert (GODOT_ROOT / "assets" / "launchmissile.wav").exists()
     assert (GODOT_ROOT / "assets" / "missile.wav").exists()
+    assert (GODOT_ROOT / "assets" / "missiledeath.wav").exists()
     assert (GODOT_ROOT / "assets" / "machinegun.wav").exists()
+    assert (GODOT_ROOT / "assets" / "metal.wav").exists()
     assert (GODOT_ROOT / "assets" / "nuke.wav").exists()
 
 
@@ -86,8 +89,9 @@ def test_classic_selector_matches_pygame_triangle_selector_contract():
     assert "draw_colored_polygon" in script
     assert "Vector2(left_base - arrow_size, center_y)" in script
     assert "Vector2(right_base + arrow_size, center_y)" in script
-    assert "draw_string(" in script
-    assert "ThemeDB.fallback_font" in script
+    assert 'preload("res://scripts/classic_font.gd")' in script
+    assert "ClassicFont.draw_text(" in script
+    assert "func uses_classic_font_atlas() -> bool" in script
     assert "GroundfireTheme.COLOR_WARN" in script
     assert 'event.is_action_pressed("ui_left")' in script
     assert 'event.is_action_pressed("ui_right")' in script
@@ -96,6 +100,29 @@ def test_classic_selector_matches_pygame_triangle_selector_contract():
     assert "func _step(direction: int) -> void" in script
     assert "selected = wrapi(selected + direction, 0, _items.size())" in script
     assert "item_selected.emit(selected)" in script
+
+
+def test_classic_font_atlas_renderer_ports_pygame_font_contract():
+    font_script = (GODOT_ROOT / "scripts" / "classic_font.gd").read_text(encoding="utf-8")
+    label_script = (GODOT_ROOT / "scripts" / "classic_label.gd").read_text(encoding="utf-8")
+    button_script = (GODOT_ROOT / "scripts" / "classic_button.gd").read_text(encoding="utf-8")
+
+    assert 'preload("res://assets/fonts.png")' in font_script
+    assert "PROPORTIONAL_ROW_OFFSET := 8" in font_script
+    assert "GLYPH_WIDTH_RATIO := 0.8" in font_script
+    assert "static func measure" in font_script
+    assert "static func draw_text" in font_script
+    assert "draw_texture_rect_region" in font_script
+    assert "text.unicode_at(index)" in font_script
+    assert "float(_width_for_code(code)) / 24.0 * spacing" in font_script
+    assert "extends Label" in label_script
+    assert "func uses_classic_font_atlas() -> bool" in label_script
+    assert "ClassicFont.draw_text(" in label_script
+    assert "GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR" in label_script
+    assert "extends Button" in button_script
+    assert "func classic_hover_color() -> Color" in button_script
+    assert 'add_theme_color_override("font_focus_color"' in button_script
+    assert "GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_X" in button_script
 
 
 def test_platform_capabilities_hide_native_networking_on_web():
@@ -900,23 +927,32 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'preload("res://assets/quake.wav")' in local_match
     assert 'preload("res://assets/jumpjets.wav")' in local_match
     assert 'preload("res://assets/fireshell.wav")' in local_match
+    assert 'preload("res://assets/shelldeath.wav")' in local_match
     assert 'preload("res://assets/launchmissile.wav")' in local_match
     assert 'preload("res://assets/missile.wav")' in local_match
+    assert 'preload("res://assets/missiledeath.wav")' in local_match
     assert 'preload("res://assets/machinegun.wav")' in local_match
+    assert 'preload("res://assets/metal.wav")' in local_match
     assert 'preload("res://assets/nuke.wav")' in local_match
     assert "func _build_quake_audio" in local_match
     assert "func _build_jump_jets_audio" in local_match
     assert "func _build_fire_shell_audio" in local_match
+    assert "func _build_shell_death_audio" in local_match
     assert "func _build_launch_missile_audio" in local_match
     assert "func _build_missile_flight_audio" in local_match
+    assert "func _build_missile_death_audio" in local_match
     assert "func _build_machine_gun_audio" in local_match
+    assert "func _build_metal_hit_audio" in local_match
     assert "func _build_nuke_audio" in local_match
     assert "quake_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
     assert "jump_jets_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
     assert "fire_shell_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
+    assert "shell_death_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
     assert "launch_missile_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
     assert "missile_flight_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
+    assert "missile_death_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
     assert "machine_gun_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD" in local_match
+    assert "metal_hit_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
     assert "nuke_stream.loop_mode = AudioStreamWAV.LOOP_DISABLED" in local_match
     assert "func _play_quake_audio" in local_match
     assert "func _stop_quake_audio" in local_match
@@ -925,40 +961,56 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _tank_can_boost" in local_match
     assert "func _play_fire_shell_audio" in local_match
     assert "func _stop_fire_shell_audio" in local_match
+    assert "func _play_shell_death_audio" in local_match
+    assert "func _stop_shell_death_audio" in local_match
     assert "func _play_launch_missile_audio" in local_match
     assert "func _stop_launch_missile_audio" in local_match
     assert "func _play_missile_flight_audio" in local_match
     assert "func _stop_missile_flight_audio" in local_match
+    assert "func _play_missile_death_audio" in local_match
+    assert "func _stop_missile_death_audio" in local_match
     assert "func _sync_missile_flight_audio" in local_match
     assert "func _play_weapon_launch_audio" in local_match
     assert "func _play_machine_gun_audio" in local_match
     assert "func _stop_machine_gun_audio" in local_match
+    assert "func _play_metal_hit_audio" in local_match
+    assert "func _stop_metal_hit_audio" in local_match
     assert "func _play_nuke_audio" in local_match
     assert "func _stop_nuke_audio" in local_match
     assert "func _exit_tree" in local_match
     assert '_stop_quake_audio()' in local_match
     assert '_stop_jump_jets_audio()' in local_match
     assert '_stop_fire_shell_audio()' in local_match
+    assert '_stop_shell_death_audio()' in local_match
     assert '_stop_launch_missile_audio()' in local_match
     assert '_stop_missile_flight_audio()' in local_match
+    assert '_stop_missile_death_audio()' in local_match
     assert '_stop_machine_gun_audio()' in local_match
+    assert '_stop_metal_hit_audio()' in local_match
     assert '_stop_nuke_audio()' in local_match
     assert "_quake_active" in local_match
     assert "_quake_countdown" in local_match
     assert "_jump_jets_active" in local_match
     assert "var _jump_jets_audio: AudioStreamPlayer" in local_match
     assert "var _fire_shell_audio: AudioStreamPlayer" in local_match
+    assert "var _shell_death_audio: AudioStreamPlayer" in local_match
     assert "var _launch_missile_audio: AudioStreamPlayer" in local_match
     assert "var _missile_flight_audio: AudioStreamPlayer" in local_match
+    assert "var _missile_death_audio: AudioStreamPlayer" in local_match
     assert "var _machine_gun_audio: AudioStreamPlayer" in local_match
+    assert "var _metal_hit_audio: AudioStreamPlayer" in local_match
     assert "var _nuke_audio: AudioStreamPlayer" in local_match
     assert 'FireShellAudio' in local_match
+    assert 'ShellDeathAudio' in local_match
     assert 'JumpJetsAudio' in local_match
     assert 'LaunchMissileAudio' in local_match
     assert 'MissileFlightAudio' in local_match
+    assert 'MissileDeathAudio' in local_match
     assert 'MachineGunAudio' in local_match
+    assert 'MetalHitAudio' in local_match
     assert 'NukeAudio' in local_match
     assert "_play_weapon_launch_audio(kind)" in local_match
+    assert "func _play_explosion_death_audio" in local_match
     assert '_play_launch_missile_audio()' in local_match
     assert '_play_fire_shell_audio()' in local_match
     assert "_play_machine_gun_audio()" in local_match
@@ -990,7 +1042,9 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _draw_whiteout_overlay" in local_match
     assert "func _whiteout_alpha" in local_match
     assert "NUKE_WHITEOUT_FADE_RATE := 0.6" in local_match
-    assert "_spawn_explosion(position, blast_radius, _weapon_white_out(weapon))" in local_match
+    assert "var white_out := _weapon_white_out(weapon)" in local_match
+    assert "_play_explosion_death_audio(kind, white_out)" in local_match
+    assert "_spawn_explosion(position, blast_radius, white_out)" in local_match
     assert '"white_out_level": 1.0 if white_out else 0.0' in local_match
     assert "var living := _living_participant_indices()" in local_match
     assert "if living.size() <= 1:" in local_match

@@ -1,6 +1,7 @@
 extends Control
 
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
+const ClassicFont := preload("res://scripts/classic_font.gd")
 
 signal item_selected(index: int)
 
@@ -70,6 +71,10 @@ func is_disabled() -> bool:
 	return _disabled
 
 
+func uses_classic_font_atlas() -> bool:
+	return true
+
+
 func _sync_disabled_state() -> void:
 	focus_mode = Control.FOCUS_NONE if _disabled else Control.FOCUS_ALL
 	mouse_filter = Control.MOUSE_FILTER_IGNORE if _disabled else Control.MOUSE_FILTER_STOP
@@ -101,30 +106,24 @@ func _draw() -> void:
 	var text := _items[selected]
 	var text_left := left_base
 	var text_width: float = max(1.0, right_base - left_base)
-	var baseline_y: float = round(size.y * 0.5 + float(_font_size) * 0.35)
 	var text_color := GroundfireTheme.COLOR_TEXT
 	if _disabled:
 		text_color.a = DISABLED_ALPHA
-	draw_string(
-		ThemeDB.fallback_font,
+	ClassicFont.draw_text(
+		self,
+		text,
+		Rect2(Vector2(text_left, 0.0), Vector2(text_width, size.y)),
+		float(_font_size),
+		text_color,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		VERTICAL_ALIGNMENT_CENTER,
+		ClassicFont.DEFAULT_SPACING_RATIO,
+		not _disabled,
+		GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR,
 		Vector2(
-			text_left + GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_X,
-			baseline_y + GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_Y
-		),
-		text,
-		HORIZONTAL_ALIGNMENT_CENTER,
-		text_width,
-		_font_size,
-		GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR
-	)
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(text_left, baseline_y),
-		text,
-		HORIZONTAL_ALIGNMENT_CENTER,
-		text_width,
-		_font_size,
-		text_color
+			float(GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_X),
+			float(GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_Y)
+		)
 	)
 
 

@@ -2,6 +2,8 @@ extends Control
 
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
 const ClassicSelector := preload("res://scripts/classic_selector.gd")
+const ClassicLabel := preload("res://scripts/classic_label.gd")
+const ClassicButton := preload("res://scripts/classic_button.gd")
 const LocalMatchScene := preload("res://scenes/local_match.tscn")
 const OnlineMatchScene := preload("res://scenes/online_match.tscn")
 const ServerBrowserScene := preload("res://scenes/server_browser.tscn")
@@ -654,7 +656,7 @@ func _add_spacer_to(parent: Container, height: float) -> Control:
 
 
 func _add_center_label(text: String, font_size := 18, color := GroundfireTheme.COLOR_TEXT) -> Label:
-	var label := Label.new()
+	var label := ClassicLabel.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -664,7 +666,7 @@ func _add_center_label(text: String, font_size := 18, color := GroundfireTheme.C
 
 
 func _add_title(text: String) -> void:
-	var label := Label.new()
+	var label := ClassicLabel.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -693,7 +695,7 @@ func _add_button_to(parent: Container, text: String, callback: Callable, accent 
 
 
 func _add_classic_button_to(parent: Container, text: String, callback: Callable) -> Button:
-	var button := Button.new()
+	var button := ClassicButton.new()
 	button.text = text
 	button.custom_minimum_size = _scaled_menu_size(MENU_CLASSIC_BUTTON_SIZE)
 	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -1329,7 +1331,7 @@ func _add_labeled_control(parent: Container, label_text: String, control: Contro
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	parent.add_child(row)
-	var label := Label.new()
+	var label := ClassicLabel.new()
 	label.text = label_text
 	label.custom_minimum_size = Vector2(150, 32)
 	GroundfireTheme.apply_label(label, 14, GroundfireTheme.COLOR_MUTED)
@@ -1842,7 +1844,7 @@ func _add_classic_option_row(parent: Container, label_text: String, control: Con
 
 
 func _add_classic_options_button_to(parent: Container, text: String, callback: Callable) -> Button:
-	var button := Button.new()
+	var button := ClassicButton.new()
 	button.text = text
 	button.custom_minimum_size = _scaled_menu_size(OPTIONS_CLASSIC_ROW_SIZE)
 	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER

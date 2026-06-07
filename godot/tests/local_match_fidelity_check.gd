@@ -47,6 +47,34 @@ class SlopedTerrain:
 		return Vector2(x, height_at(x))
 
 
+class TrackStepTerrain:
+	extends FlatTerrain
+
+	var center_x := 100.0
+	var left_ground_y := 100.0
+	var mid_ground_y := 100.0
+	var right_ground_y := 100.0
+
+	func _init(origin_x := 100.0) -> void:
+		center_x = origin_x
+
+	func height_at(_x: float) -> float:
+		return mid_ground_y
+
+	func tank_position(x: float) -> Vector2:
+		return Vector2(x, mid_ground_y)
+
+	func move_to_ground(x: float, _y: float) -> float:
+		if x < center_x - 1.0:
+			return left_ground_y
+		if x > center_x + 1.0:
+			return right_ground_y
+		return mid_ground_y
+
+	func slope_angle_at(_x: float) -> float:
+		return 0.0
+
+
 func _init() -> void:
 	call_deferred("_run")
 
@@ -73,6 +101,16 @@ func _run() -> void:
 	var enemy_tank: RefCounted = local_match.get("_enemy")
 	player_tank.position = Vector2(120.0, 120.0)
 	enemy_tank.position = Vector2(240.0, 120.0)
+	var shell_death_audio: AudioStreamPlayer = local_match.get_node("ShellDeathAudio")
+	assert(shell_death_audio.stream != null)
+	var shell_death_stream := shell_death_audio.stream as AudioStreamWAV
+	assert(shell_death_stream != null)
+	assert(shell_death_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
+	var missile_death_audio: AudioStreamPlayer = local_match.get_node("MissileDeathAudio")
+	assert(missile_death_audio.stream != null)
+	var missile_death_stream := missile_death_audio.stream as AudioStreamWAV
+	assert(missile_death_stream != null)
+	assert(missile_death_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
 	assert(str(local_match.call("_segment_tank_hit_owner", Vector2(60.0, 102.0), Vector2(300.0, 102.0))) == "Player")
 	assert(str(local_match.call("_segment_tank_hit_owner", Vector2(60.0, 102.0), Vector2(300.0, 102.0), "Player")) == "Enemy")
 	assert(str(local_match.call("_segment_tank_hit_owner", Vector2(180.0, 102.0), Vector2(300.0, 102.0))) == "Enemy")
@@ -90,6 +128,25 @@ func _run() -> void:
 	assert(int(enemy_tank.health) == TankState.TANK_MAX_HEALTH - 40)
 	assert(int(local_match.get("_score")) == 40)
 	assert(int(local_match.get("_credits")) == 40)
+	assert(shell_death_audio.playing)
+	local_match.call("_set_paused", true)
+	assert(shell_death_audio.stream_paused)
+	local_match.call("_set_paused", false)
+	assert(not shell_death_audio.stream_paused)
+	local_match.call("_stop_shell_death_audio")
+	assert(not shell_death_audio.playing)
+	local_match.call(
+		"_apply_explosion",
+		enemy_tank.position + Vector2(0.0, -20.0),
+		{"weapon": {"name": "Missile", "kind": "missile", "damage": 0, "blast": 1.0}, "kind": "missile", "player_owned": true}
+	)
+	assert(missile_death_audio.playing)
+	local_match.call("_set_paused", true)
+	assert(missile_death_audio.stream_paused)
+	local_match.call("_set_paused", false)
+	assert(not missile_death_audio.stream_paused)
+	local_match.call("_stop_missile_death_audio")
+	assert(not missile_death_audio.playing)
 	_clear_explosions(local_match)
 	enemy_tank.health = TankState.TANK_MAX_HEALTH
 	enemy_tank.shield_active = true
@@ -412,11 +469,23 @@ func _run() -> void:
 	assert(abs(float(first_machine_gun_projectile.get("delay", -1.0))) < 0.01)
 	assert(abs(float(machine_gun_projectiles[1].get("delay", 0.0)) - 0.1) < 0.01)
 	assert(abs(float(machine_gun_projectiles[4].get("delay", 0.0)) - 0.4) < 0.01)
+	var metal_hit_audio: AudioStreamPlayer = local_match.get_node("MetalHitAudio")
+	assert(metal_hit_audio.stream != null)
+	var metal_hit_stream := metal_hit_audio.stream as AudioStreamWAV
+	assert(metal_hit_stream != null)
+	assert(metal_hit_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
 	var enemy_health_before := int(enemy_tank.health)
 	var score_before := int(local_match.get("_score"))
 	local_match.call("_apply_machine_gun_damage", first_machine_gun_projectile, "Enemy")
 	assert(int(enemy_tank.health) == enemy_health_before - 2)
 	assert(int(local_match.get("_score")) == score_before + 2)
+	assert(metal_hit_audio.playing)
+	local_match.call("_set_paused", true)
+	assert(metal_hit_audio.stream_paused)
+	local_match.call("_set_paused", false)
+	assert(not metal_hit_audio.stream_paused)
+	local_match.call("_stop_metal_hit_audio")
+	assert(not metal_hit_audio.playing)
 	_clear_projectiles(local_match)
 	enemy_tank.health = 1
 	enemy_tank.state = TankState.STATE_ALIVE
@@ -1560,6 +1629,27 @@ func _run() -> void:
 	stacked_landing_tank.settle_on_terrain(stacked_ground_terrain, 0.0)
 	assert(stacked_landing_tank.on_ground)
 	assert(abs(stacked_landing_tank.position.y - 60.0) < 0.01)
+
+	var track_step_terrain := TrackStepTerrain.new(100.0)
+	var track_alignment_tank := TankState.new()
+	track_alignment_tank.position = Vector2(100.0, 100.0)
+	track_alignment_tank.tank_angle = 0.0
+	track_alignment_tank.on_ground = true
+	track_step_terrain.right_ground_y = 100.0 + 0.06 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+	track_alignment_tank.settle_on_terrain(track_step_terrain, 0.0)
+	assert(track_alignment_tank.on_ground)
+	assert(abs(track_alignment_tank.position.y - 100.0) < 0.01)
+	assert(abs(track_alignment_tank.tank_angle - 4.5) < 0.01)
+	var track_drop := 0.06 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+	track_step_terrain.left_ground_y = 100.0 + track_drop
+	track_step_terrain.mid_ground_y = 100.0 + track_drop
+	track_step_terrain.right_ground_y = 100.0 + track_drop
+	track_alignment_tank.position = Vector2(100.0, 100.0)
+	track_alignment_tank.tank_angle = 0.0
+	track_alignment_tank.on_ground = true
+	track_alignment_tank.settle_on_terrain(track_step_terrain, 0.0)
+	assert(not track_alignment_tank.on_ground)
+	assert(abs(track_alignment_tank.position.y - 100.0) < 0.01)
 
 	var terrain := TerrainModel.new()
 	terrain.rebuild_with_seed(320.0, 240.0, 1401)

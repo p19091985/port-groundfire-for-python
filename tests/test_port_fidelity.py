@@ -133,6 +133,64 @@ class TankFidelityTests(unittest.TestCase):
             2.0 + t_back * (4.0 - 5.0 * t_back),
         )
 
+    def test_machine_gun_round_tank_hit_queues_classic_metal_sound(self):
+        # Fidelity target: MachineGunRound.update() queues SoundEntity(..., 9,
+        # False) for the classic metal clang before applying direct tank damage.
+        game = self.game
+
+        class HitTank:
+            def __init__(self):
+                self.damage_calls = []
+                self.sound_seen_before_damage = False
+
+            def intersect_tank(self, _old_x, _old_y, _x, _y):
+                return True
+
+            def do_damage(self, damage):
+                self.sound_seen_before_damage = any(
+                    isinstance(entity, SoundEntity)
+                    and entity._sound is not None
+                    and entity._sound._sound_id == 9
+                    for entity in game._entities
+                )
+                self.damage_calls.append(damage)
+                return False
+
+        class HitPlayer:
+            def __init__(self, tank):
+                self._tank = tank
+
+            def get_tank(self):
+                return self._tank
+
+        target_tank = HitTank()
+        target_player = HitPlayer(target_tank)
+        self.game.get_players = lambda: [target_player]
+        machine_gun_round = MachineGunRound(
+            self.game,
+            self.player,
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            0.25,
+            2,
+        )
+
+        self.game.set_time(0.75)
+
+        self.assertTrue(machine_gun_round.update(0.05))
+        self.assertTrue(machine_gun_round._kill_next_frame)
+        self.assertEqual(target_tank.damage_calls, [2])
+        self.assertTrue(target_tank.sound_seen_before_damage)
+        sound_entities = [
+            entity for entity in self.game._entities if isinstance(entity, SoundEntity)
+        ]
+        self.assertEqual(len(sound_entities), 1)
+        self.assertEqual(sound_entities[0]._sound._sound_id, 9)
+        self.assertFalse(sound_entities[0]._looping)
+        self.assertFalse(sound_entities[0]._sound._looping)
+
     def test_mirv_vertical_split_does_not_add_minimum_horizontal_spread(self):
         # Fidelity target: Mirv.update() fragment spread formula.
         #
@@ -220,6 +278,26 @@ class TankFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(missile._fuel, -0.05)
         self.assertAlmostEqual(missile._x_vel, 0.0)
         self.assertAlmostEqual(missile._y_vel, powered_speed)
+
+    def test_projectile_explosions_use_classic_death_sound_ids(self):
+        # Fidelity target: Shell.explode()/Missile.explode() sound id routing.
+        #
+        # Classic shell/MIRV explosions use sound 1, missile death uses sound 6,
+        # and whiteout shell explosions, used by Nukes, use sound 7.
+        shell = Shell(self.game, self.player, 0.0, 0.0, 1.0, 1.0, 0.0, 0.25, 40.0, False)
+        shell.explode(1.0, 2.0, -1)
+        self.assertEqual(self.game._explosions[-1][5], 1)
+        self.assertFalse(self.game._explosions[-1][6])
+
+        nuke_shell = Shell(self.game, self.player, 0.0, 0.0, 1.0, 1.0, 0.0, 3.0, 90.0, True)
+        nuke_shell.explode(2.0, 3.0, -1)
+        self.assertEqual(self.game._explosions[-1][5], 7)
+        self.assertTrue(self.game._explosions[-1][6])
+
+        missile = Missile(self.game, self.player, 0.0, 0.0, 0.0, 0.3, 40.0)
+        self.assertFalse(missile.explode(3.0, 4.0, -1))
+        self.assertEqual(self.game._explosions[-1][5], 6)
+        self.assertFalse(self.game._explosions[-1][6])
 
     def test_do_damage_keeps_tank_alive_at_exactly_zero(self):
         self.tank._health = 40.0
@@ -358,6 +436,52 @@ class TankFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(self.tank._tank_angle, 12.0)
         self.assertAlmostEqual(self.tank._fuel, 0.5)
         self.assertAlmostEqual(self.tank._total_fuel, 0.5)
+
+    def test_update_aligns_tank_tracks_using_classic_support_displacements(self):
+        # Fidelity target: Tank.update() track-ground support branch.
+        #
+        # The classic tank does not simply copy a center slope value. It probes
+        # left, center, and right track support through Landscape.move_to_ground,
+        # then rotates by the bounded relative support displacement.
+        class TrackStepLandscape:
+            left_ground_y = 0.0
+            mid_ground_y = 0.0
+            right_ground_y = -0.06
+
+            def move_to_ground(self, x, _y):
+                if x < -0.01:
+                    return self.left_ground_y
+                if x > 0.01:
+                    return self.right_ground_y
+                return self.mid_ground_y
+
+        landscape = TrackStepLandscape()
+        self.game._landscape = landscape
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = True
+        self.tank._x = 0.0
+        self.tank._y = 0.0
+        self.tank._tank_angle = 0.0
+
+        self.tank.update(0.0)
+
+        self.assertTrue(self.tank._on_ground)
+        self.assertAlmostEqual(self.tank._y, 0.0)
+        self.assertAlmostEqual(self.tank._tank_angle, -4.5)
+
+        landscape.left_ground_y = -0.06
+        landscape.mid_ground_y = -0.06
+        landscape.right_ground_y = -0.06
+        self.tank._on_ground = True
+        self.tank._x = 0.0
+        self.tank._y = 0.0
+        self.tank._tank_angle = 0.0
+
+        self.tank.update(0.0)
+
+        self.assertFalse(self.tank._on_ground)
+        self.assertAlmostEqual(self.tank._y, 0.0)
+        self.assertAlmostEqual(self.tank._tank_angle, 0.0)
 
     def test_update_gun_requires_release_before_second_shot(self):
         weapons = [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS)]

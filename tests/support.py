@@ -219,6 +219,8 @@ class FlatLandscape:
 class DummySoundManager:
     class SoundSource:
         def __init__(self, _sound_manager, _sound_id, looping):
+            self._sound_id = _sound_id
+            self._looping = looping
             self._playing = looping
 
         def stop(self):
@@ -242,6 +244,7 @@ class DummyGameForTank:
         self._settings = settings
         self._landscape = landscape or FlatLandscape()
         self._entities = []
+        self._explosions = []
         self._sound = DummySoundManager()
         self._recorded_tank_deaths = 0
         self._game_state = GameState.ROUND_IN_ACTION
@@ -261,6 +264,9 @@ class DummyGameForTank:
 
     def add_entity(self, entity):
         self._entities.append(entity)
+
+    def explosion(self, *args):
+        self._explosions.append(args)
 
     def record_tank_death(self):
         self._recorded_tank_deaths += 1
