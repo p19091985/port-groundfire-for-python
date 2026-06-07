@@ -10,12 +10,10 @@ import os
 import struct
 import time
 from collections.abc import Iterable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any
 
 from groundfire_net.codec import to_plain
-from src.groundfire.sim.match import MatchState, ReplicatedPlayerState
-from src.groundfire.sim.world import WorldState
 
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 PROTOCOL_VERSION = 1
@@ -81,134 +79,11 @@ class GatewayJoinRegistry:
         self.active_players = len(self._occupied_player_numbers)
 
 
-@dataclass
-class GatewaySimulation:
-    session_id: str = "web-dev"
-    world: WorldState = field(default_factory=lambda: WorldState(seed=1401))
-    match: MatchState = field(default_factory=lambda: MatchState(session_id="web-dev", game_phase="lobby"))
-    player_number: int = 1
-    player_name: str = "Guest"
-    last_input: dict[str, Any] = field(default_factory=dict)
-    sequence: int = 0
-    tank_entity_id: int | None = None
-    projectile_entity_id: int | None = None
 
-    def join(self, player_name: str) -> None:
-        self.player_name = player_name
-        if self.tank_entity_id is None:
-            tank = self.world.entity_registry.create(
-                "tank",
-                position=(-6.0, self.world.terrain.height_at(-6.0)),
-                owner_player=self.player_number,
-                payload={"health": 100, "fuel": 1.0, "weapon": "shell"},
-            )
-            self.tank_entity_id = tank.entity_id
-        self.match.upsert_player(
-            ReplicatedPlayerState(
-                player_number=self.player_number,
-                name=self.player_name,
-                connected=True,
-                tank_entity_id=self.tank_entity_id,
-                is_leader=True,
-                selected_weapon="shell",
-                weapon_stocks=(("shell", -1), ("machine_gun", 50), ("missile", 4), ("mirv", 3), ("nuke", 1)),
-            )
-        )
-        self.match.game_phase = "online"
-
-    def apply_input(self, sequence: int, command: dict[str, Any]) -> None:
-        self.sequence = sequence
-        self.last_input = dict(command)
-        self.match.simulation_tick += 1
-        tank = self.world.entity_registry.get(self.tank_entity_id or -1)
-        if tank is None:
-            return
-        x, _y = tank.position
-        angle = tank.angle
-        if command.get("move_left"):
-            x -= 0.08
-        if command.get("move_right"):
-            x += 0.08
-        if command.get("aim_left"):
-            angle += 1.5
-        if command.get("aim_right"):
-            angle -= 1.5
-        x = max(-(self.world.width / 2.0), min(self.world.width / 2.0, x))
-        y = self.world.terrain.height_at(x)
-        payload = dict(tank.payload)
-        payload["last_input"] = dict(command)
-        if command.get("fire"):
-            projectile = self.world.entity_registry.create(
-                "projectile",
-                position=(round(x + 1.0, 4), round(y + 0.6, 4)),
-                velocity=(1.8, 1.2),
-                angle=angle,
-                owner_player=self.player_number,
-                payload={"weapon": "shell", "ttl": 0.45},
-            )
-            self.projectile_entity_id = projectile.entity_id
-            patch = self.world.apply_explosion(x + 1.0, y, 0.55, caused_by=self.player_number)
-            if patch is not None:
-                self.match.queue_event(
-                    "terrain_explosion",
-                    patch_id=patch.patch_id,
-                    position=(round(x + 1.0, 4), round(y, 4)),
-                    radius=0.55,
-                )
-        elif self.projectile_entity_id is not None:
-            projectile = self.world.entity_registry.get(self.projectile_entity_id)
-            if projectile is not None:
-                px, py = projectile.position
-                vx, vy = projectile.velocity
-                ttl = float(projectile.payload.get("ttl", 0.0)) - 0.08
-                if ttl <= 0.0:
-                    self.world.entity_registry.remove(self.projectile_entity_id)
-                    self.projectile_entity_id = None
-                else:
-                    payload = dict(projectile.payload)
-                    payload["ttl"] = round(ttl, 4)
-                    self.world.entity_registry.replace(
-                        replace(
-                            projectile,
-                            position=(round(px + vx * 0.08, 4), round(py + vy * 0.08, 4)),
-                            payload=payload,
-                        )
-                    )
-        updated = replace(tank, position=(round(x, 4), round(y, 4)), angle=round(angle, 4), payload=payload)
-        self.world.entity_registry.replace(updated)
-        self.match.update_player(self.player_number, acknowledged_command_sequence=sequence)
-
-    def snapshot(self, *, status: str) -> dict[str, Any]:
-        snapshot = self.match.snapshot(
-            self.world.snapshot_entities(),
-            seed=self.world.seed,
-            world_width=self.world.width,
-            terrain_revision=self.world.terrain_revision,
-            terrain_profile=self.world.snapshot_terrain_profile(),
-        )
-        return {
-            "type": "snapshot",
-            "protocol": PROTOCOL_VERSION,
-            "sequence": self.sequence,
-            "state": {
-                "status": status,
-                "player_name": self.player_name,
-                "player_number": self.player_number,
-                "joined": self.tank_entity_id is not None,
-                "last_input": self.last_input,
-                "server_time_msec": int(time.time() * 1000),
-                "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
-                "event_schema": EVENT_SCHEMA_VERSION,
-                "match_snapshot": to_plain(snapshot),
-                "terrain_patches": [to_plain(patch) for patch in self.world.drain_terrain_patches()],
-                "events": [_version_event(event) for event in self.match.drain_events()],
-            },
-        }
 
 
 @dataclass
 class WebSocketGatewaySession:
-    simulation: GatewaySimulation = field(default_factory=GatewaySimulation)
     required_password: str = ""
     required_auth_token: str = ""
     session_secret: str = ""
@@ -217,6 +92,9 @@ class WebSocketGatewaySession:
     banned_players: frozenset[str] = field(default_factory=frozenset)
     _joined: bool = False
     _player_number: int = 0
+    player_name: str = "Guest"
+    last_input: dict = field(default_factory=dict)
+    last_input_sequence: int = 0
 
     def snapshot(self, *, status: str) -> dict[str, Any]:
         payload = self.simulation.snapshot(status=status)
@@ -332,6 +210,8 @@ class WebSocketGateway:
         max_players: int = 0,
         closed: bool = False,
         banned_players: Iterable[str] = (),
+        udp_host: str = "127.0.0.1",
+        udp_port: int = 27015,
     ):
         self.host = host
         self.port = port
@@ -339,6 +219,8 @@ class WebSocketGateway:
         self.auth_token = auth_token
         self.session_secret = session_secret
         self.closed = closed
+        self.udp_host = udp_host
+        self.udp_port = udp_port
         self.banned_players = _normalized_player_names(banned_players)
         self.join_registry = GatewayJoinRegistry(max_players=max(0, max_players))
 
@@ -346,6 +228,7 @@ class WebSocketGateway:
         server = await asyncio.start_server(self._handle_client, self.host, self.port)
         async with server:
             await server.serve_forever()
+
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         session = WebSocketGatewaySession(
@@ -356,19 +239,166 @@ class WebSocketGateway:
             joins_closed=self.closed,
             banned_players=self.banned_players,
         )
+        ws_queue = asyncio.Queue()
+
+        class UdpProxyProtocol(asyncio.DatagramProtocol):
+            def connection_made(self, transport):
+                pass
+            def datagram_received(self, data, addr):
+                from src.groundfire.network.codec import decode_message
+                try:
+                    msg = decode_message(data)
+                    ws_queue.put_nowait(msg)
+                except Exception:
+                    pass
+            def error_received(self, exc):
+                pass
+            def connection_lost(self, exc):
+                pass
+
+        loop = asyncio.get_running_loop()
+        transport, protocol = await loop.create_datagram_endpoint(
+            lambda: UdpProxyProtocol(),
+            remote_addr=(self.udp_host, self.udp_port)
+        )
+
+        async def udp_to_ws_loop():
+            from src.groundfire.network.messages import JoinAccept, JoinReject, ServerSnapshotEnvelope
+            while True:
+                msg = await ws_queue.get()
+                if isinstance(msg, ServerSnapshotEnvelope):
+                    response = {
+                        "type": "snapshot",
+                        "protocol": PROTOCOL_VERSION,
+                        "sequence": session.last_input_sequence,
+                        "state": {
+                            "status": "joined",
+                            "player_name": session.player_name,
+                            "player_number": session._player_number,
+                            "joined": True,
+                            "last_input": session.last_input,
+                            "server_time_msec": int(time.time() * 1000),
+                            "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
+                            "event_schema": EVENT_SCHEMA_VERSION,
+                            "match_snapshot": to_plain(msg.snapshot),
+                            "terrain_patches": [to_plain(patch) for patch in msg.terrain_patches],
+                            "events": [_version_event(event) for event in msg.events],
+                        }
+                    }
+                    response["state"].update(session.join_registry.metadata())
+                    await _write_text(writer, json.dumps(response, separators=(",", ":")))
+                elif isinstance(msg, JoinAccept):
+                    session._joined = True
+                    session._player_number = msg.player_number
+                elif isinstance(msg, JoinReject):
+                    await _write_text(writer, json.dumps(_error(msg.reason), separators=(",", ":")))
+                    writer.close()
+
+        udp_task = asyncio.create_task(udp_to_ws_loop())
+
         try:
             await _accept_handshake(reader, writer)
-            connected_snapshot = session.snapshot(status="connected")
-            await _write_text(writer, json.dumps(connected_snapshot, separators=(",", ":")))
+            
+            from src.groundfire.network.codec import encode_message
+            from src.groundfire.network.messages import ClientCommandEnvelope, HelloRequest, JoinRequest
+            
             while not reader.at_eof():
                 payload = await _read_frame(reader)
                 if payload is None:
                     break
-                for response in session.handle_text(payload):
+                
+                try:
+                    message = json.loads(payload)
+                except json.JSONDecodeError:
+                    await _write_text(writer, json.dumps(_error("invalid_json"), separators=(",", ":")))
+                    continue
+                    
+                message_type = str(message.get("type", ""))
+                
+                if message_type == "hello":
+                    # Send hello to UDP server just to wake it up or log it, but proxy returns standard JSON immediately
+                    transport.sendto(encode_message(HelloRequest(player_name="WebGuest")))
+                    response = {
+                        "type": "hello",
+                        "protocol": PROTOCOL_VERSION,
+                        "min_protocol": MIN_PROTOCOL_VERSION,
+                        "max_protocol": MAX_PROTOCOL_VERSION,
+                        "supported_protocols": list(SUPPORTED_PROTOCOL_VERSIONS),
+                        "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
+                        "event_schema": EVENT_SCHEMA_VERSION,
+                        "password_required": bool(session.required_password),
+                        "auth_required": bool(session.required_auth_token or session.session_secret),
+                        "auth_token_mode": _auth_token_mode(session.required_auth_token, session.session_secret),
+                        "joins_open": not session.joins_closed,
+                        "ban_enforced": bool(session.banned_players),
+                        **session.join_registry.metadata(),
+                        "server": "python-websocket-proxy",
+                    }
                     await _write_text(writer, json.dumps(response, separators=(",", ":")))
-                    if response.get("type") == "disconnect":
-                        return
+                
+                elif message_type == "join":
+                    if session.joins_closed:
+                        await _write_text(writer, json.dumps(_error("server_closed"), separators=(",", ":")))
+                        continue
+                    
+                    player_name = str(message.get("player_name", "Guest"))
+                    if _normalized_player_name(player_name) in session.banned_players:
+                        await _write_text(writer, json.dumps(_error("banned"), separators=(",", ":")))
+                        continue
+                    
+                    if not _auth_token_is_authorized(
+                        str(message.get("auth_token", "")),
+                        required_auth_token=session.required_auth_token,
+                        session_secret=session.session_secret,
+                        player_name=player_name,
+                    ):
+                        await _write_text(writer, json.dumps(_error("authentication_failed"), separators=(",", ":")))
+                        continue
+                        
+                    if session.required_password and str(message.get("password", "")) != session.required_password:
+                        await _write_text(writer, json.dumps(_error("invalid_password"), separators=(",", ":")))
+                        continue
+                    
+                    session.player_name = player_name
+                    transport.sendto(encode_message(JoinRequest(player_name=player_name)))
+                
+                elif message_type == "input":
+                    if not session._joined:
+                        await _write_text(writer, json.dumps(_error("not_joined"), separators=(",", ":")))
+                        continue
+                        
+                    sequence = int(message.get("sequence", session.last_input_sequence + 1))
+                    command = message.get("command", {})
+                    if isinstance(command, dict):
+                        session.last_input_sequence = sequence
+                        session.last_input = command
+                        env = ClientCommandEnvelope(
+                            session_id="web",
+                            player_number=session._player_number,
+                            client_sequence=sequence,
+                            simulation_tick=0,
+                            issued_at=time.time(),
+                            source="websocket",
+                            commands={k: bool(v) for k, v in command.items() if k in INPUT_COMMAND_FIELDS},
+                            protocol_version=PROTOCOL_VERSION,
+                        )
+                        transport.sendto(encode_message(env))
+                
+                elif message_type == "ping":
+                    response = {
+                        "type": "pong",
+                        "protocol": PROTOCOL_VERSION,
+                        "sequence": int(message.get("sequence", 0)),
+                        "client_time_msec": int(message.get("client_time_msec", 0)),
+                        "server_time_msec": int(time.time() * 1000),
+                    }
+                    await _write_text(writer, json.dumps(response, separators=(",", ":")))
+                    
+                elif message_type == "disconnect":
+                    break
         finally:
+            udp_task.cancel()
+            transport.close()
             session.close()
             writer.close()
             await writer.wait_closed()
@@ -637,6 +667,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=27080)
     parser.add_argument(
+        "--udp-host",
+        default=os.environ.get("GROUNDFIRE_WEB_GATEWAY_UDP_HOST", "127.0.0.1"),
+        help="The UDP host of the definitive ServerApp to proxy to.",
+    )
+    parser.add_argument(
+        "--udp-port",
+        type=_positive_int,
+        default=_environment_positive_int("GROUNDFIRE_WEB_GATEWAY_UDP_PORT", 27015),
+        help="The UDP port of the definitive ServerApp to proxy to.",
+    )
+    parser.add_argument(
         "--password",
         default=os.environ.get("GROUNDFIRE_WEB_GATEWAY_PASSWORD", ""),
         help="Optional join password. Also configurable through GROUNDFIRE_WEB_GATEWAY_PASSWORD.",
@@ -717,6 +758,8 @@ def main(argv: list[str] | None = None) -> int:
         max_players=args.max_players,
         closed=args.closed,
         banned_players=args.ban_player,
+        udp_host=args.udp_host,
+        udp_port=args.udp_port,
     )
     asyncio.run(gateway.serve_forever())
     return 0

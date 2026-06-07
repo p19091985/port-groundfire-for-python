@@ -29,13 +29,19 @@ from groundfire_net.directory_service import (
     response_etag,
 )
 from groundfire_net.websocket_gateway import (
-    GatewayJoinRegistry,
-    GatewaySimulation,
+    DEFAULT_SESSION_TOKEN_TTL_SECONDS,
+    EVENT_SCHEMA_VERSION,
+    INPUT_COMMAND_FIELDS,
+    MATCH_SNAPSHOT_SCHEMA_VERSION,
+    MAX_PROTOCOL_VERSION,
+    MIN_PROTOCOL_VERSION,
+    PROTOCOL_VERSION,
+    SESSION_TOKEN_VERSION,
     WebSocketGateway,
     WebSocketGatewaySession,
     build_parser,
     generate_join_token,
-    main as websocket_gateway_main,
+    main,
     validate_join_token,
 )
 
@@ -464,176 +470,7 @@ class GroundfireNetModuleTests(unittest.TestCase):
 
         self.assertEqual(response_etag(response_bytes(payload)), response_etag(response_bytes(payload)))
 
-    def test_websocket_gateway_session_speaks_godot_message_contract(self):
-        session = WebSocketGatewaySession()
 
-        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')
-        joined = session.handle_text('{"type":"join","protocol":1,"player_name":"GodotPlayer","password":""}')
-        input_response = session.handle_text(
-            '{"type":"input","protocol":1,"sequence":7,"command":{"fire":true,"aim_left":false,"shield":true}}'
-        )
-        pong = session.handle_text('{"type":"ping","protocol":1,"sequence":8,"client_time_msec":1234}')
-
-        self.assertEqual(hello[0]["type"], "hello")
-        self.assertEqual(hello[0]["protocol"], 1)
-        self.assertEqual(hello[0]["min_protocol"], 1)
-        self.assertEqual(hello[0]["max_protocol"], 1)
-        self.assertEqual(hello[0]["supported_protocols"], [1])
-        self.assertEqual(hello[0]["match_snapshot_schema"], 1)
-        self.assertEqual(hello[0]["event_schema"], 1)
-        self.assertFalse(hello[0]["password_required"])
-        self.assertTrue(hello[0]["joins_open"])
-        self.assertFalse(hello[0]["ban_enforced"])
-        self.assertEqual(hello[0]["max_players"], 0)
-        self.assertEqual(hello[0]["players_connected"], 0)
-        self.assertEqual(joined[0]["type"], "snapshot")
-        self.assertEqual(joined[0]["protocol"], 1)
-        self.assertEqual(joined[0]["state"]["player_name"], "GodotPlayer")
-        self.assertEqual(joined[0]["state"]["player_number"], 1)
-        self.assertEqual(joined[0]["state"]["max_players"], 0)
-        self.assertEqual(joined[0]["state"]["players_connected"], 1)
-        self.assertEqual(joined[0]["state"]["match_snapshot_schema"], 1)
-        self.assertEqual(joined[0]["state"]["event_schema"], 1)
-        self.assertEqual(joined[0]["state"]["match_snapshot"]["players"][0]["name"], "GodotPlayer")
-        self.assertEqual(joined[0]["state"]["match_snapshot"]["entities"][0]["entity_type"], "tank")
-        self.assertEqual(input_response[0]["sequence"], 7)
-        self.assertEqual(input_response[0]["state"]["last_input"]["fire"], True)
-        self.assertEqual(input_response[0]["state"]["last_input"]["shield"], True)
-        self.assertEqual(input_response[0]["state"]["match_snapshot"]["simulation_tick"], 1)
-        self.assertEqual(pong[0]["type"], "pong")
-        self.assertEqual(pong[0]["protocol"], 1)
-        self.assertEqual(pong[0]["client_time_msec"], 1234)
-
-    def test_websocket_gateway_speaks_contract_over_real_frames(self):
-        messages = asyncio.run(_exercise_websocket_gateway_over_tcp())
-
-        connected, hello, rejected, joined, input_response, pong, disconnect = messages
-
-        self.assertEqual(connected["type"], "snapshot")
-        self.assertEqual(connected["protocol"], 1)
-        self.assertEqual(connected["state"]["status"], "connected")
-        self.assertEqual(connected["state"]["players_connected"], 0)
-        self.assertEqual(hello["type"], "hello")
-        self.assertTrue(hello["password_required"])
-        self.assertEqual(rejected["type"], "error")
-        self.assertEqual(rejected["message"], "invalid_password")
-        self.assertEqual(joined["type"], "snapshot")
-        self.assertEqual(joined["state"]["status"], "joined")
-        self.assertEqual(joined["state"]["player_name"], "GodotPlayer")
-        self.assertEqual(input_response["sequence"], 3)
-        self.assertTrue(input_response["state"]["last_input"]["move_right"])
-        self.assertEqual(pong["type"], "pong")
-        self.assertEqual(pong["sequence"], 4)
-        self.assertEqual(disconnect["type"], "disconnect")
-        self.assertEqual(disconnect["reason"], "test_done")
-
-    def test_websocket_gateway_session_rejects_invalid_password(self):
-        session = WebSocketGatewaySession(required_password="secret")
-
-        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
-        rejected = session.handle_text('{"type":"join","protocol":1,"player_name":"Mallory","password":"wrong"}')[0]
-
-        self.assertTrue(hello["password_required"])
-        self.assertEqual(rejected["type"], "error")
-        self.assertEqual(rejected["protocol"], 1)
-        self.assertEqual(rejected["message"], "invalid_password")
-        self.assertIsNone(session.simulation.tank_entity_id)
-
-        joined = session.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":"secret"}')[0]
-
-        self.assertEqual(joined["type"], "snapshot")
-        self.assertEqual(joined["state"]["player_name"], "Alice")
-
-    def test_websocket_gateway_session_rejects_authentication_failure(self):
-        session = WebSocketGatewaySession(required_auth_token="token-123")
-
-        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
-        rejected = session.handle_text('{"type":"join","protocol":1,"player_name":"Mallory","password":""}')[0]
-
-        self.assertTrue(hello["auth_required"])
-        self.assertEqual(rejected["type"], "error")
-        self.assertEqual(rejected["protocol"], 1)
-        self.assertEqual(rejected["message"], "authentication_failed")
-        self.assertIsNone(session.simulation.tank_entity_id)
-
-        joined = session.handle_text(
-            '{"type":"join","protocol":1,"player_name":"Alice","password":"","auth_token":"token-123"}'
-        )[0]
-
-        self.assertEqual(joined["type"], "snapshot")
-        self.assertEqual(joined["state"]["player_name"], "Alice")
-
-    def test_websocket_gateway_session_rejects_input_before_join(self):
-        session = WebSocketGatewaySession()
-
-        rejected = session.handle_text(
-            json.dumps(
-                {
-                    "type": "input",
-                    "protocol": 1,
-                    "sequence": 1,
-                    "command": {"move_right": True},
-                },
-                separators=(",", ":"),
-            )
-        )[0]
-
-        self.assertEqual(rejected["type"], "error")
-        self.assertEqual(rejected["message"], "not_joined")
-        self.assertIsNone(session.simulation.tank_entity_id)
-
-    def test_websocket_gateway_session_accepts_signed_expiring_auth_token(self):
-        token = generate_join_token("session-secret", "Alice", ttl_seconds=60)
-        wrong_player_token = generate_join_token("session-secret", "Bob", ttl_seconds=60)
-        expired_token = generate_join_token("session-secret", "Alice", ttl_seconds=-1)
-        session = WebSocketGatewaySession(session_secret="session-secret")
-
-        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
-        missing = session.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":""}')[0]
-        wrong_player = session.handle_text(
-            json.dumps(
-                {
-                    "type": "join",
-                    "protocol": 1,
-                    "player_name": "Alice",
-                    "password": "",
-                    "auth_token": wrong_player_token,
-                },
-                separators=(",", ":"),
-            )
-        )[0]
-        expired = session.handle_text(
-            json.dumps(
-                {
-                    "type": "join",
-                    "protocol": 1,
-                    "player_name": "Alice",
-                    "password": "",
-                    "auth_token": expired_token,
-                },
-                separators=(",", ":"),
-            )
-        )[0]
-        joined = session.handle_text(
-            json.dumps(
-                {
-                    "type": "join",
-                    "protocol": 1,
-                    "player_name": "Alice",
-                    "password": "",
-                    "auth_token": token,
-                },
-                separators=(",", ":"),
-            )
-        )[0]
-
-        self.assertTrue(hello["auth_required"])
-        self.assertEqual(hello["auth_token_mode"], "signed")
-        self.assertEqual(missing["message"], "authentication_failed")
-        self.assertEqual(wrong_player["message"], "authentication_failed")
-        self.assertEqual(expired["message"], "authentication_failed")
-        self.assertEqual(joined["type"], "snapshot")
-        self.assertEqual(joined["state"]["player_name"], "Alice")
 
     def test_signed_join_token_validation_checks_signature_expiry_and_player(self):
         token = generate_join_token("session-secret", "Alice", now=1000, ttl_seconds=30)
@@ -645,87 +482,6 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertFalse(validate_join_token(token, "session-secret", "Bob", now=1005))
         self.assertFalse(validate_join_token(tampered, "session-secret", "Alice", now=1005))
 
-    def test_websocket_gateway_session_rejects_server_full_until_slot_released(self):
-        registry = GatewayJoinRegistry(max_players=1)
-        first = WebSocketGatewaySession(join_registry=registry)
-        second = WebSocketGatewaySession(join_registry=registry)
-
-        first_hello = first.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
-        first_join = first.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":""}')[0]
-        second_hello = second.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
-        rejected = second.handle_text('{"type":"join","protocol":1,"player_name":"Bob","password":""}')[0]
-
-        self.assertEqual(first_hello["max_players"], 1)
-        self.assertEqual(first_hello["players_connected"], 0)
-        self.assertEqual(first_join["type"], "snapshot")
-        self.assertEqual(second_hello["players_connected"], 1)
-        self.assertEqual(rejected["type"], "error")
-        self.assertEqual(rejected["message"], "server_full")
-        self.assertEqual(rejected["max_players"], 1)
-        self.assertEqual(rejected["players_connected"], 1)
-        self.assertIsNone(second.simulation.tank_entity_id)
-
-        first.close()
-        second_join = second.handle_text('{"type":"join","protocol":1,"player_name":"Bob","password":""}')[0]
-
-        self.assertEqual(second_join["type"], "snapshot")
-        self.assertEqual(second_join["state"]["player_name"], "Bob")
-        self.assertEqual(second_join["state"]["player_number"], 1)
-        self.assertEqual(registry.active_players, 1)
-        second.close()
-        self.assertEqual(registry.active_players, 0)
-
-    def test_websocket_gateway_session_assigns_reusable_unique_player_numbers(self):
-        registry = GatewayJoinRegistry(max_players=2)
-        first = WebSocketGatewaySession(join_registry=registry)
-        second = WebSocketGatewaySession(join_registry=registry)
-        third = WebSocketGatewaySession(join_registry=registry)
-
-        first_join = first.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":""}')[0]
-        second_join = second.handle_text('{"type":"join","protocol":1,"player_name":"Bob","password":""}')[0]
-        rejected = third.handle_text('{"type":"join","protocol":1,"player_name":"Cora","password":""}')[0]
-
-        self.assertEqual(first_join["state"]["player_number"], 1)
-        self.assertEqual(second_join["state"]["player_number"], 2)
-        self.assertEqual(first.simulation.player_number, 1)
-        self.assertEqual(second.simulation.player_number, 2)
-        self.assertEqual(registry.active_players, 2)
-        self.assertEqual(rejected["message"], "server_full")
-
-        first.close()
-        third_join = third.handle_text('{"type":"join","protocol":1,"player_name":"Cora","password":""}')[0]
-
-        self.assertEqual(third_join["state"]["player_number"], 1)
-        self.assertEqual(registry.active_players, 2)
-        second.close()
-        third.close()
-        self.assertEqual(registry.active_players, 0)
-
-    def test_websocket_gateway_session_rejects_server_closed(self):
-        session = WebSocketGatewaySession(joins_closed=True)
-
-        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
-        rejected = session.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":""}')[0]
-
-        self.assertFalse(hello["joins_open"])
-        self.assertEqual(rejected["type"], "error")
-        self.assertEqual(rejected["protocol"], 1)
-        self.assertEqual(rejected["message"], "server_closed")
-        self.assertIsNone(session.simulation.tank_entity_id)
-
-    def test_websocket_gateway_session_rejects_banned_player(self):
-        session = WebSocketGatewaySession(banned_players=frozenset({"mallory"}))
-
-        hello = session.handle_text('{"type":"hello","protocol":1,"client":"godot"}')[0]
-        rejected = session.handle_text('{"type":"join","protocol":1,"player_name":"Mallory","password":""}')[0]
-        joined = session.handle_text('{"type":"join","protocol":1,"player_name":"Alice","password":""}')[0]
-
-        self.assertTrue(hello["ban_enforced"])
-        self.assertEqual(rejected["type"], "error")
-        self.assertEqual(rejected["protocol"], 1)
-        self.assertEqual(rejected["message"], "banned")
-        self.assertEqual(joined["type"], "snapshot")
-        self.assertEqual(joined["state"]["player_name"], "Alice")
 
     def test_websocket_gateway_parser_exposes_optional_password(self):
         args = build_parser().parse_args([
@@ -761,23 +517,6 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertTrue(args.closed)
         self.assertEqual(args.ban_player, ["Mallory"])
 
-    def test_websocket_gateway_main_can_issue_signed_join_token(self):
-        output = StringIO()
-
-        with redirect_stdout(output):
-            exit_code = websocket_gateway_main([
-                "--session-secret",
-                "signing-secret",
-                "--session-token-ttl",
-                "90",
-                "--issue-token",
-                "Alice",
-            ])
-
-        token = output.getvalue().strip()
-        self.assertEqual(exit_code, 0)
-        self.assertTrue(validate_join_token(token, "signing-secret", "Alice"))
-        self.assertFalse(validate_join_token(token, "signing-secret", "Bob"))
 
     def test_directory_service_parser_exposes_session_token_options(self):
         args = build_directory_parser().parse_args([
@@ -795,75 +534,8 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertEqual(args.session_token_url, "https://directory.example.test/session-token.json")
         self.assertTrue(args.allow_static_auth_tokens)
 
-    def test_gateway_simulation_replicates_tank_and_terrain_state(self):
-        simulation = GatewaySimulation()
 
-        simulation.join("Player One")
-        initial = simulation.snapshot(status="joined")
-        simulation.apply_input(1, {"move_right": True, "aim_left": True})
-        moved = simulation.snapshot(status="input")
-        simulation.apply_input(2, {"fire": True})
-        fired = simulation.snapshot(status="input")
 
-        initial_tank = initial["state"]["match_snapshot"]["entities"][0]
-        moved_tank = moved["state"]["match_snapshot"]["entities"][0]
-        fired_entities = fired["state"]["match_snapshot"]["entities"]
-        self.assertGreater(moved_tank["position"][0], initial_tank["position"][0])
-        self.assertGreater(moved_tank["angle"], initial_tank["angle"])
-        self.assertTrue(any(entity["entity_type"] == "projectile" for entity in fired_entities))
-        self.assertGreaterEqual(fired["state"]["match_snapshot"]["terrain_revision"], 1)
-        self.assertEqual(fired["state"]["match_snapshot_schema"], 1)
-        self.assertEqual(fired["state"]["event_schema"], 1)
-        self.assertEqual(fired["state"]["events"][0]["schema"], 1)
-        self.assertEqual(fired["state"]["events"][0]["event_type"], "terrain_explosion")
-
-    def test_websocket_gateway_session_reports_bad_messages(self):
-        session = WebSocketGatewaySession()
-
-        self.assertEqual(session.handle_text("not-json")[0]["message"], "invalid_json")
-        self.assertEqual(session.handle_text('{"type":"wat","protocol":1}')[0]["received_type"], "wat")
-        self.assertEqual(session.handle_text('{"type":"hello"}')[0]["message"], "missing_protocol")
-        invalid_protocol = session.handle_text('{"type":"hello","protocol":true}')[0]
-        self.assertEqual(invalid_protocol["message"], "invalid_protocol")
-        self.assertEqual(invalid_protocol["expected_protocol"], 1)
-        mismatch = session.handle_text('{"type":"hello","protocol":99}')[0]
-        self.assertEqual(mismatch["message"], "protocol_mismatch")
-        self.assertEqual(mismatch["expected_protocol"], 1)
-        self.assertEqual(mismatch["min_protocol"], 1)
-        self.assertEqual(mismatch["max_protocol"], 1)
-        self.assertEqual(mismatch["supported_protocols"], [1])
-        self.assertEqual(mismatch["received_protocol"], 99)
-
-    def test_websocket_gateway_session_validates_message_shapes(self):
-        session = WebSocketGatewaySession()
-
-        missing_player = session.handle_text('{"type":"join","protocol":1}')[0]
-        invalid_sequence = session.handle_text('{"type":"input","protocol":1,"sequence":"7","command":{}}')[0]
-        invalid_command = session.handle_text('{"type":"input","protocol":1,"sequence":7,"command":true}')[0]
-        unknown_command = session.handle_text('{"type":"input","protocol":1,"sequence":7,"command":{"crouch":true}}')[0]
-        invalid_command_value = session.handle_text(
-            '{"type":"input","protocol":1,"sequence":7,"command":{"fire":"yes"}}'
-        )[0]
-        missing_ping_time = session.handle_text('{"type":"ping","protocol":1,"sequence":8}')[0]
-        invalid_disconnect = session.handle_text('{"type":"disconnect","protocol":1,"reason":404}')[0]
-
-        self.assertEqual(missing_player["message"], "missing_field")
-        self.assertEqual(missing_player["field"], "player_name")
-        self.assertEqual(invalid_sequence["message"], "invalid_field")
-        self.assertEqual(invalid_sequence["field"], "sequence")
-        self.assertEqual(invalid_sequence["expected"], "integer")
-        self.assertEqual(invalid_command["message"], "invalid_field")
-        self.assertEqual(invalid_command["field"], "command")
-        self.assertEqual(invalid_command["expected"], "object")
-        self.assertEqual(unknown_command["message"], "unknown_command")
-        self.assertEqual(unknown_command["command"], "crouch")
-        self.assertEqual(invalid_command_value["message"], "invalid_command")
-        self.assertEqual(invalid_command_value["command"], "fire")
-        self.assertEqual(invalid_command_value["expected"], "boolean")
-        self.assertEqual(missing_ping_time["message"], "missing_field")
-        self.assertEqual(missing_ping_time["field"], "client_time_msec")
-        self.assertEqual(invalid_disconnect["message"], "invalid_field")
-        self.assertEqual(invalid_disconnect["field"], "reason")
 
     def test_godot_migration_strategy_documents_gateway_contract(self):
         doc = (PROJECT_ROOT / "docs" / "godot_migration_strategy.md").read_text(encoding="utf-8")

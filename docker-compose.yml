@@ -24,11 +24,20 @@ services:
       - GROUNDFIRE_DIRECTORY_REQUIRE_GITHUB_OAUTH=1
     restart: always
 
-  gateway:
+  server:
     build: .
-    command: ["python", "-m", "groundfire_net.websocket_gateway", "--host", "0.0.0.0", "--port", "27080", "--session-secret", "${SESSION_SECRET:-changeme_for_prod}", "--max-players", "100"]
+    command: ["python", "-m", "src.groundfire.server", "--host", "0.0.0.0", "--port", "27015", "--directory", "http://directory:27880"]
     environment:
       - PYTHONUNBUFFERED=1
+    restart: always
+
+  gateway:
+    build: .
+    command: ["python", "-m", "groundfire_net.websocket_gateway", "--host", "0.0.0.0", "--port", "27080", "--session-secret", "${SESSION_SECRET:-changeme_for_prod}", "--max-players", "100", "--udp-host", "server", "--udp-port", "27015"]
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - server
     restart: always
 
 volumes:
