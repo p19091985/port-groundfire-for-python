@@ -1558,5 +1558,191 @@ class WeaponFidelityTests(unittest.TestCase):
         # Since _shots_in_air remains 0, the AI should hold fire when cooldown allows it
         self.assertEqual(fire_commands_count, 10)
 
+class ShopMenuEconomyFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class MockSettings:
+            def get_float(self, section, key, default): return default
+            def get_int(self, section, key, default): return default
+            
+        class FakeGame:
+            def __init__(self):
+                self.settings = MockSettings()
+                self.players = [None] * 8
+                self.current_round = 0
+                self.num_rounds = 5
+            def get_settings(self): return self.settings
+            def get_players(self): return self.players
+            def get_current_round(self): return self.current_round
+            def get_num_of_rounds(self): return self.num_rounds
+            def get_font(self): return None
+            def get_interface(self): return None
+            def get_graphics(self): return None
+            def get_sound(self): return None
+            def get_ui(self): return None
+            
+        self.game = FakeGame()
+        
+        from src.player import Player
+        from src.tank import Tank
+        
+        class MockPlayer(Player):
+            def __init__(self, game):
+                super().__init__(game, 0, "Test", (255, 255, 255))
+                self.commands = [False] * 11
+                
+            def get_command(self, cmd, ref=None):
+                return self.commands[cmd]
+                
+            def update(self): pass
+            
+        self.player = MockPlayer(self.game)
+        self.tank = Tank(self.game, self.player, 0)
+        self.player._tank = self.tank
+        self.game.players[0] = self.player
+
+    def test_shop_purchase_machine_gun_adds_50_ammo(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+        
+        # Override update_background because it accesses graphics/UI that we didn't mock
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+            
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = -1.0 # ready for input
+        shop._player_select_pos[0] = 0 # Machine Gun
+        
+        mg = self.tank.get_weapon(Tank.MACHINEGUN)
+        cost = mg.get_cost()
+        self.player.set_money(cost)
+        initial_ammo = mg.get_ammo()
+        
+        self.player.commands[Player.CMD_FIRE] = True
+        shop.update(0.0)
+        
+        self.assertEqual(self.player.get_money(), 0)
+        self.assertEqual(mg.get_ammo(), initial_ammo + 50)
+        self.assertEqual(shop._player_select_delay[0], 0.2)
+
+    def test_shop_purchase_jump_jets_adds_one_total_fuel(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+            
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = -1.0
+        shop._player_select_pos[0] = 1 # Jump Jets
+        
+        cost = shop._jumpjets_cost
+        self.player.set_money(cost)
+        initial_fuel = self.tank.get_total_fuel()
+        
+        self.player.commands[Player.CMD_FIRE] = True
+        shop.update(0.0)
+        
+        self.assertEqual(self.player.get_money(), 0)
+        self.assertAlmostEqual(self.tank.get_total_fuel(), initial_fuel + 1.0)
+
+    def test_shop_purchase_missiles_adds_5_ammo_and_nukes_mirvs_add_1(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+        
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+            
+        shop = MockShopMenu(self.game)
+        
+        for pos, w_idx, amount in [(2, Tank.MIRVS, 1), (3, Tank.MISSILES, 5), (4, Tank.NUKES, 1)]:
+            shop._player_select_delay[0] = -1.0
+            shop._player_select_pos[0] = pos
+            weapon = self.tank.get_weapon(w_idx)
+            self.player.set_money(weapon.get_cost())
+            
+            initial_ammo = weapon.get_ammo()
+            self.player.commands[Player.CMD_FIRE] = True
+            shop.update(0.0)
+            
+            self.assertEqual(self.player.get_money(), 0)
+            self.assertEqual(weapon.get_ammo(), initial_ammo + amount)
+
+    def test_shop_purchase_prevents_buy_without_sufficient_funds(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+        
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+            
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = -1.0
+        shop._player_select_pos[0] = 0 # MG
+        
+        mg = self.tank.get_weapon(Tank.MACHINEGUN)
+        cost = mg.get_cost()
+        self.player.set_money(cost - 1) # Not enough
+        initial_ammo = mg.get_ammo()
+        
+        self.player.commands[Player.CMD_FIRE] = True
+        shop.update(0.0)
+        
+        # Money not deducted, ammo not added
+        self.assertEqual(self.player.get_money(), cost - 1)
+        self.assertEqual(mg.get_ammo(), initial_ammo)
+
+    def test_shop_input_delay_prevents_duplicate_buy_actions(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+        
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+            
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = -1.0
+        shop._player_select_pos[0] = 0
+        
+        mg = self.tank.get_weapon(Tank.MACHINEGUN)
+        cost = mg.get_cost()
+        self.player.set_money(cost * 2)
+        initial_ammo = mg.get_ammo()
+        
+        self.player.commands[Player.CMD_FIRE] = True
+        
+        # Frame 1: Action triggers, delay becomes 0.2
+        shop.update(0.0)
+        self.assertEqual(self.player.get_money(), cost)
+        self.assertEqual(mg.get_ammo(), initial_ammo + 50)
+        
+        # Frame 2: User holds FIRE, delay > 0, so no second purchase
+        shop.update(0.05)
+        self.assertEqual(self.player.get_money(), cost)
+        self.assertEqual(mg.get_ammo(), initial_ammo + 50)
+
+    def test_shop_done_position_marks_player_ready(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.common import GameState
+        
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+            
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = -1.0
+        shop._player_select_pos[0] = 10 # Done!
+        
+        self.player.commands[Player.CMD_FIRE] = True
+        
+        state = shop.update(0.0)
+        
+        self.assertTrue(shop._player_done[0])
+        # On the frame it was pressed, it returns CURRENT_STATE because still_players_in_shop was evaluated first.
+        # On the next frame, it transitions to ROUND_STARTING.
+        state2 = shop.update(0.0)
+        self.assertEqual(state2, GameState.ROUND_STARTING)
+
 if __name__ == "__main__":
     unittest.main()
