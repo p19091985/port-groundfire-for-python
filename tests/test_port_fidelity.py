@@ -2043,6 +2043,294 @@ class ScoreMenuFidelityTests(unittest.TestCase):
         
         self.assertEqual(state, GameState.WINNER_MENU)
 
+class MainMenuFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class FakeSettings:
+            def get_float(self, sec, key, default): return default
+            
+        class FakeControls:
+            def __init__(self):
+                self.commands = {}
+            def get_command(self, idx, cmd):
+                return self.commands.get((idx, cmd), False)
+
+        class FakeInterface:
+            def get_mouse_pos(self): return (0.0, 0.0)
+            def get_mouse_clicked(self, b): return False
+            def get_window_settings(self): return (640, 480, False)
+
+        class FakeGame:
+            def __init__(self):
+                self.settings = FakeSettings()
+                self.controls = FakeControls()
+                self.interface = FakeInterface()
+                self.players_added = []
+                self.num_rounds = 0
+            def get_settings(self): return self.settings
+            def get_controls(self): return self.controls
+            def get_font(self): return None
+            def get_interface(self): return self.interface
+            def get_graphics(self): return None
+            def get_sound(self): return None
+            def get_ui(self): return None
+            
+        self.game = FakeGame()
+
+    def test_main_menu_transitions(self):
+        from src.mainmenu import MainMenu
+        from src.common import GameState
+        class MockMainMenu(MainMenu):
+            def update_background(self, time): pass
+            
+        menu = MockMainMenu(self.game)
+        
+        # Test Start
+        menu._start_button.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.SELECT_PLAYERS_MENU)
+        menu._start_button.update = lambda: False
+        
+        # Test Find Servers
+        menu._find_servers_button.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.SERVER_BROWSER_MENU)
+        menu._find_servers_button.update = lambda: False
+        
+        # Test Options
+        menu._options_button.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.OPTION_MENU)
+        menu._options_button.update = lambda: False
+        
+        # Test Quit
+        menu._quit_button.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.QUIT_MENU)
+
+class OptionMenuFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class FakeSettings:
+            def get_float(self, sec, key, default): return default
+            
+        class FakeControls:
+            def __init__(self):
+                self.commands = {}
+            def get_command(self, idx, cmd):
+                return self.commands.get((idx, cmd), False)
+
+        class FakeInterface:
+            def __init__(self):
+                self.changed = None
+            def get_mouse_pos(self): return (0.0, 0.0)
+            def get_mouse_clicked(self, b): return False
+            def get_window_settings(self): return (640, 480, False)
+            def change_window(self, w, h, fs):
+                self.changed = (w, h, fs)
+
+        class FakeGame:
+            def __init__(self):
+                self.settings = FakeSettings()
+                self.controls = FakeControls()
+                self.interface = FakeInterface()
+            def get_settings(self): return self.settings
+            def get_controls(self): return self.controls
+            def get_font(self): return None
+            def get_interface(self): return self.interface
+            def get_graphics(self): return None
+            def get_sound(self): return None
+            def get_ui(self): return None
+            
+        self.game = FakeGame()
+
+    def test_option_menu_apply_changes_resolution_and_transitions(self):
+        from src.optionmenu import OptionMenu
+        from src.common import GameState
+        class MockOptionMenu(OptionMenu):
+            def update_background(self, time): pass
+            
+        menu = MockOptionMenu(self.game)
+        
+        # Initially, selector will pick 640x480 (index 0) from FakeInterface
+        self.assertEqual(menu._resolutions.get_option(), 0)
+        self.assertEqual(menu._screen_mode.get_option(), 1)
+        
+        # Change resolution to 1024x768 (index 2) and Fullscreen (0)
+        menu._resolutions.set_option(2)
+        menu._screen_mode.set_option(0)
+        
+        menu._apply_button.update = lambda: True
+        # Apply button doesn't change state itself, it calls change_window
+        state = menu.update(0.1)
+        self.assertEqual(state, GameState.CURRENT_STATE)
+        self.assertEqual(self.game.interface.changed, (1024, 768, True))
+        
+    def test_option_menu_transitions(self):
+        from src.optionmenu import OptionMenu
+        from src.common import GameState
+        class MockOptionMenu(OptionMenu):
+            def update_background(self, time): pass
+            
+        menu = MockOptionMenu(self.game)
+        
+        menu._define_controls.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.CONTROLLERS_MENU)
+        menu._define_controls.update = lambda: False
+        
+        menu._back_button.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.MAIN_MENU)
+
+class ControllerMenuFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class FakeSettings:
+            def get_float(self, sec, key, default): return default
+            
+        class FakeControlsFile:
+            def write_file(self): pass
+            
+        class FakeControls:
+            def __init__(self):
+                self.commands = {}
+            def get_command(self, idx, cmd): return self.commands.get((idx, cmd), False)
+            def get_layout(self, idx): return idx
+            def set_layout(self, idx, l): pass
+
+        class FakeInterface:
+            def get_mouse_pos(self): return (0.0, 0.0)
+            def get_mouse_clicked(self, b): return False
+
+        class FakeGame:
+            def __init__(self):
+                self.settings = FakeSettings()
+                self.controls = FakeControls()
+                self.interface = FakeInterface()
+                self.active = -1
+                self.controls_file = FakeControlsFile()
+            def get_settings(self): return self.settings
+            def get_controls(self): return self.controls
+            def get_controls_file(self): return self.controls_file
+            def get_font(self): return None
+            def get_interface(self): return self.interface
+            def get_graphics(self): return None
+            def get_sound(self): return None
+            def get_ui(self): return None
+            def set_active_controller(self, a): self.active = a
+            
+        self.game = FakeGame()
+
+    @unittest.mock.patch('pygame.joystick.get_count', return_value=0)
+    def test_controller_menu_transitions(self, mock_joystick):
+        from src.controllermenu import ControllerMenu
+        from src.common import GameState
+        class MockControllerMenu(ControllerMenu):
+            def update_background(self, time): pass
+            
+        menu = MockControllerMenu(self.game)
+        
+        # Test Edit Keyboard 1
+        menu._keyboard[0].update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.SET_CONTROLS_MENU)
+        self.assertEqual(self.game.active, 0)
+        menu._keyboard[0].update = lambda: False
+        
+        # Test Edit Keyboard 2
+        menu._keyboard[1].update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.SET_CONTROLS_MENU)
+        self.assertEqual(self.game.active, 1)
+        menu._keyboard[1].update = lambda: False
+        
+        # Test Back
+        menu._back_button.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.OPTION_MENU)
+
+class QuitMenuFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class FakeSettings:
+            def get_float(self, sec, key, default): return default
+            
+        class FakeControls:
+            def __init__(self):
+                self.commands = {}
+            def get_command(self, idx, cmd): return False
+
+        class FakeInterface:
+            def get_mouse_pos(self): return (0.0, 0.0)
+            def get_mouse_clicked(self, b): return False
+
+        class FakeGame:
+            def __init__(self):
+                self.settings = FakeSettings()
+                self.controls = FakeControls()
+                self.interface = FakeInterface()
+            def get_settings(self): return self.settings
+            def get_controls(self): return self.controls
+            def get_font(self): return None
+            def get_interface(self): return self.interface
+            def get_graphics(self): return None
+            def get_sound(self): return None
+            def get_ui(self): return None
+            
+        self.game = FakeGame()
+
+    def test_quit_menu_transitions(self):
+        from src.quitmenu import QuitMenu
+        from src.common import GameState
+        class MockQuitMenu(QuitMenu):
+            def update_background(self, time): pass
+            
+        menu = MockQuitMenu(self.game)
+        
+        menu._yes.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.EXITED)
+        menu._yes.update = lambda: False
+        
+        menu._no.update = lambda: True
+        self.assertEqual(menu.update(0.1), GameState.MAIN_MENU)
+
+class QuakeFidelityTests(unittest.TestCase):
+    def test_quake_drops_terrain_and_offsets_viewport(self):
+        from src.quake import Quake
+        class FakeInterface:
+            def __init__(self):
+                self.offset = (0, 0)
+            def offset_viewport(self, x, y):
+                self.offset = (x, y)
+                
+        class FakeLandscape:
+            def __init__(self):
+                self.dropped = 0
+            def drop_terrain(self, amt):
+                self.dropped += amt
+                
+        class FakeSound:
+            def SoundSource(self, s, idx, loop):
+                return "mock_sound_source"
+                
+        class FakeGame:
+            def __init__(self):
+                self.interface = FakeInterface()
+                self.landscape = FakeLandscape()
+                self.sound = FakeSound()
+            def get_interface(self): return self.interface
+            def get_landscape(self): return self.landscape
+            def get_sound(self): return self.sound
+            
+        game = FakeGame()
+        quake = Quake(game)
+        
+        # Fast forward to first quake
+        quake.update(Quake.OPTION_TimeTillFirstQuake + 0.1)
+        self.assertTrue(quake._earthquake)
+        self.assertEqual(quake._rumble, "mock_sound_source")
+        
+        # During earthquake, terrain drops
+        quake.update(1.0)
+        self.assertAlmostEqual(game.landscape.dropped, 1.0 * Quake.OPTION_QuakeDropRate)
+        # Viewport is offset
+        self.assertNotEqual(game.interface.offset[0], 0.0)
+        self.assertEqual(game.interface.offset[1], 0.0)
+        
+        # Fast forward past duration
+        quake.update(Quake.OPTION_QuakeDuration)
+        self.assertFalse(quake._earthquake)
+        self.assertEqual(game.interface.offset, (0.0, 0.0))
+        self.assertIsNone(quake._rumble)
+
 class PlayerMenuFidelityTests(unittest.TestCase):
     def setUp(self):
         class FakeSettings:
