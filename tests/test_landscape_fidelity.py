@@ -2010,6 +2010,104 @@ class LandscapeFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(result.min_height_2, -5.0)
         self.assertFalse(result.falling_state)
 
+    def test_ground_collision_vertical_drop(self):
+        # Fidelity target: Landscape.ground_collision() lines 580-638 (Python)
+        # Vertical drop within a single slice (index1 == index2).
+        landscape = Landscape(TerrainSettings(slices=2, width=2.0), 0.0)
+        landscape._land_chunks = [[make_chunk(0.0, 0.0, -5.0, -5.0)], [make_chunk(0.0, 0.0, -5.0, -5.0)]]
+        
+        hit, hit_x, hit_y = landscape.ground_collision(0.5, 2.0, 0.5, -2.0)
+        self.assertTrue(hit)
+        self.assertAlmostEqual(hit_x, 0.5)
+        self.assertAlmostEqual(hit_y, 0.0)
+
+    def test_ground_collision_left_to_right(self):
+        # Fidelity target: Landscape.ground_collision() lines 584-608 (Python)
+        # Trajectory spanning multiple slices left to right.
+        landscape = Landscape(TerrainSettings(slices=3, width=3.0), 0.0)
+        landscape._land_chunks = [
+            [make_chunk(2.0, 2.0, -5.0, -5.0)], 
+            [make_chunk(2.0, 2.0, -5.0, -5.0)], 
+            [make_chunk(2.0, 2.0, -5.0, -5.0)]
+        ]
+        
+        # Shoot from x=0.5, y=3.0 down to x=2.5, y=1.0. Terrain is at y=2.0.
+        # Should hit in the middle slice where y crosses 2.0.
+        hit, hit_x, hit_y = landscape.ground_collision(0.5, 3.0, 2.5, 1.0)
+        self.assertTrue(hit)
+        self.assertAlmostEqual(hit_y, 2.0)
+        self.assertAlmostEqual(hit_x, 1.5)
+
+    def test_ground_collision_right_to_left(self):
+        # Fidelity target: Landscape.ground_collision() lines 610-634 (Python)
+        # Trajectory spanning multiple slices right to left.
+        landscape = Landscape(TerrainSettings(slices=3, width=3.0), 0.0)
+        landscape._land_chunks = [
+            [make_chunk(2.0, 2.0, -5.0, -5.0)], 
+            [make_chunk(2.0, 2.0, -5.0, -5.0)], 
+            [make_chunk(2.0, 2.0, -5.0, -5.0)]
+        ]
+        
+        hit, hit_x, hit_y = landscape.ground_collision(2.5, 3.0, 0.5, 1.0)
+        self.assertTrue(hit)
+        self.assertAlmostEqual(hit_y, 2.0)
+        self.assertAlmostEqual(hit_x, 1.5)
+
+    def test_ground_collision_misses_terrain(self):
+        # Fidelity target: Landscape.ground_collision() lines 580-638 (Python)
+        landscape = Landscape(TerrainSettings(slices=2, width=2.0), 0.0)
+        landscape._land_chunks = [[make_chunk(0.0, 0.0, -5.0, -5.0)], [make_chunk(0.0, 0.0, -5.0, -5.0)]]
+        
+        hit, hit_x, hit_y = landscape.ground_collision(0.5, 5.0, 1.5, 4.0)
+        self.assertFalse(hit)
+
+    def test_ground_collision_single_slice_angle(self):
+        # Fidelity target: Landscape.ground_collision()
+        landscape = Landscape(TerrainSettings(slices=2, width=2.0), 0.0)
+        landscape._land_chunks = [[make_chunk(0.0, 0.0, -5.0, -5.0)], [make_chunk(0.0, 0.0, -5.0, -5.0)]]
+        
+        # Shoot across from x=0.2, y=1.0 to x=0.8, y=-1.0. Still within slice 0.
+        hit, hit_x, hit_y = landscape.ground_collision(0.2, 1.0, 0.8, -1.0)
+        self.assertTrue(hit)
+        self.assertAlmostEqual(hit_y, 0.0)
+
+    def test_move_to_ground_no_chunk_returns_min_land_height(self):
+        # Fidelity target: Landscape.move_to_ground()
+        landscape = Landscape(TerrainSettings(slices=2, width=2.0), 0.0)
+        landscape._land_chunks = [[], []]
+        
+        from src.landscape import MIN_LAND_HEIGHT
+        height = landscape.move_to_ground(0.5, 0.0)
+        self.assertAlmostEqual(height, 0.0)
+        
+        height_out = landscape.move_to_ground(-1000.0, 0.0)
+        self.assertAlmostEqual(height_out, MIN_LAND_HEIGHT)
+
+    def test_move_to_ground_at_angle_positive_angle(self):
+        # Fidelity target: Landscape.move_to_ground_at_angle() lines 461-506 (Python)
+        # Hits chunk edge with angle > 0 (traces left)
+        landscape = Landscape(TerrainSettings(slices=2, width=2.0), 0.0)
+        landscape._land_chunks = [
+            [make_chunk(2.0, 4.0, -5.0, -5.0)],
+            [make_chunk(4.0, 2.0, -5.0, -5.0)]
+        ]
+        
+        x, y = landscape.move_to_ground_at_angle(1.5, 0.0, math.pi / 4.0)
+        self.assertAlmostEqual(x, -2.0)
+        self.assertAlmostEqual(y, 1.75)
+
+    def test_move_to_ground_at_angle_negative_angle(self):
+        # Fidelity target: Landscape.move_to_ground_at_angle()
+        # Hits chunk edge with angle < 0 (traces right)
+        landscape = Landscape(TerrainSettings(slices=2, width=2.0), 0.0)
+        landscape._land_chunks = [
+            [make_chunk(2.0, 4.0, -5.0, -5.0)],
+            [make_chunk(4.0, 2.0, -5.0, -5.0)]
+        ]
+        
+        x, y = landscape.move_to_ground_at_angle(0.5, 0.0, -math.pi / 4.0)
+        self.assertAlmostEqual(x, 2.0)
+        self.assertAlmostEqual(y, 0.75)
 
 if __name__ == "__main__":
     unittest.main()
