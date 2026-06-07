@@ -3,13 +3,6 @@ import os
 import unittest
 from unittest.mock import patch
 
-from tests.support import (
-    PROJECT_ROOT,
-    CommandPlayer,
-    DummyGameForTank,
-    RecordingWeapon,
-)
-
 from src.common import PI, deg_cos, deg_sin, sqr
 from src.inifile import ReadIniFile
 from src.machinegunround import MachineGunRound
@@ -20,7 +13,12 @@ from src.shell import Shell
 from src.soundentity import SoundEntity
 from src.tank import Tank
 from src.weapons_impl import MachineGunWeapon
-
+from tests.support import (
+    PROJECT_ROOT,
+    CommandPlayer,
+    DummyGameForTank,
+    RecordingWeapon,
+)
 
 SETTINGS = ReadIniFile(os.path.join(PROJECT_ROOT, "conf", "options.ini"))
 
@@ -1071,6 +1069,219 @@ class PlayerAndSoundFidelityTests(unittest.TestCase):
         self.assertTrue(entity.update(0.1))
         entity.set_inactive()
         self.assertFalse(entity.update(0.1))
+
+
+class ScoreEconomyFidelityTests(unittest.TestCase):
+    """
+    Granular fidelity tests for Player.end_round() scoring and economy.
+
+    Fidelity target: src/player.py:60-75
+    C++/Python invariants:
+    - Defeating a leader-flagged player: +200 score, +50 money.
+    - Defeating a non-leader player:    +100 score, +50 money.
+    - Self-defeat (defeated_player == self): -50 score, no money change.
+    - Surviving (tank.alive()): +100 score, +25 money.
+    - Stipend: always +10 money.
+    - All four of the above accumulate in one end_round() call.
+
+    Required validation: Each rule verified in isolation so a regression in one
+    constant cannot be masked by another.
+    """
+
+    def _make_player(self, alive: bool = True):
+        """Return a fresh Player with a fake tank whose alive() is controllable."""
+        from src.player import Player
+
+        game = DummyGameForTank(SETTINGS)
+        player = Player(game, 0, "P1", (255, 255, 255))
+        _alive = alive
+
+        class FakeTank:
+            def alive(self):
+                return _alive
+
+        player._tank = FakeTank()
+        return player
+
+    def test_end_round_only_stipend_when_no_defeats_and_dead(self):
+        # Fidelity target: player.py:75 — stipend is unconditional.
+        # A dead player with no defeats: score=0, money=10 (stipend only).
+        player = self._make_player(alive=False)
+        player._defeated_players = []
+        player.end_round()
+
+        self.assertEqual(player.get_score(), 0,
+                         "Dead player with no defeats should score 0")
+        self.assertEqual(player.get_money(), 10,
+                         "Stipend of 10 credits always applies")
+
+    def test_end_round_survival_adds_100_score_and_25_money(self):
+        # Fidelity target: player.py:71-73
+        # Surviving (alive) always adds 100 to score and 25 to money.
+        player = self._make_player(alive=True)
+        player._defeated_players = []
+        player.end_round()
+
+        self.assertEqual(player.get_score(), 100,
+                         "Survival should add exactly 100 to score")
+        self.assertEqual(player.get_money(), 35,
+                         "Survival adds 25 money; stipend adds 10 → total 35")
+
+    def test_end_round_defeat_non_leader_adds_100_score_and_50_money(self):
+        # Fidelity target: player.py:67-69
+        # Defeating a non-leader gives +100 score, +50 money (+ stipend).
+        player = self._make_player(alive=False)
+        enemy = type("Enemy", (), {"_leader": False})()
+        player._defeated_players = [enemy]
+        player.end_round()
+
+        self.assertEqual(player.get_score(), 100,
+                         "Killing non-leader gives 100 score")
+        self.assertEqual(player.get_money(), 60,
+                         "Killing non-leader gives 50 money + 10 stipend = 60")
+
+    def test_end_round_defeat_leader_adds_200_score_and_50_money(self):
+        # Fidelity target: player.py:64-66
+        # Defeating a leader-flagged player gives +200 score, +50 money (+ stipend).
+        player = self._make_player(alive=False)
+        leader = type("Leader", (), {"_leader": True})()
+        player._defeated_players = [leader]
+        player.end_round()
+
+        self.assertEqual(player.get_score(), 200,
+                         "Killing leader gives 200 score")
+        self.assertEqual(player.get_money(), 60,
+                         "Killing leader gives 50 money + 10 stipend = 60")
+
+    def test_end_round_self_defeat_subtracts_50_score_no_money(self):
+        # Fidelity target: player.py:62-63
+        # Self-defeat (player defeats themselves) subtracts 50 from score.
+        # No money is added for self-defeat; only stipend applies.
+        player = self._make_player(alive=False)
+        player._defeated_players = [player]  # self-defeat
+        player.end_round()
+
+        self.assertEqual(player.get_score(), -50,
+                         "Self-defeat should subtract exactly 50 from score")
+        self.assertEqual(player.get_money(), 10,
+                         "Self-defeat awards no defeat money; only stipend of 10")
+
+    def test_end_round_multiple_defeats_accumulate_independently(self):
+        # Fidelity target: player.py:60-75 full loop.
+        # Defeating two non-leaders while alive: 2*100 score + 100 survival,
+        # money = 2*50 + 25 survival + 10 stipend.
+        player = self._make_player(alive=True)
+        enemy1 = type("Enemy1", (), {"_leader": False})()
+        enemy2 = type("Enemy2", (), {"_leader": False})()
+        player._defeated_players = [enemy1, enemy2]
+        player.end_round()
+
+        self.assertEqual(player.get_score(), 300,
+                         "Two non-leader kills + survival = 300 score")
+        self.assertEqual(player.get_money(), 135,
+                         "2×50 defeat + 25 survival + 10 stipend = 135 money")
+
+    def test_end_round_all_four_rules_match_combined_expectation(self):
+        # Fidelity target: player.py:60-75 — this mirrors test_end_round_matches_cpp
+        # but asserts each component in sequence using known constants.
+        # Defeats: self (-50 score, 0 money), leader (+200 score, +50 money),
+        #          non-leader (+100 score, +50 money).
+        # Survival: +100 score, +25 money.
+        # Stipend: +10 money.
+        # Total: -50+200+100+100=350 score; 0+50+50+25+10=135 money.
+        player = self._make_player(alive=True)
+        leader = type("Leader", (), {"_leader": True})()
+        regular = type("Regular", (), {"_leader": False})()
+        player._defeated_players = [player, leader, regular]
+        player.end_round()
+
+        self.assertEqual(player.get_score(), 350)
+        self.assertEqual(player.get_money(), 135)
+
+    def test_end_round_score_is_cumulative_across_rounds(self):
+        # Fidelity target: player.py:63,65,68,72 all use += (accumulate across rounds).
+        # Running end_round twice should double the awards when conditions repeat.
+        player = self._make_player(alive=True)
+        player._defeated_players = []
+
+        player.end_round()
+        self.assertEqual(player.get_score(), 100)   # survival round 1
+        self.assertEqual(player.get_money(), 35)    # 25 survival + 10 stipend
+
+        # Reset defeats for round 2, tank stays alive.
+        player._defeated_players = []
+        player.end_round()
+        self.assertEqual(player.get_score(), 200)   # 100+100
+        self.assertEqual(player.get_money(), 70)    # 35+35
+
+
+class AIPlayerShopFidelityTests(unittest.TestCase):
+    """
+    Fidelity tests for the AI shop logic in src/aiplayer.py.
+
+    Fidelity target: aiplayer.py:49-62 (AI shop update: press GUNUP until
+    position==10 then FIRE to exit the shop).
+
+    The classic C++ AI moves its cursor to position 10 (Done!) and then fires
+    to exit; it does NOT buy any weapons — spending is handled elsewhere.
+
+    Required validation: verify command output for each shop-position state.
+    """
+
+    def _make_ai_in_shop(self, select_pos: int):
+        from src.aiplayer import AIPlayer
+        from src.common import GameState
+
+        class FakeMenu:
+            def __init__(self, pos):
+                self._player_select_pos = {0: pos}
+
+        game = DummyGameForTank(SETTINGS)
+        menu = FakeMenu(select_pos)
+        game._menu = menu
+        game._game_state = GameState.SHOP_MENU
+
+        # Patch get_current_menu onto the dummy game.
+        game.get_current_menu = lambda: game._menu
+        game.get_players = lambda: game._players if hasattr(game, "_players") else [None] * 8
+
+        ai = AIPlayer(game, 0, "Bot", (255, 0, 0))
+        return game, ai
+
+    def test_ai_shop_presses_gunup_when_not_at_done(self):
+        # Fidelity target: aiplayer.py:56-57
+        # When the AI's shop cursor is NOT at position 10 (Done!), the AI
+        # presses GUNUP to cycle to Done! as quickly as possible.
+        _game, ai = self._make_ai_in_shop(select_pos=3)
+        ai.update(0.0)
+
+        from src.player import Player
+        self.assertTrue(ai.get_command(Player.CMD_GUNUP),
+                        "AI in shop should press GUNUP when not at Done! (pos 10)")
+        self.assertFalse(ai.get_command(Player.CMD_FIRE),
+                         "AI in shop should not press FIRE until at Done!")
+
+    def test_ai_shop_presses_fire_when_at_done(self):
+        # Fidelity target: aiplayer.py:58-59
+        # When the AI's shop cursor is at position 10 (Done!), the AI presses
+        # FIRE to confirm and leave the shop.
+        _game, ai = self._make_ai_in_shop(select_pos=10)
+        ai.update(0.0)
+
+        from src.player import Player
+        self.assertFalse(ai.get_command(Player.CMD_GUNUP),
+                         "AI at Done! should not press GUNUP")
+        self.assertTrue(ai.get_command(Player.CMD_FIRE),
+                        "AI at Done! should press FIRE to exit shop")
+
+    def test_ai_shop_position_zero_is_not_done(self):
+        # Position 0 is Machine Gun (first item), not Done! — AI should move up.
+        _game, ai = self._make_ai_in_shop(select_pos=0)
+        ai.update(0.0)
+
+        from src.player import Player
+        self.assertTrue(ai.get_command(Player.CMD_GUNUP),
+                        "AI at position 0 (Machine Gun) should still move toward Done!")
 
 
 if __name__ == "__main__":
