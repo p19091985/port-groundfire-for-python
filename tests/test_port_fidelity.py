@@ -1284,5 +1284,154 @@ class AIPlayerShopFidelityTests(unittest.TestCase):
                         "AI at position 0 (Machine Gun) should still move toward Done!")
 
 
+class WeaponFidelityTests(unittest.TestCase):
+    def setUp(self):
+        class FakeGame:
+            def __init__(self):
+                self.time = 100.0
+                self.entities = []
+                self.interface = None
+                self.sound = None
+            def get_time(self): return self.time
+            def add_entity(self, e): self.entities.append(e)
+            def get_interface(self): return self.interface
+            def get_sound(self): return self.sound
+            def get_landscape(self): return None
+            def get_players(self): return []
+            def explosion(self, x, y, size, damage, hit_tank, type, is_missile, player):
+                self.last_explosion = (x, y, size, damage, hit_tank, type, is_missile, player)
+        
+        class FakePlayer:
+            def __init__(self, number):
+                self._number = number
+                self.fired_count = 0
+            def record_fired(self): self.fired_count += 1
+            def get_tank(self): return None
+        
+        class FakeTank:
+            def __init__(self, player):
+                self.player = player
+                self.gun_angle = 45.0
+            def get_player(self): return self.player
+            def gun_launch_position(self): return (0.0, 5.0)
+            def gun_launch_velocity(self): return (10.0, 10.0)
+            def gun_launch_angle(self): return self.gun_angle
+            def intersect_tank(self, old_x, old_y, new_x, new_y): return False
+
+        self.game = FakeGame()
+        self.player = FakePlayer(1)
+        self.tank = FakeTank(self.player)
+
+    def test_nuke_weapon_fire_consumes_inventory_and_spawns_whiteout_shell(self):
+        from src.weapons_impl import NukeWeapon
+        from src.shell import Shell
+        from src.soundentity import SoundEntity
+        
+        nuke_weapon = NukeWeapon(self.game, self.tank)
+        nuke_weapon._quantity = 1
+        nuke_weapon._cooldown = 0.0
+        
+        result = nuke_weapon.fire(True, 0.0)
+        self.assertFalse(result)
+        self.assertEqual(nuke_weapon._quantity, 0)
+        
+        shells = [e for e in self.game.entities if isinstance(e, Shell)]
+        sounds = [e for e in self.game.entities if isinstance(e, SoundEntity)]
+        
+        self.assertEqual(len(shells), 1)
+        self.assertEqual(len(sounds), 1)
+        
+        self.assertTrue(shells[0]._white_out)
+        self.assertEqual(shells[0]._damage, NukeWeapon.OPTION_Damage)
+
+    def test_mirv_splits_into_exact_fragment_count_at_apex(self):
+        from src.mirv import Mirv
+        from src.shell import Shell
+        
+        mirv = Mirv(self.game, self.player, 0.0, 5.0, 10.0, 20.0, self.game.get_time(), 0.3, 20.0)
+        # Apex time = launch_time + y_vel / 10.0 = 100.0 + 2.0 = 102.0
+        self.assertAlmostEqual(mirv._apex_time, 102.0)
+        
+        # Advance game time to after apex
+        self.game.time = 102.1
+        alive = mirv.update(0.1)
+        
+        self.assertFalse(alive) # Consumed
+        fragments = [e for e in self.game.entities if isinstance(e, Shell)]
+        self.assertEqual(len(fragments), Mirv.OPTION_Fragments)
+
+    def test_mirv_fragments_inherit_zero_vertical_velocity_and_spread_horizontally(self):
+        from src.mirv import Mirv
+        from src.shell import Shell
+        
+        mirv = Mirv(self.game, self.player, 0.0, 5.0, 10.0, 20.0, self.game.get_time(), 0.3, 20.0)
+        self.game.time = 102.1
+        mirv.update(0.1)
+        
+        fragments = [e for e in self.game.entities if isinstance(e, Shell)]
+        self.assertEqual(len(fragments), Mirv.OPTION_Fragments)
+        
+        # Check velocities
+        expected_x_vels = [6.0, 8.0, 10.0, 12.0, 14.0]
+        
+        for i, frag in enumerate(fragments):
+            self.assertEqual(frag._y_launch_vel, 0.0)
+            self.assertAlmostEqual(frag._x_launch_vel, expected_x_vels[i])
+
+    def test_mirv_ground_collision_before_apex_explodes_without_splitting(self):
+        from src.mirv import Mirv
+        from src.shell import Shell
+        
+        mirv = Mirv(self.game, self.player, 0.0, 5.0, 10.0, 20.0, self.game.get_time(), 0.3, 20.0)
+        
+        class MockLandscape:
+            def ground_collision(self, x1, y1, x2, y2):
+                return (True, 5.0, 10.0) # Collision at (5, 10)
+            def get_landscape_width(self):
+                return 100.0
+                
+        self.game.get_landscape = lambda: MockLandscape()
+        
+        # Before apex
+        self.game.time = 101.0
+        alive = mirv.update(0.1)
+        
+        self.assertFalse(alive)
+        self.assertTrue(hasattr(self.game, "last_explosion"))
+        self.assertEqual(self.game.last_explosion[0], 5.0) # Hit x
+        self.assertEqual(self.game.last_explosion[1], 10.0) # Hit y
+        
+        fragments = [e for e in self.game.entities if isinstance(e, Shell)]
+        self.assertEqual(len(fragments), 0)
+
+    def test_mirv_tank_collision_before_apex_explodes_without_splitting(self):
+        from src.mirv import Mirv
+        from src.shell import Shell
+        
+        mirv = Mirv(self.game, self.player, 0.0, 5.0, 10.0, 20.0, self.game.get_time(), 0.3, 20.0)
+        
+        class MockTargetPlayer:
+            def __init__(self, tank): self.tank = tank
+            def get_tank(self): return self.tank
+            
+        class MockTargetTank:
+            def intersect_tank(self, old_x, old_y, x, y): return True
+            
+        target_tank = MockTargetTank()
+        target_player = MockTargetPlayer(target_tank)
+        
+        # Game returns target player to test tank collision
+        self.game.get_players = lambda: [target_player]
+        
+        self.game.time = 101.0
+        alive = mirv.update(0.1)
+        
+        self.assertFalse(alive)
+        self.assertTrue(hasattr(self.game, "last_explosion"))
+        self.assertEqual(self.game.last_explosion[4], 0) # Hit tank index 0
+        
+        fragments = [e for e in self.game.entities if isinstance(e, Shell)]
+        self.assertEqual(len(fragments), 0)
+
 if __name__ == "__main__":
     unittest.main()
