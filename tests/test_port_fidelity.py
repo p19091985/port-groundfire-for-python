@@ -1298,6 +1298,12 @@ class WeaponFidelityTests(unittest.TestCase):
             def get_sound(self): return self.sound
             def get_landscape(self): return None
             def get_players(self): return []
+            def get_settings(self):
+                class MockSettings:
+                    def get_float(self, section, key, default): return default
+                    def get_int(self, section, key, default): return default
+                return MockSettings()
+            def record_tank_death(self): pass
             def explosion(self, x, y, size, damage, hit_tank, type, is_missile, player):
                 self.last_explosion = (x, y, size, damage, hit_tank, type, is_missile, player)
         
@@ -1432,6 +1438,125 @@ class WeaponFidelityTests(unittest.TestCase):
         
         fragments = [e for e in self.game.entities if isinstance(e, Shell)]
         self.assertEqual(len(fragments), 0)
+
+    def test_machine_gun_fire_starts_looped_audio_and_unselect_stops_it(self):
+        from src.weapons_impl import MachineGunWeapon
+        
+        class MockSoundSource:
+            def __init__(self, sound, sound_id, loop):
+                self.sound_id = sound_id
+                self.loop = loop
+        
+        class MockSound:
+            def SoundSource(self, sound, sound_id, loop):
+                return MockSoundSource(sound, sound_id, loop)
+                
+        self.game.sound = MockSound()
+        
+        mg = MachineGunWeapon(self.game, self.tank)
+        mg._quantity = 50
+        mg.set_ammo_for_round()
+        
+        # Fire
+        result = mg.fire(True, 0.0)
+        self.assertTrue(result)
+        self.assertIsNotNone(mg._gun_source)
+        self.assertEqual(mg._gun_source.sound_id, 8)
+        self.assertTrue(mg._gun_source.loop)
+        
+        # Unselect
+        mg.unselect()
+        self.assertIsNone(mg._gun_source)
+
+    def test_machine_gun_pre_shot_cancellation_stops_audio_before_firing(self):
+        from src.weapons_impl import MachineGunWeapon
+        
+        mg = MachineGunWeapon(self.game, self.tank)
+        mg._quantity = 50
+        mg.set_ammo_for_round()
+        
+        class MockSoundSource:
+            def __init__(self, sound, sound_id, loop): pass
+        class MockSound:
+            def SoundSource(self, sound, sound_id, loop): return MockSoundSource(sound, sound_id, loop)
+        self.game.sound = MockSound()
+        
+        mg.fire(True, 0.0)
+        self.assertIsNotNone(mg._gun_source)
+        
+        # Cancel fire without calling update() (no bullets spawned)
+        mg.fire(False, 0.0)
+        self.assertIsNone(mg._gun_source)
+
+    def test_machine_gun_lethal_hit_stops_firing_and_audio(self):
+        from src.tank import Tank
+        
+        # Give tank proper weapons
+        tank = Tank(self.game, self.player, 0)
+        tank._state = Tank.TANK_ALIVE
+        tank._health = 10.0
+        
+        mg = tank.get_weapon(Tank.MACHINEGUN)
+        mg._quantity = 50
+        mg.set_ammo_for_round()
+        
+        tank._selected_weapon = Tank.MACHINEGUN
+        
+        # Fire
+        tank._firing = True # Tank update_gun sets this when fire() returns True
+        mg.fire(True, 0.0)
+        
+        # Take lethal damage
+        tank.do_damage(20.0)
+        
+        self.assertEqual(tank._state, Tank.TANK_DEAD)
+        self.assertFalse(tank._firing)
+        self.assertIsNone(mg._gun_source)
+
+    def test_ai_tactical_hold_fires_machine_gun_continuously(self):
+        from src.aiplayer import AIPlayer
+        from src.tank import Tank
+        from src.player import Player
+        
+        ai = AIPlayer(self.game, 1, "AI", (255, 0, 0))
+        tank = Tank(self.game, ai, 0)
+        ai._tank = tank
+        
+        class MockTargetPlayer:
+            def __init__(self, t): self.t = t
+            def get_tank(self): return self.t
+            
+        target_tank = Tank(self.game, None, 1)
+        target_tank.set_position(5.0, 0.0)
+        target_tank._state = Tank.TANK_ALIVE
+        
+        # Set AI target
+        ai._target_tank = target_tank
+        ai._target_last_x_pos = target_tank._x
+        ai._target_last_y_pos = target_tank._y
+        ai._target_angle = 45.0
+        ai._target_power = 10.0
+        
+        # Set gun exactly to target so ready_to_fire = True
+        tank._gun_angle = 45.0
+        tank._gun_power = 10.0
+        
+        # For MachineGun, ready_to_fire() depends on having ammo. Let's select it.
+        tank._selected_weapon = Tank.MACHINEGUN
+        mg = tank.get_weapon(Tank.MACHINEGUN)
+        mg._quantity = 50
+        mg.set_ammo_for_round()
+        
+        fire_commands_count = 0
+        for i in range(10):
+            # simulate Tank updating MG cooldown
+            mg._cooldown = 0.0 # Force cooldown to 0.0 to simulate fast time or check AI logic
+            ai.compute_action()
+            if ai._commands[Player.CMD_FIRE]:
+                fire_commands_count += 1
+                
+        # Since _shots_in_air remains 0, the AI should hold fire when cooldown allows it
+        self.assertEqual(fire_commands_count, 10)
 
 if __name__ == "__main__":
     unittest.main()
