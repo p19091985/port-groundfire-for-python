@@ -21,6 +21,14 @@ on:
         options:
           - "false"
           - "true"
+      sign-release:
+        description: "Sign the SHA256SUMS file with GPG (requires RELEASE_SIGN_KEY secret)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   quality:
@@ -107,3 +115,14 @@ jobs:
             flags+=(--package)
           fi
           scripts/validate_godot_release.sh "${flags[@]}"
+
+      - name: Import GPG private key
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' && secrets.RELEASE_GPG_PRIVATE_KEY != '' }}
+        run: |
+          echo "${{ secrets.RELEASE_GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+      - name: Sign checksums file
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' && secrets.RELEASE_SIGN_KEY != '' }}
+        env:
+          GROUNDFIRE_SIGN_KEY: ${{ secrets.RELEASE_SIGN_KEY }}
+        run: scripts/sign_godot_release.sh

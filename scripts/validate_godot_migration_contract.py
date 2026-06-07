@@ -39,6 +39,17 @@ PENDING_SECTION_HEADERS = (
     "### 7. Export And Runtime Validation",
 )
 
+# Scripts and CI files that must exist for the documented release/signing policy
+# to be actionable.  These are part of the migration contract because the strategy
+# document references them by name.
+REQUIRED_RELEASE_FILES = (
+    "scripts/sign_godot_release.sh",
+    "scripts/validate_godot_release.sh",
+    "scripts/package_godot_release.sh",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+)
+
 
 def _section_body(markdown: str, header: str) -> str:
     pattern = rf"^{re.escape(header)}\n(?P<body>.*?)(?=^### |^## |\Z)"
@@ -78,9 +89,19 @@ def validate_migration_contract(markdown: str) -> list[str]:
     return errors
 
 
+def validate_release_files() -> list[str]:
+    errors: list[str] = []
+    for rel_path in REQUIRED_RELEASE_FILES:
+        full_path = PROJECT_ROOT / rel_path
+        if not full_path.exists():
+            errors.append(f"missing required release/CI file: {rel_path}")
+    return errors
+
+
 def main() -> int:
     markdown = MIGRATION_DOC.read_text(encoding="utf-8")
     errors = validate_migration_contract(markdown)
+    errors += validate_release_files()
     if errors:
         print("Godot migration fidelity contract validation failed:", file=sys.stderr)
         for error in errors:

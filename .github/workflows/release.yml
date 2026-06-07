@@ -1,0 +1,139 @@
+name: release
+
+# Triggered automatically when a version tag (v*) is pushed.
+# Creates a GitHub Release with the packaged Godot Linux/Web artifacts and
+# their SHA256SUMS file.  GPG signing is optional; if the RELEASE_SIGN_KEY
+# secret is set, the checksums file is also signed and the .sig file is
+# attached to the release.
+#
+# Pre-requisites for GPG signing (optional):
+#   1. Generate a keypair:  gpg --full-generate-key
+#   2. Export secret key:   gpg --export-secret-keys --armor <fingerprint>
+#   3. Add to repo secrets: Settings → Secrets → RELEASE_GPG_PRIVATE_KEY
+#   4. Add fingerprint:     Settings → Secrets → RELEASE_SIGN_KEY
+#
+# To trigger a release:
+#   git tag v0.25.0
+#   git push origin v0.25.0
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  godot-publish:
+    name: Package and publish Godot release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required to create GitHub Releases
+    env:
+      GODOT_VERSION: "4.6.2"
+      GODOT_BIN: ${{ github.workspace }}/tools/godot/Godot_v4.6.2-stable_linux.x86_64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      # ── Godot binary ────────────────────────────────────────────────────────
+      - name: Install Godot
+        run: |
+          set -euo pipefail
+          godot_tag="${GODOT_VERSION}-stable"
+          mkdir -p tools/godot
+          curl -L --retry 3 \
+            -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${godot_tag}/Godot_v${godot_tag}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d tools/godot
+          chmod +x "$GODOT_BIN"
+
+      # ── Export templates (needed for packaging) ──────────────────────────────
+      - name: Install Godot export templates
+        run: |
+          set -euo pipefail
+          godot_tag="${GODOT_VERSION}-stable"
+          template_dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$template_dir"
+          curl -L --retry 3 \
+            -o /tmp/godot-export-templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${godot_tag}/Godot_v${godot_tag}_export_templates.tpz"
+          unzip -q /tmp/godot-export-templates.tpz -d /tmp/godot-export-templates
+          cp /tmp/godot-export-templates/templates/linux_release.x86_64 "$template_dir/"
+          cp /tmp/godot-export-templates/templates/web_nothreads_release.zip "$template_dir/"
+
+      # ── Fidelity gate ────────────────────────────────────────────────────────
+      - name: Run Godot release validation gate
+        run: scripts/validate_godot_release.sh
+
+      # ── Package release artifacts ────────────────────────────────────────────
+      - name: Package release
+        run: scripts/package_godot_release.sh
+
+      # ── Optional GPG signing ─────────────────────────────────────────────────
+      - name: Import GPG private key
+        if: ${{ secrets.RELEASE_GPG_PRIVATE_KEY != '' }}
+        run: |
+          echo "${{ secrets.RELEASE_GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+      - name: Sign checksums file
+        if: ${{ secrets.RELEASE_SIGN_KEY != '' }}
+        env:
+          GROUNDFIRE_SIGN_KEY: ${{ secrets.RELEASE_SIGN_KEY }}
+        run: scripts/sign_godot_release.sh
+
+      # ── Collect artifacts ────────────────────────────────────────────────────
+      - name: List release artifacts
+        run: ls -lh dist/
+
+      # ── Create GitHub Release ────────────────────────────────────────────────
+      - name: Extract tag name
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release and upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "Groundfire Godot ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## Groundfire Godot ${{ steps.tag.outputs.tag }}
+
+            Packaged Linux desktop and Web HTML5 release artifacts.
+
+            ### Verifying integrity
+
+            ```bash
+            sha256sum --check groundfire-godot-*-SHA256SUMS
+            ```
+
+            If a `.sig` file is attached, verify the GPG signature:
+            ```bash
+            gpg --verify groundfire-godot-*-SHA256SUMS.sig \
+                         groundfire-godot-*-SHA256SUMS
+            ```
+
+            ### Artifacts
+            - `*-linux-x86_64.tar.gz` — Linux desktop executable
+            - `*-web.zip` — Web HTML5 static files (serve from any static host)
+            - `*-manifest.json` — Release metadata
+            - `*-SHA256SUMS` — SHA-256 checksums
+            - `*-SHA256SUMS.sig` — Detached GPG signature *(if signing key is configured)*
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}
+          fail_on_unmatched_files: false
+          files: |
+            dist/*-linux-x86_64.tar.gz
+            dist/*-web.zip
+            dist/*-manifest.json
+            dist/*-SHA256SUMS
+            dist/*-SHA256SUMS.sig
