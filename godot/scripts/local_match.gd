@@ -16,10 +16,15 @@ const MISSILE_DEATH_SOUND := preload("res://assets/missiledeath.wav")
 const MACHINE_GUN_SOUND := preload("res://assets/machinegun.wav")
 const METAL_HIT_SOUND := preload("res://assets/metal.wav")
 const NUKE_SOUND := preload("res://assets/nuke.wav")
+const BLAST_TEXTURE := preload("res://assets/blast.png")
+const CURSOR_TEXTURE := preload("res://assets/arrow.png")
+const EXHAUST_TEXTURE := preload("res://assets/exhaust.png")
 const SMOKE_TEXTURE := preload("res://assets/smoke.png")
+const TRAIL_TEXTURE := preload("res://assets/trail.png")
 const MENU_TILE := preload("res://assets/menuback.png")
 
 const OPTIONS_PATH := "user://groundfire_options.cfg"
+const PHASE_ROUND_STARTING := "round_starting"
 const PHASE_AIM := "aim"
 const PHASE_PROJECTILE := "projectile"
 const PHASE_ROUND_OVER := "round_over"
@@ -37,7 +42,6 @@ const MISSILE_ANGLE_CHANGE_LIMIT := 500.0
 const MISSILE_RECENTER_MULTIPLIER := 3.0
 const MISSILE_AI_STEER_ANGLE_SCALE := 18.0
 const PROJECTILE_WORLD_MARGIN := 160.0
-const SPLASH_OCCLUSION_MULTIPLIER := 0.45
 const TANK_GUN_ARROW_START_OFFSET := TankState.TANK_BODY_HALF_WIDTH * 1.5
 const TANK_GUN_ARROW_BASE_LENGTH := TankState.TANK_BODY_HALF_WIDTH * 2.0
 const TANK_GUN_ARROW_POWER_SCALE := TankState.TANK_BODY_HALF_WIDTH * 0.5
@@ -52,10 +56,28 @@ const WIND_GUST_SCALE := 0.35
 const WIND_GUST_FREQUENCY := 2.7
 const QUAKE_DURATION := 5.0
 const QUAKE_DROP_RATE := 7.0
-const QUAKE_TIME_TILL_FIRST := 90.0
-const QUAKE_TIME_BETWEEN := 30.0
-const QUAKE_CAMERA_SHAKE := 14.0
+const QUAKE_TIME_TILL_FIRST := 60.0
+const QUAKE_TIME_BETWEEN := 20.0
+const QUAKE_SHAKE_AMPLITUDE := 0.05 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const QUAKE_SHAKE_FREQUENCY := 50.0
+const BLAST_INITIAL_FADE := 0.8
+const BLAST_FADE_RATE := 0.1
+const BLAST_VISUAL_SIZE_SCALE := 1.1
 const NUKE_WHITEOUT_FADE_RATE := 0.6
+const TRAIL_INITIAL_FADE := 0.8
+const TRAIL_FADE_RATE := 0.2
+const TRAIL_LAY_DISTANCE := 0.2 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const TRAIL_SEGMENT_WIDTH := 0.2 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const TRAIL_SEGMENT_LENGTH := 0.2 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const TRAIL_SEGMENT_BASE_HEIGHT := 0.4 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const SHELL_PROJECTILE_TIP_OFFSET := Vector2(0.0, 0.018) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const SHELL_PROJECTILE_RIGHT_OFFSET := Vector2(0.03, -0.018) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const SHELL_PROJECTILE_LEFT_OFFSET := Vector2(-0.03, -0.018) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const MISSILE_PROJECTILE_TIP_OFFSET := Vector2(0.0, 0.08) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const MISSILE_PROJECTILE_LEFT_SHOULDER_OFFSET := Vector2(-0.08, 0.0) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const MISSILE_PROJECTILE_LEFT_BASE_OFFSET := Vector2(-0.08, -0.16) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const MISSILE_PROJECTILE_RIGHT_BASE_OFFSET := Vector2(0.08, -0.16) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+const MISSILE_PROJECTILE_RIGHT_SHOULDER_OFFSET := Vector2(0.08, 0.0) * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
 const SCORE_ROUND_WIN_REWARD := 100
 const SCORE_DEFEAT_REWARD := 100
 const SCORE_DEFEAT_LEADER_REWARD := 200
@@ -65,8 +87,16 @@ const CREDITS_DEFEAT_REWARD := 50
 const CREDITS_SURVIVAL_REWARD := 25
 const CREDITS_ROUND_STIPEND := 10
 const MATCH_TOTAL_ROUNDS := 5
+const ROUND_STARTING_DELAY := 2.0
 const SHOP_JUMP_JET := "Jump Jet"
 const SHOP_JUMP_JET_COST := 50
+const CLASSIC_DISABLED_SHOP_WEAPONS := {
+	"Rolling Mines": true,
+	"Airstrike": true,
+	"Death's Head": true,
+	"Hover Coil": true,
+	"Corbomite": true,
+}
 const MACHINE_GUN_AI_EASY_BURST := 3
 const MACHINE_GUN_AI_NORMAL_BURST := 5
 const MACHINE_GUN_AI_HARD_BURST := 8
@@ -80,11 +110,9 @@ const AI_SELF_DAMAGE_WEIGHT_NORMAL := 2.2
 const AI_SELF_DAMAGE_WEIGHT_HARD := 3.0
 const AI_KILL_BONUS := 35.0
 const AI_SELF_KILL_PENALTY := 1000.0
-const AI_SHOP_PRIORITY_EASY := ["Machine Gun", "Missile", "Jump Jet"]
-const AI_SHOP_PRIORITY_NORMAL := ["Missile", "MIRV", "Machine Gun", "Jump Jet"]
-const AI_SHOP_PRIORITY_HARD := ["Nuke", "MIRV", "Missile", "Machine Gun", "Jump Jet"]
 const SCORE_HUMAN_ACTIVATION_DELAY := 2.0
 const SCORE_COMPUTER_ACTIVATION_DELAY := 4.0
+const SCORE_AUTO_ADVANCE_TIME := 10.0
 const WINNER_HUMAN_ACTIVATION_DELAY := 2.0
 const WINNER_COMPUTER_ACTIVATION_DELAY := 4.0
 const WINNER_SPIN_TEXT := "Winner!"
@@ -94,6 +122,7 @@ const WINNER_SPIN_RADIUS := 24.0
 const WINNER_BACKGROUND_SCROLL_SPEED := 0.1
 const SHOP_INITIAL_INPUT_DELAY := 0.4
 const SHOP_ACTION_INPUT_DELAY := 0.2
+const WEAPON_SWITCH_DELAY := 0.2
 
 var _hud: Node
 var _terrain := TerrainModel.new()
@@ -111,6 +140,8 @@ var _camera_smoothing := 1.0
 var _mouse_aim_enabled := false
 var _ai_difficulty := AI_DIFFICULTY_NORMAL
 var _mouse_world_position := Vector2.ZERO
+var _classic_mouse_cursor_active := false
+var _classic_mouse_cursor_previous_mode := Input.MOUSE_MODE_VISIBLE
 var _player := TankState.new()
 var _enemy := TankState.new()
 var _player_name := TURN_PLAYER
@@ -131,6 +162,7 @@ var _wind_gust := 0.0
 var _wind_rng := RandomNumberGenerator.new()
 var _quake_active := false
 var _quake_countdown := QUAKE_TIME_TILL_FIRST
+var _quake_viewport_offset := Vector2.ZERO
 var _jump_jets_active := false
 var _score := 0
 var _enemy_score := 0
@@ -141,6 +173,7 @@ var _message := "Aim with arrows, move with A/D, weapon with Tab, fire with Spac
 var _projectiles: Array[Dictionary] = []
 var _explosions: Array[Dictionary] = []
 var _smoke_particles: Array[Dictionary] = []
+var _trail_segments: Array[Dictionary] = []
 var _machine_gun_active := false
 var _machine_gun_fire_held := false
 var _machine_gun_player_owned := true
@@ -149,6 +182,7 @@ var _machine_gun_weapon: Dictionary = {}
 var _machine_gun_cooldown := 0.0
 var _machine_gun_shots_fired := 0
 var _machine_gun_ai_burst_remaining := 0
+var _weapon_switch_delay_remaining := 0.0
 var _ai_timer := 0.0
 var _last_shot_player_owned := true
 var _last_shot_owner := TURN_PLAYER
@@ -176,6 +210,7 @@ var _shop_reward := 0
 var _shop_participant_indices: Array[int] = []
 var _shop_participant_cursor := 0
 var _shop_input_delay := 0.0
+var _shop_finish_pending := false
 var _winner_overlay: Control
 var _winner_heading_label: Label
 var _winner_title_label: Label
@@ -185,8 +220,11 @@ var _winner_rows_container: VBoxContainer
 var _winner_main_menu_button: Button
 var _winner_background: TextureRect
 var _winner_continue_delay := 0.0
+var _winner_exit_pending := false
 var _winner_spin_phase := 0.0
 var _winner_background_scroll := 0.0
+var _round_start_delay := 0.0
+var _round_start_message := ""
 var _quake_audio: AudioStreamPlayer
 var _jump_jets_audio: AudioStreamPlayer
 var _fire_shell_audio: AudioStreamPlayer
@@ -430,6 +468,14 @@ func _tank_position(tank: RefCounted) -> Vector2:
 	return tank.get("position") as Vector2
 
 
+func _tank_damage_center(tank: RefCounted) -> Vector2:
+	if tank == null:
+		return Vector2.ZERO
+	if tank.has_method("tank_center"):
+		return Vector2(tank.call("tank_center"))
+	return _tank_position(tank) + Vector2(0.0, -20.0)
+
+
 func _participant_inventory(index: int) -> RefCounted:
 	if index < 0 or index >= _participants.size():
 		return null
@@ -480,25 +526,48 @@ func _target_index_for_attacker(attacker_index: int) -> int:
 	if _participants.is_empty():
 		return -1
 	var attacker_tank := _participant_tank(attacker_index)
+	if attacker_tank == null:
+		return -1
 	var best_index := -1
-	var best_distance := INF
+	var best_score := 0.0
+	var nearest_index := -1
+	var nearest_distance := INF
 	for index in range(_participants.size()):
 		if index == attacker_index or not _participant_is_alive(index):
 			continue
 		var tank := _participant_tank(index)
-		if tank == null or attacker_tank == null:
+		if tank == null:
 			continue
 		var distance: float = abs(_tank_position(tank).x - _tank_position(attacker_tank).x)
-		if distance < best_distance:
+		if distance < nearest_distance:
+			nearest_index = index
+			nearest_distance = distance
+		var score := _classic_ai_target_score(attacker_tank, tank, distance)
+		if score >= best_score:
 			best_index = index
-			best_distance = distance
-	return best_index
+			best_score = score
+	return nearest_index if best_index == -1 else best_index
+
+
+func _classic_ai_target_score(attacker_tank: RefCounted, target_tank: RefCounted, horizontal_distance_pixels: float) -> float:
+	var score := 0.0
+	if _terrain != null and attacker_tank.has_method("launch_origin"):
+		var origin: Vector2 = attacker_tank.call("launch_origin")
+		var target: Vector2 = _tank_damage_center(target_tank)
+		if not bool(_terrain_collision(origin, target)["hit"]):
+			score += 100.0
+			if _tank_position(target_tank).y < _tank_position(attacker_tank).y:
+				score += 50.0
+	var classic_distance: float = horizontal_distance_pixels / max(TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 0.001)
+	score += 40.0 - float(int(2.0 * classic_distance))
+	return score
 
 
 func _set_turn_index(index: int) -> void:
 	_turn_index = clamp(index, 0, max(0, _participants.size() - 1))
 	_turn_owner = _participant_owner(_turn_index)
 	_target_index = _target_index_for_attacker(_turn_index)
+	_weapon_switch_delay_remaining = 0.0
 
 
 func _turn_tank() -> RefCounted:
@@ -632,17 +701,22 @@ func _exit_tree() -> void:
 		_prepare_for_shutdown()
 	else:
 		set_process(false)
+		_restore_classic_mouse_cursor_mode()
 		_stop_all_audio()
 
 
 func _process(delta: float) -> void:
 	_rebuild_terrain_if_needed()
+	_sync_classic_mouse_cursor_mode()
 	if _is_paused:
 		queue_redraw()
 		return
 	if _mouse_aim_enabled and _phase == PHASE_AIM and _participant_is_human(_turn_index):
 		_mouse_world_position = _screen_to_world(get_local_mouse_position())
-	if _phase == PHASE_AIM and _participant_is_human(_turn_index):
+	_update_weapon_switch_delay(delta)
+	if _phase == PHASE_ROUND_STARTING:
+		_update_round_starting(delta)
+	elif _phase == PHASE_AIM and _participant_is_human(_turn_index):
 		_handle_player_input(delta)
 	else:
 		_stop_jump_jets_audio()
@@ -654,9 +728,11 @@ func _process(delta: float) -> void:
 	_update_winner_spin(delta)
 	_update_winner_background(delta)
 	_update_shields(delta)
+	_update_weapon_cooldowns(delta)
 	_update_machine_gun_fire(delta)
 	_update_projectiles(delta)
 	_update_explosions(delta)
+	_update_trail_segments(delta)
 	_update_smoke_particles(delta)
 	_update_tank_burn_smoke(delta)
 	_update_quake(delta)
@@ -707,9 +783,9 @@ func _handle_player_input(delta: float) -> void:
 	if Input.is_action_pressed("gf_aim_right"):
 		aim_direction -= 1.0
 	if Input.is_action_pressed("gf_power_up"):
-		power_direction += 1.0
-	if Input.is_action_pressed("gf_power_down"):
-		power_direction -= 1.0
+		power_direction = 1.0
+	elif Input.is_action_pressed("gf_power_down"):
+		power_direction = -1.0
 	tank.call("update_gun", delta, aim_direction, power_direction)
 	var move_direction := 0.0
 	if Input.is_action_pressed("gf_move_left"):
@@ -803,22 +879,36 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _update_modal_activation(delta: float) -> void:
-	if _phase == PHASE_SHOP and _shop_input_delay > 0.0:
-		_shop_input_delay = max(0.0, _shop_input_delay - delta)
-		if _shop_input_delay <= 0.0:
+	if _phase == PHASE_SHOP and _shop_finish_pending:
+		_finish_shop_and_start_next_round()
+		return
+	if _phase == PHASE_SHOP and _shop_input_delay >= 0.0:
+		_shop_input_delay -= max(0.0, delta)
+		if _shop_input_delay < 0.0:
 			_refresh_shop_overlay()
-	elif _phase == PHASE_SCORE and _score_continue_delay > 0.0:
-		_score_continue_delay = max(0.0, _score_continue_delay - delta)
-		if _score_continue_delay <= 0.0:
+	elif _phase == PHASE_SCORE:
+		var score_was_locked := _score_continue_delay > 0.0
+		_score_continue_delay -= delta
+		if score_was_locked and _score_continue_delay <= 0.0:
 			_refresh_score_continue_button()
 			if not _has_human_participants():
 				_continue_from_score()
-	elif _phase == PHASE_WINNER and _winner_continue_delay > 0.0:
-		_winner_continue_delay = max(0.0, _winner_continue_delay - delta)
-		if _winner_continue_delay <= 0.0:
-			_refresh_winner_continue_button()
-			if not _has_human_participants():
-				_return_to_main_menu()
+				return
+		if _phase == PHASE_SCORE \
+				and _has_human_participants() \
+				and _score_continue_delay <= -SCORE_AUTO_ADVANCE_TIME:
+			_continue_from_score()
+	elif _phase == PHASE_WINNER:
+		if _winner_exit_pending or (not _has_human_participants() and _winner_continue_delay <= 0.0):
+			_winner_exit_pending = false
+			_return_to_main_menu()
+			return
+		if _winner_continue_delay > 0.0:
+			_winner_continue_delay = max(0.0, _winner_continue_delay - delta)
+			if _winner_continue_delay <= 0.0:
+				_refresh_winner_continue_button()
+				if not _has_human_participants():
+					_winner_exit_pending = true
 
 
 func _machine_gun_release_event(event: InputEvent) -> bool:
@@ -1155,6 +1245,7 @@ func _set_paused(value: bool, focus_resume := true) -> void:
 	if _nuke_audio != null:
 		_nuke_audio.stream_paused = value
 	_message = "Paused." if value else "Match resumed."
+	_sync_classic_mouse_cursor_mode()
 	_update_hud()
 
 
@@ -1176,13 +1267,13 @@ func _restart_round() -> void:
 	_projectiles.clear()
 	_explosions.clear()
 	_smoke_particles.clear()
+	_trail_segments.clear()
 	_ai_timer = 0.0
-	_phase = PHASE_AIM
+	_phase = PHASE_ROUND_STARTING
+	_round_start_delay = 0.0
+	_round_start_message = ""
 	_round_defeats.clear()
-	for index in range(_participants.size()):
-		var inventory := _participant_inventory(index)
-		if inventory != null:
-			inventory.call("reset_round_ammo")
+	_reset_round_inventories()
 	_rebuild_terrain_if_needed(true)
 	_start_round_turn("Round restarted.")
 	_update_hud()
@@ -1192,6 +1283,7 @@ func _return_to_main_menu() -> void:
 	if _phase == PHASE_WINNER and _winner_continue_delay > 0.0:
 		return
 	_set_paused(false)
+	_restore_classic_mouse_cursor_mode()
 	var host := get_parent()
 	while host != null and not host.has_method("_show_main_menu"):
 		host = host.get_parent()
@@ -1218,10 +1310,11 @@ func _fire_player() -> void:
 	if tank == null or inventory == null:
 		return
 	var weapon: Dictionary = inventory.call("current")
+	var weapon_name := str(weapon.get("name", inventory.call("current_name")))
 	var kind := str(weapon.get("kind", "shell"))
 	if kind == "corbomite":
 		if not bool(inventory.call("consume_current")):
-			_message = "No ammo for %s." % str(inventory.call("current_name"))
+			_message = "No ammo for %s." % weapon_name
 			return
 		tank.corbomite_active = true
 		tank.shield_active = true
@@ -1232,8 +1325,12 @@ func _fire_player() -> void:
 	if str(weapon.get("kind", "shell")) == "machine_gun":
 		_begin_player_machine_gun_fire(weapon)
 		return
+	if inventory.has_method("is_current_ready") and not bool(inventory.call("is_current_ready")):
+		var cooldown := float(inventory.call("current_cooldown"))
+		_message = "%s not ready %.1fs." % [weapon_name, cooldown]
+		return
 	if not bool(inventory.call("consume_current")):
-		_message = "No ammo for %s." % str(inventory.call("current_name"))
+		_message = "No ammo for %s." % weapon_name
 		return
 	var speed_multiplier := float(weapon.get("speed", 4.2))
 	_fire_weapon(
@@ -1246,10 +1343,12 @@ func _fire_player() -> void:
 		tank.call("launch_velocity", float(tank.get("gun_power")), speed_multiplier)
 	)
 	_phase = PHASE_PROJECTILE
-	_message = "%s fired %s." % [_participant_name_for_owner(_turn_owner), str(inventory.call("current_name"))]
+	_message = "%s fired %s." % [_participant_name_for_owner(_turn_owner), weapon_name]
 
 
 func _fire_ai() -> void:
+	if _phase == PHASE_ROUND_STARTING:
+		return
 	var tank := _turn_tank()
 	var inventory := _turn_inventory()
 	if tank == null or inventory == null or _target_index < 0:
@@ -1294,7 +1393,7 @@ func _choose_ai_shot() -> Dictionary:
 	var attacker := _turn_tank()
 	var target_tank := _target_tank()
 	var origin: Vector2 = attacker.call("launch_origin")
-	var target: Vector2 = _tank_position(target_tank) + Vector2(0.0, -20.0)
+	var target: Vector2 = _tank_damage_center(target_tank)
 	var aim_sign := 1.0 if target.x < origin.x else -1.0
 	var best_angle := 45.0 * aim_sign
 	var best_power := TankState.GUN_POWER_DEFAULT
@@ -1423,7 +1522,7 @@ func _ai_expected_self_damage(weapon: Dictionary) -> int:
 	if blast_radius <= 0.0:
 		return 0
 	var damage := int(weapon.get("damage", 0))
-	return _splash_damage(_tank_position(_target_tank()) + Vector2(0.0, -20.0), _tank_position(_turn_tank()) + Vector2(0.0, -20.0), damage, blast_radius)
+	return _splash_damage(_tank_damage_center(_target_tank()), _tank_damage_center(_turn_tank()), damage, blast_radius)
 
 
 func _ai_hit_quality(weapon: Dictionary, shot: Dictionary, direct_line: bool, distance: float) -> float:
@@ -1488,7 +1587,7 @@ func _ai_nuke_miss_threshold() -> float:
 
 func _direct_ai_shot(weapon: Dictionary, fallback: Dictionary) -> Dictionary:
 	var origin: Vector2 = _turn_tank().call("launch_origin")
-	var target: Vector2 = _tank_position(_target_tank()) + Vector2(0.0, -20.0)
+	var target: Vector2 = _tank_damage_center(_target_tank())
 	var direction := target - origin
 	if direction.length_squared() <= 1.0:
 		return fallback
@@ -1500,7 +1599,7 @@ func _direct_ai_shot(weapon: Dictionary, fallback: Dictionary) -> Dictionary:
 
 func _has_direct_line_to_player() -> bool:
 	var origin: Vector2 = _turn_tank().call("launch_origin")
-	var target: Vector2 = _tank_position(_target_tank()) + Vector2(0.0, -20.0)
+	var target: Vector2 = _tank_damage_center(_target_tank())
 	return not bool(_terrain_collision(origin, target)["hit"])
 
 
@@ -1571,6 +1670,30 @@ func _machine_gun_ai_burst_budget(weapon: Dictionary) -> int:
 
 func _machine_gun_cooldown_time(weapon: Dictionary) -> float:
 	return max(0.001, float(weapon.get("cooldown", WeaponInventory.MACHINE_GUN_COOLDOWN)))
+
+
+func _update_weapon_cooldowns(delta: float) -> void:
+	if delta <= 0.0:
+		return
+	for participant_data in _participants:
+		var participant: Dictionary = participant_data
+		var inventory := participant.get("inventory") as RefCounted
+		if inventory != null and inventory.has_method("update_current_cooldown"):
+			inventory.call("update_current_cooldown", delta)
+
+
+func _update_round_starting(delta: float) -> void:
+	_round_start_delay -= delta
+	if _round_start_delay > 0.0:
+		return
+	_round_start_delay = 0.0
+	if _participant_is_human(_turn_index):
+		_phase = PHASE_AIM
+		_message = "%s %s turn. %s." % [_round_start_message, _participant_name_for_owner(_turn_owner), _wind_status()]
+	else:
+		_phase = PHASE_AIM
+		_message = "%s %s starts." % [_round_start_message, _participant_name_for_owner(_turn_owner)]
+		_fire_ai()
 
 
 func _update_machine_gun_fire(delta: float) -> void:
@@ -1661,12 +1784,15 @@ func _finish_machine_gun_sequence_if_idle() -> void:
 func _unselect_machine_gun_and_cycle(direction := 1) -> void:
 	if not _machine_gun_active or not _machine_gun_player_owned:
 		return
+	if _weapon_switch_delay_remaining > 0.0:
+		return
 	_machine_gun_fire_held = false
 	_stop_machine_gun_audio()
 	var inventory := _participant_inventory(_participant_index_for_owner(_machine_gun_owner))
 	if inventory == null:
 		return
 	var weapon_name := str(inventory.call("cycle", direction))
+	_weapon_switch_delay_remaining = WEAPON_SWITCH_DELAY
 	_message = "Machine Gun unselected. Weapon selected: %s." % weapon_name
 	if _machine_gun_shots_fired == 0 and not _has_projectile_kind("machine_gun"):
 		_cancel_machine_gun_before_first_shot(_message)
@@ -1732,6 +1858,8 @@ func _fire_from(origin: Vector2, angle_degrees: float, power: float, owner: Vari
 		"fuel": missile_fuel,
 		"steer_sensitivity": float(weapon.get("steer_sensitivity", 300.0)),
 		"back_position": origin,
+		"trail_last_position": origin,
+		"trail_active": _kind_uses_classic_trail(kind),
 		"split_age": split_age,
 		"split": false,
 	})
@@ -1760,33 +1888,38 @@ func _update_projectiles(delta: float) -> void:
 			var previous_pos := Vector2(projectile["position"])
 			var new_x := previous_pos.x + x_change
 			var new_y := _terrain.height_at(new_x)
-			var position := Vector2(new_x, new_y)
+			var rolling_position := Vector2(new_x, new_y)
 			projectile["previous_position"] = previous_pos
-			projectile["position"] = position
+			projectile["position"] = rolling_position
 			projectile["age"] = float(projectile.get("age", 0.0)) + delta
 			
-			var direct_hit_owner := _segment_tank_hit_owner(previous_pos, position, str(projectile.get("owner", _owner_from_player_owned(bool(projectile.get("player_owned", true))))))
+			var direct_hit_owner := _segment_tank_hit_owner(previous_pos, rolling_position)
 			if not direct_hit_owner.is_empty():
-				_apply_explosion(position, projectile, direct_hit_owner)
+				_apply_explosion(rolling_position, projectile, direct_hit_owner)
 				return
-			if position.x < 0.0 or position.x > _world_size.x:
-				var clamped_x: float = clampf(position.x, 0.0, _world_size.x)
+			if rolling_position.x < 0.0 or rolling_position.x > _world_size.x:
+				var clamped_x: float = clampf(rolling_position.x, 0.0, _world_size.x)
 				_apply_explosion(Vector2(clamped_x, _terrain.height_at(clamped_x)), projectile)
 				return
 			if float(projectile.get("age", 0.0)) >= 2.5:
-				_apply_explosion(position, projectile)
+				_apply_explosion(rolling_position, projectile)
 				return
 			continue
+		if kind != "missile":
+			_ensure_projectile_launch_state(projectile, previous_position, velocity)
 		var previous_age := float(projectile.get("age", 0.0))
 		projectile["age"] = previous_age + delta
 		var apply_ballistic_acceleration := true
 		if kind == "missile":
 			velocity = _update_missile_projectile(projectile, velocity, previous_position, delta)
 			apply_ballistic_acceleration = _missile_applies_ballistic_acceleration(projectile)
-		if (kind == "mirv" or kind == "deaths_head") and not bool(projectile.get("split", false)) and float(projectile["age"]) >= float(projectile.get("split_age", 0.8)):
-			var split_delta: float = clamp(float(projectile.get("split_age", 0.8)) - previous_age, 0.0, delta)
-			var split_velocity := _mirv_split_velocity(velocity, previous_age, split_delta)
-			var split_position := previous_position + split_velocity * split_delta
+		if (kind == "mirv" or kind == "deaths_head") and not bool(projectile.get("split", false)) and float(projectile["age"]) > float(projectile.get("split_age", 0.8)):
+			var split_age: float = float(projectile.get("split_age", 0.8))
+			var split_delta: float = clamp(split_age - previous_age, 0.0, delta)
+			var split_velocity := _mirv_split_velocity(projectile, velocity, previous_age, split_delta)
+			var split_position := previous_position + Vector2(split_velocity.x * split_delta, 0.0)
+			split_position.y = _ballistic_projectile_y_at(projectile, split_age, previous_position, velocity)
+			_lay_projectile_trail(projectile, split_position)
 			projectile["split"] = true
 			if kind == "deaths_head":
 				_spawn_deaths_head_children(split_position, split_velocity, str(projectile.get("owner", _owner_from_player_owned(bool(projectile.get("player_owned", true))))), Dictionary(projectile["weapon"]))
@@ -1794,21 +1927,24 @@ func _update_projectiles(delta: float) -> void:
 				_spawn_mirv_children(split_position, split_velocity, str(projectile.get("owner", _owner_from_player_owned(bool(projectile.get("player_owned", true))))), Dictionary(projectile["weapon"]))
 			projectile["expired"] = true
 			continue
-		if apply_ballistic_acceleration:
-			velocity.x += _wind_acceleration(float(projectile["age"])) * delta
+		var position: Vector2
+		if kind == "missile" and apply_ballistic_acceleration:
+			position = previous_position + velocity * delta
 			velocity.y += PROJECTILE_GRAVITY * delta
-		var position := previous_position + velocity * delta
+		elif apply_ballistic_acceleration:
+			velocity.x += _wind_acceleration(float(projectile["age"])) * delta
+			velocity.y = _ballistic_projectile_velocity_y_at(projectile, float(projectile["age"]), velocity)
+			position = previous_position + Vector2(velocity.x * delta, 0.0)
+			position.y = _ballistic_projectile_y_at(projectile, float(projectile["age"]), previous_position, velocity)
+		else:
+			position = previous_position + velocity * delta
 		projectile["previous_position"] = previous_position
 		projectile["velocity"] = velocity
 		projectile["position"] = position
-		var direct_hit_owner := _segment_tank_hit_owner(
-			previous_position,
-			position,
-			str(projectile.get("owner", _owner_from_player_owned(bool(projectile.get("player_owned", true)))))
-		)
-		if not direct_hit_owner.is_empty():
-			_apply_explosion(position, projectile, direct_hit_owner)
-			return
+		if position.x < 0.0 or position.x > _world_size.x:
+			_lay_projectile_trail(projectile, position)
+			_expire_projectile_without_explosion(projectile)
+			continue
 		var terrain_collision := _terrain_collision(previous_position, position)
 		if bool(terrain_collision["hit"]):
 			if kind == "rolling_mine":
@@ -1817,23 +1953,51 @@ func _update_projectiles(delta: float) -> void:
 				projectile["roll_speed"] = 125.0 * (1.0 if velocity.x >= 0.0 else -1.0)
 				projectile["age"] = 0.0
 				continue
-			_apply_explosion(Vector2(terrain_collision["position"]), projectile)
+			var terrain_collision_position := Vector2(terrain_collision["position"])
+			_lay_projectile_trail(projectile, terrain_collision_position)
+			_apply_explosion(terrain_collision_position, projectile)
 			return
-		if position.x < 0.0 or position.x > _world_size.x:
-			var clamped_x: float = clampf(position.x, 0.0, _world_size.x)
-			_apply_explosion(Vector2(clamped_x, min(position.y, _terrain.height_at(clamped_x))), projectile)
+		var direct_hit_owner := _segment_tank_hit_owner(
+			previous_position,
+			position
+		)
+		if not direct_hit_owner.is_empty():
+			_lay_projectile_trail(projectile, position)
+			_apply_explosion(position, projectile, direct_hit_owner)
 			return
 		if position.y > _world_size.y + PROJECTILE_WORLD_MARGIN:
-			_apply_explosion(Vector2(position.x, _terrain.height_at(position.x)), projectile)
+			var clamped_x: float = clampf(position.x, 0.0, _world_size.x)
+			_lay_projectile_trail(projectile, position)
+			_apply_explosion(Vector2(clamped_x, _terrain.height_at(clamped_x)), projectile)
 			return
+		_lay_projectile_trail(projectile, position)
 	_sync_missile_flight_audio()
 	_finish_machine_gun_volley_if_needed()
 
 
-func _mirv_split_velocity(velocity: Vector2, age: float, delta: float) -> Vector2:
+func _ensure_projectile_launch_state(projectile: Dictionary, previous_position: Vector2, velocity: Vector2) -> void:
+	if not projectile.has("launch_position"):
+		projectile["launch_position"] = previous_position
+	if not projectile.has("launch_velocity"):
+		projectile["launch_velocity"] = velocity
+
+
+func _ballistic_projectile_y_at(projectile: Dictionary, age: float, fallback_position: Vector2, fallback_velocity: Vector2) -> float:
+	var launch_position: Vector2 = Vector2(projectile.get("launch_position", fallback_position))
+	var launch_velocity: Vector2 = Vector2(projectile.get("launch_velocity", fallback_velocity))
+	var projectile_age: float = max(0.0, age)
+	return launch_position.y + launch_velocity.y * projectile_age + 0.5 * PROJECTILE_GRAVITY * projectile_age * projectile_age
+
+
+func _ballistic_projectile_velocity_y_at(projectile: Dictionary, age: float, fallback_velocity: Vector2) -> float:
+	var launch_velocity: Vector2 = Vector2(projectile.get("launch_velocity", fallback_velocity))
+	return launch_velocity.y + PROJECTILE_GRAVITY * max(0.0, age)
+
+
+func _mirv_split_velocity(projectile: Dictionary, velocity: Vector2, age: float, delta: float) -> Vector2:
 	var split_velocity := velocity
 	split_velocity.x += _wind_acceleration(age) * delta
-	split_velocity.y += PROJECTILE_GRAVITY * delta
+	split_velocity.y = _ballistic_projectile_velocity_y_at(projectile, age + delta, velocity)
 	return split_velocity
 
 
@@ -1851,6 +2015,9 @@ func _machine_gun_projectile_delta(projectile: Dictionary, delta: float) -> floa
 
 
 func _update_machine_gun_projectile(projectile: Dictionary, previous_position: Vector2, velocity: Vector2, delta: float) -> void:
+	if bool(projectile.get("kill_next_frame", false)):
+		projectile["expired"] = true
+		return
 	var weapon: Dictionary = projectile.get("weapon", {})
 	if not projectile.has("launch_position"):
 		projectile["launch_position"] = previous_position
@@ -1866,22 +2033,24 @@ func _update_machine_gun_projectile(projectile: Dictionary, previous_position: V
 	projectile["previous_position"] = previous_position
 	projectile["velocity"] = velocity
 	projectile["position"] = position
-	var target_owner := _segment_tank_hit_owner(
-		previous_position,
-		position,
-		str(projectile.get("owner", _owner_from_player_owned(bool(projectile.get("player_owned", true)))))
-	)
-	if not target_owner.is_empty():
-		_apply_machine_gun_damage(projectile, target_owner)
-		projectile["expired"] = true
+	if position.x < 0.0 or position.x > _world_size.x:
+		projectile["kill_next_frame"] = true
 		return
 	var terrain_collision := _terrain_collision(previous_position, position)
 	if bool(terrain_collision["hit"]):
 		projectile["position"] = Vector2(terrain_collision["position"])
-		projectile["expired"] = true
+		projectile["kill_next_frame"] = true
 		return
-	if position.x < 0.0 or position.x > _world_size.x or position.y > _world_size.y + PROJECTILE_WORLD_MARGIN:
-		projectile["expired"] = true
+	var target_owner := _segment_tank_hit_owner(
+		previous_position,
+		position
+	)
+	if not target_owner.is_empty():
+		_apply_machine_gun_damage(projectile, target_owner)
+		projectile["kill_next_frame"] = true
+		return
+	if position.y > _world_size.y + PROJECTILE_WORLD_MARGIN:
+		projectile["kill_next_frame"] = true
 
 
 func _machine_gun_projectile_position_at(projectile: Dictionary, age: float) -> Vector2:
@@ -1894,6 +2063,83 @@ func _machine_gun_projectile_position_at(projectile: Dictionary, age: float) -> 
 		launch_velocity.x * t,
 		launch_velocity.y * t + 0.5 * tracer_gravity * t * t
 	)
+
+
+func _kind_uses_classic_trail(kind: String) -> bool:
+	return kind == "shell" or kind == "mirv" or kind == "missile" or kind == "nuke"
+
+
+func _kind_uses_shell_projectile_shape(kind: String) -> bool:
+	return kind == "shell" or kind == "mirv" or kind == "nuke"
+
+
+func _shell_projectile_draw_points(position: Vector2) -> PackedVector2Array:
+	return PackedVector2Array([
+		position + SHELL_PROJECTILE_TIP_OFFSET,
+		position + SHELL_PROJECTILE_RIGHT_OFFSET,
+		position + SHELL_PROJECTILE_LEFT_OFFSET,
+	])
+
+
+func _missile_projectile_draw_points(position: Vector2, angle_degrees: float) -> PackedVector2Array:
+	var radians := deg_to_rad(angle_degrees)
+	var cos_angle := cos(radians)
+	var sin_angle := sin(radians)
+	var points := PackedVector2Array()
+	for offset in [
+		MISSILE_PROJECTILE_TIP_OFFSET,
+		MISSILE_PROJECTILE_LEFT_SHOULDER_OFFSET,
+		MISSILE_PROJECTILE_LEFT_BASE_OFFSET,
+		MISSILE_PROJECTILE_RIGHT_BASE_OFFSET,
+		MISSILE_PROJECTILE_RIGHT_SHOULDER_OFFSET,
+	]:
+		var rotated := Vector2(
+			offset.x * cos_angle - offset.y * sin_angle,
+			offset.x * sin_angle + offset.y * cos_angle
+		)
+		points.append(position + rotated)
+	return points
+
+
+func _projectile_trail_is_active(projectile: Dictionary) -> bool:
+	if not bool(projectile.get("trail_active", _kind_uses_classic_trail(str(projectile.get("kind", "shell"))))):
+		return false
+	if str(projectile.get("kind", "shell")) == "missile":
+		return float(projectile.get("fuel", -1.0)) >= 0.0 or bool(projectile.get("fuel_exhausted_this_frame", false))
+	return true
+
+
+func _lay_projectile_trail(projectile: Dictionary, target_position: Vector2) -> void:
+	if not _projectile_trail_is_active(projectile):
+		return
+	var last_position := Vector2(projectile.get("trail_last_position", projectile.get("previous_position", target_position)))
+	var difference := target_position - last_position
+	while difference.length_squared() > TRAIL_LAY_DISTANCE * TRAIL_LAY_DISTANCE:
+		var distance := difference.length()
+		if distance <= 0.0001:
+			break
+		var segment_delta := difference
+		last_position += difference * (TRAIL_LAY_DISTANCE / distance)
+		_trail_segments.append({
+			"position": last_position,
+			"fade": TRAIL_INITIAL_FADE,
+			"length": TRAIL_SEGMENT_LENGTH,
+			"angle": _classic_trail_segment_angle(segment_delta),
+		})
+		difference = target_position - last_position
+	projectile["trail_last_position"] = last_position
+
+
+func _classic_trail_segment_angle(delta: Vector2) -> float:
+	var distance := delta.length()
+	if distance <= 0.0001:
+		return 0.0
+	var ratio: float = clamp(delta.y / distance, -1.0, 1.0)
+	if delta.x > 0.0:
+		return -rad_to_deg(acos(ratio))
+	if delta.x < 0.0:
+		return rad_to_deg(acos(ratio))
+	return 0.0
 
 
 func _apply_machine_gun_damage(projectile: Dictionary, target_owner: String) -> void:
@@ -1910,9 +2156,6 @@ func _apply_machine_gun_damage(projectile: Dictionary, target_owner: String) -> 
 	_play_metal_hit_audio()
 	var killed := bool(target.apply_damage(damage))
 	var owner := str(projectile.get("owner", _owner_from_player_owned(bool(projectile.get("player_owned", true)))))
-	if owner != target_owner:
-		_add_score_for_owner(owner, damage)
-		_add_credits_for_owner(owner, damage)
 	_message = "%s Machine Gun dealt %d damage to %s." % [
 		_participant_name_for_owner(owner),
 		damage,
@@ -2014,7 +2257,7 @@ func _missile_steer_direction(projectile: Dictionary, position: Vector2) -> floa
 	var target_tank := _participant_tank(target_index)
 	if target_tank == null:
 		return 0.0
-	var target: Vector2 = _tank_position(target_tank) + Vector2(0.0, -20.0)
+	var target: Vector2 = _tank_damage_center(target_tank)
 	var desired_angle := _angle_from_direction(target - position)
 	var delta_angle := _short_angle_delta(float(projectile.get("angle", 0.0)), desired_angle)
 	return clamp(delta_angle / MISSILE_AI_STEER_ANGLE_SCALE, -1.0, 1.0)
@@ -2045,6 +2288,8 @@ func _spawn_mirv_children(origin: Vector2, velocity: Vector2, owner: Variant, we
 			"weapon": child_weapon,
 			"kind": "shell",
 			"age": 0.0,
+			"trail_last_position": origin,
+			"trail_active": true,
 			"split": true,
 		})
 
@@ -2072,6 +2317,8 @@ func _spawn_deaths_head_children(origin: Vector2, velocity: Vector2, owner: Vari
 			"weapon": child_weapon,
 			"kind": "shell",
 			"age": 0.0,
+			"trail_last_position": origin,
+			"trail_active": true,
 			"split": true,
 		})
 
@@ -2100,12 +2347,14 @@ func _trigger_airstrike(impact_x: float, owner: String, weapon: Dictionary) -> v
 			"weapon": child_weapon,
 			"kind": "shell",
 			"age": 0.0,
+			"trail_last_position": spawn_pos,
+			"trail_active": true,
 			"split": true,
 		})
 
 
-func _segment_hits_tank(start: Vector2, end: Vector2, tank_position: Vector2) -> bool:
-	return _distance_to_segment(tank_position + Vector2(0.0, -18.0), start, end) < 34.0
+func _segment_hits_tank(start: Vector2, end: Vector2, tank: RefCounted) -> bool:
+	return _segment_tank_hit_fraction(start, end, tank) < INF
 
 
 func _segment_tank_hit_owner(start: Vector2, end: Vector2, ignored_owner := "") -> String:
@@ -2120,21 +2369,94 @@ func _segment_tank_hit_owner(start: Vector2, end: Vector2, ignored_owner := "") 
 		var tank := _participant_tank(index)
 		if tank == null:
 			continue
-		var fraction := _segment_tank_hit_fraction(start, end, _tank_position(tank))
+		var fraction := _segment_tank_hit_fraction(start, end, tank)
 		if fraction < best_fraction:
 			best_owner = owner
 			best_fraction = fraction
 	return best_owner
 
 
-func _segment_tank_hit_fraction(start: Vector2, end: Vector2, tank_position: Vector2) -> float:
-	if not _segment_hits_tank(start, end, tank_position):
+func _segment_tank_hit_fraction(start: Vector2, end: Vector2, tank: RefCounted) -> float:
+	if tank == null:
 		return INF
-	var segment := end - start
-	if segment.length_squared() <= 0.0:
+	var polygon := _tank_body_polygon(tank)
+	var best_fraction := INF
+	for index in range(polygon.size()):
+		var fraction := _segment_intersection_fraction(
+			start,
+			end,
+			polygon[index],
+			polygon[(index + 1) % polygon.size()]
+		)
+		if fraction < best_fraction:
+			best_fraction = fraction
+	if best_fraction < INF:
+		return best_fraction
+	if _point_in_convex_polygon(start, polygon):
 		return 0.0
-	var tank_center := tank_position + Vector2(0.0, -18.0)
-	return clamp((tank_center - start).dot(segment) / segment.length_squared(), 0.0, 1.0)
+	return INF
+
+
+func _tank_body_polygon(tank: RefCounted) -> Array[Vector2]:
+	var points: Array[Vector2] = []
+	points.append(_transform_tank_point(Vector2(-26.0, 0.0), tank))
+	points.append(_transform_tank_point(Vector2(-13.0, -22.0), tank))
+	points.append(_transform_tank_point(Vector2(13.0, -22.0), tank))
+	points.append(_transform_tank_point(Vector2(26.0, 0.0), tank))
+	return points
+
+
+func _segment_intersection_fraction(
+	start: Vector2,
+	end: Vector2,
+	edge_start: Vector2,
+	edge_end: Vector2
+) -> float:
+	var segment := end - start
+	var edge := edge_end - edge_start
+	var denominator := segment.cross(edge)
+	var offset := edge_start - start
+	if abs(denominator) <= 0.0001:
+		if abs(offset.cross(segment)) > 0.0001:
+			return INF
+		var length_squared := segment.length_squared()
+		if length_squared <= 0.0001:
+			return 0.0 if _point_on_segment(start, edge_start, edge_end) else INF
+		var edge_start_fraction := offset.dot(segment) / length_squared
+		var edge_end_fraction := (edge_end - start).dot(segment) / length_squared
+		var overlap_start: float = max(min(edge_start_fraction, edge_end_fraction), 0.0)
+		var overlap_end: float = min(max(edge_start_fraction, edge_end_fraction), 1.0)
+		return overlap_start if overlap_start <= overlap_end else INF
+	var fraction := offset.cross(edge) / denominator
+	var edge_fraction := offset.cross(segment) / denominator
+	if fraction < -0.0001 or fraction > 1.0001:
+		return INF
+	if edge_fraction < -0.0001 or edge_fraction > 1.0001:
+		return INF
+	return clamp(fraction, 0.0, 1.0)
+
+
+func _point_on_segment(point: Vector2, start: Vector2, end: Vector2) -> bool:
+	var segment := end - start
+	var offset := point - start
+	if abs(offset.cross(segment)) > 0.0001:
+		return false
+	return offset.dot(point - end) <= 0.0001
+
+
+func _point_in_convex_polygon(point: Vector2, polygon: Array[Vector2]) -> bool:
+	var sign_seen := 0
+	for index in range(polygon.size()):
+		var edge_start := polygon[index]
+		var edge_end := polygon[(index + 1) % polygon.size()]
+		var cross := (edge_end - edge_start).cross(point - edge_start)
+		if abs(cross) <= 0.0001:
+			continue
+		var current_sign := 1 if cross > 0.0 else -1
+		if sign_seen != 0 and current_sign != sign_seen:
+			return false
+		sign_seen = current_sign
+	return true
 
 
 func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float:
@@ -2161,6 +2483,13 @@ func _terrain_collision(start: Vector2, end: Vector2) -> Dictionary:
 		if point.y >= _terrain.height_at(point.x):
 			return {"hit": true, "position": point, "distance": start.distance_to(point)}
 	return {"hit": false, "position": Vector2.ZERO, "distance": INF}
+
+
+func _expire_projectile_without_explosion(projectile: Dictionary) -> void:
+	_projectiles.erase(projectile)
+	_sync_missile_flight_audio()
+	if _projectiles.is_empty():
+		_after_explosion()
 
 
 func _apply_explosion(position: Vector2, projectile: Dictionary, direct_hit_owner := "") -> void:
@@ -2201,7 +2530,7 @@ func _apply_explosion(position: Vector2, projectile: Dictionary, direct_hit_owne
 	var white_out := _weapon_white_out(weapon)
 	_play_explosion_death_audio(kind, white_out)
 	_spawn_explosion(position, blast_radius, white_out)
-	var total_other_damage := 0
+	var total_other_damage := 0.0
 	for index in range(_participants.size()):
 		if not _participant_is_alive(index):
 			continue
@@ -2209,9 +2538,9 @@ func _apply_explosion(position: Vector2, projectile: Dictionary, direct_hit_owne
 		var target := _participant_tank(index)
 		if target == null:
 			continue
-		var raw_target_damage := _explosion_damage_for_target(
+		var raw_target_damage: float = _explosion_damage_for_target(
 			position,
-			_tank_position(target) + Vector2(0.0, -20.0),
+			_tank_damage_center(target),
 			damage,
 			blast_radius,
 			target_owner,
@@ -2226,17 +2555,15 @@ func _apply_explosion(position: Vector2, projectile: Dictionary, direct_hit_owne
 				if shooter_tank.state == TankState.STATE_DEAD:
 					_record_round_defeat(target_owner, owner)
 			continue
-		var target_damage := _damage_after_tank_shield(target, raw_target_damage)
+		var target_damage: float = _damage_after_tank_shield(target, raw_target_damage)
 		if target_damage <= 0:
 			continue
 		var killed := bool(target.call("apply_damage", target_damage))
 		if owner != target_owner:
 			total_other_damage += target_damage
-			_add_score_for_owner(owner, target_damage)
-			_add_credits_for_owner(owner, target_damage)
 		if killed:
 			_record_round_defeat(owner, target_owner)
-	_message = "%s dealt %d damage." % [_participant_name_for_owner(owner), total_other_damage]
+	_message = "%s dealt %d damage." % [_participant_name_for_owner(owner), int(round(total_other_damage))]
 	_stop_missile_flight_audio()
 	_projectiles.clear()
 	_after_explosion()
@@ -2248,15 +2575,15 @@ func _explosion_damage_for_target(
 		max_damage: int,
 		radius: float,
 		target_owner: String,
-		direct_hit_owner: String) -> int:
+		direct_hit_owner: String) -> float:
 	if direct_hit_owner == target_owner:
-		return max_damage
+		return float(max_damage)
 	return _splash_damage(explosion_position, target_position, max_damage, radius)
 
 
-func _damage_after_tank_shield(tank: RefCounted, amount: int) -> int:
+func _damage_after_tank_shield(tank: RefCounted, amount: float) -> float:
 	if tank != null and tank.has_method("damage_after_shield"):
-		return int(tank.call("damage_after_shield", amount))
+		return float(tank.call("damage_after_shield", amount))
 	return amount
 
 
@@ -2306,16 +2633,18 @@ func _start_round_turn(message: String) -> void:
 	if first_index < 0:
 		return
 	_set_turn_index(first_index)
+	_phase = PHASE_ROUND_STARTING
+	_round_start_delay = ROUND_STARTING_DELAY
+	_round_start_message = message
 	if _participant_is_human(_turn_index):
-		_phase = PHASE_AIM
-		_message = "%s %s turn. %s." % [message, _participant_name_for_owner(_turn_owner), _wind_status()]
+		_message = "%s %s turn in %.0fs." % [message, _participant_name_for_owner(_turn_owner), ROUND_STARTING_DELAY]
 	else:
-		_message = "%s %s starts." % [message, _participant_name_for_owner(_turn_owner)]
-		_fire_ai()
+		_message = "%s %s starts in %.0fs." % [message, _participant_name_for_owner(_turn_owner), ROUND_STARTING_DELAY]
 
 
 func _open_round_score(title: String, reward: int, score_winner := TURN_PLAYER) -> void:
 	_reset_machine_gun_fire()
+	_stop_jump_jets_audio()
 	_score_title = title
 	_score_reward = reward
 	_score_round_winner = score_winner
@@ -2675,11 +3004,11 @@ func _continue_from_score() -> void:
 		return
 	if _score_continue_delay > 0.0:
 		return
-	_update_leader_flags()
 	if _is_final_round():
 		_hide_score_overlay()
 		_open_winner_overlay()
 		return
+	_update_leader_flags()
 	var title := _score_title
 	var reward := _score_reward
 	_hide_score_overlay()
@@ -2690,6 +3019,7 @@ func _open_post_round_shop(title: String, reward: int, award_credits := true) ->
 	_reset_machine_gun_fire()
 	_shop_title = title
 	_shop_reward = reward
+	_shop_finish_pending = false
 	if award_credits:
 		_credits += reward
 	_prepare_shop_pass()
@@ -2721,7 +3051,8 @@ func _refresh_shop_overlay() -> void:
 		"inventory": _shop_inventory(shopper_index).inventory_snapshot(),
 		"shop_items": _shop_items_snapshot(),
 		"message": _message,
-		"input_locked": _shop_input_delay > 0.0,
+			"input_locked": _shop_input_delay >= 0.0,
+		"participants": _participant_rows_snapshot(),
 	})
 	_update_hud()
 
@@ -2734,14 +3065,19 @@ func _hide_shop_overlay() -> void:
 	_shop_participant_indices.clear()
 	_shop_participant_cursor = 0
 	_shop_input_delay = 0.0
+	_shop_finish_pending = false
 
 
 func _buy_shop_weapon(weapon_name: String) -> void:
-	if _shop_input_delay > 0.0:
+	if _shop_input_delay >= 0.0 or _shop_finish_pending:
 		return
 	_shop_input_delay = SHOP_ACTION_INPUT_DELAY
 	if weapon_name == SHOP_JUMP_JET:
 		_buy_jump_jet()
+		return
+	if CLASSIC_DISABLED_SHOP_WEAPONS.has(weapon_name):
+		_message = "%s is not available in the classic shop." % weapon_name
+		_refresh_shop_overlay()
 		return
 	var shopper_index := _current_shop_participant_index()
 	var inventory := _shop_inventory(shopper_index)
@@ -2756,8 +3092,8 @@ func _buy_shop_weapon(weapon_name: String) -> void:
 		_refresh_shop_overlay()
 		return
 	_set_shop_credits(shopper_index, credits - cost)
-	var ammo_count: int = int(inventory.call("add_ammo", weapon_name))
-	_message = "Bought %s ammo. Ammo now %s." % [weapon_name, str(ammo_count)]
+	var stock_count: int = int(inventory.call("add_ammo", weapon_name))
+	_message = "Bought %s ammo. Stock now %s." % [weapon_name, str(stock_count)]
 	_refresh_shop_overlay()
 
 
@@ -2787,17 +3123,20 @@ func _shop_items_snapshot() -> Array[Dictionary]:
 
 
 func _continue_from_shop() -> void:
-	if _shop_input_delay > 0.0:
+	if _shop_input_delay >= 0.0 or _shop_finish_pending:
 		return
 	_shop_input_delay = SHOP_ACTION_INPUT_DELAY
 	if _advance_shop_participant():
 		if not _complete_computer_shop_passes():
-			_finish_shop_and_start_next_round()
+			_shop_finish_pending = true
+			_refresh_shop_overlay()
 			return
 		_message = "%s is shopping." % _shop_participant_name(_current_shop_participant_index())
 		_refresh_shop_overlay()
 		return
-	_finish_shop_and_start_next_round()
+	_shop_finish_pending = true
+	_message = "%s is done shopping." % _shop_participant_name(_current_shop_participant_index())
+	_refresh_shop_overlay()
 
 
 func _finish_shop_and_start_next_round() -> void:
@@ -2813,10 +3152,19 @@ func _finish_shop_and_start_next_round() -> void:
 	_projectiles.clear()
 	_explosions.clear()
 	_smoke_particles.clear()
+	_trail_segments.clear()
 	_round_defeats.clear()
+	_reset_round_inventories()
 	_rebuild_terrain_if_needed(true)
 	_start_round_turn("Round %d ready." % _round)
 	_update_hud()
+
+
+func _reset_round_inventories() -> void:
+	for index in range(_participants.size()):
+		var inventory := _participant_inventory(index)
+		if inventory != null:
+			inventory.call("reset_round_ammo")
 
 
 func _prepare_shop_pass() -> void:
@@ -2853,38 +3201,7 @@ func _complete_computer_shop_passes() -> bool:
 
 
 func _run_computer_shop_for_participant(index: int) -> void:
-	var inventory := _shop_inventory(index)
-	if inventory == null:
-		return
-	var credits := _shop_credits(index)
-	var purchases: Array[String] = []
-	for item_name in _computer_shop_priority():
-		if item_name == SHOP_JUMP_JET:
-			if credits >= SHOP_JUMP_JET_COST and _shop_fuel_reserve(index) <= TankState.TANK_FULL_FUEL:
-				credits -= SHOP_JUMP_JET_COST
-				_set_shop_credits(index, credits)
-				_add_shop_fuel_reserve(index, TankState.TANK_FUEL_PURCHASE_AMOUNT)
-				purchases.append(SHOP_JUMP_JET)
-			continue
-		var cost: int = int(inventory.call("weapon_cost", item_name))
-		if cost <= 0 or credits < cost:
-			continue
-		credits -= cost
-		_set_shop_credits(index, credits)
-		inventory.call("add_ammo", item_name)
-		purchases.append(item_name)
-	if purchases.is_empty():
-		_message = "%s saved credits." % _shop_participant_name(index)
-	else:
-		_message = "%s bought %s." % [_shop_participant_name(index), ", ".join(purchases)]
-
-
-func _computer_shop_priority() -> Array:
-	if _ai_difficulty == AI_DIFFICULTY_EASY:
-		return AI_SHOP_PRIORITY_EASY.duplicate()
-	if _ai_difficulty == AI_DIFFICULTY_HARD:
-		return AI_SHOP_PRIORITY_HARD.duplicate()
-	return AI_SHOP_PRIORITY_NORMAL.duplicate()
+	_message = "%s is done shopping." % _shop_participant_name(index)
 
 
 func _shop_participant_name(index: int) -> String:
@@ -2951,6 +3268,7 @@ func _open_winner_overlay() -> void:
 	_hide_shop_overlay()
 	_phase = PHASE_WINNER
 	_winner_continue_delay = _winner_activation_delay()
+	_winner_exit_pending = false
 	_winner_spin_phase = 0.0
 	_ai_timer = 0.0
 	_stop_quake_audio()
@@ -3153,6 +3471,7 @@ func _hide_winner_overlay() -> void:
 	if _winner_overlay != null:
 		_winner_overlay.visible = false
 	_winner_continue_delay = 0.0
+	_winner_exit_pending = false
 
 
 func _spawn_explosion(position: Vector2, crater_radius: float, white_out := false) -> void:
@@ -3163,14 +3482,13 @@ func _spawn_explosion(position: Vector2, crater_radius: float, white_out := fals
 		if tank != null:
 			tank.call("settle_on_terrain", _terrain)
 	_add_camera_shake(crater_radius)
-	var life := 0.55
 	if white_out:
 		_play_nuke_audio()
-		life = max(life, 1.0 / NUKE_WHITEOUT_FADE_RATE)
 	_explosions.append({
 		"position": position,
-		"radius": 8.0,
-		"life": life,
+		"radius": crater_radius * BLAST_VISUAL_SIZE_SCALE,
+		"life": BLAST_INITIAL_FADE / BLAST_FADE_RATE,
+		"fade_away": BLAST_INITIAL_FADE,
 		"crater_radius": crater_radius,
 		"white_out": white_out,
 		"white_out_level": 1.0 if white_out else 0.0,
@@ -3179,14 +3497,21 @@ func _spawn_explosion(position: Vector2, crater_radius: float, white_out := fals
 
 func _update_explosions(delta: float) -> void:
 	for explosion in _explosions:
-		explosion["life"] = float(explosion["life"]) - delta
-		explosion["radius"] = float(explosion["radius"]) + 120.0 * delta
+		var fade_away: float = float(explosion.get("fade_away", BLAST_INITIAL_FADE)) - delta * BLAST_FADE_RATE
+		explosion["fade_away"] = fade_away
+		explosion["life"] = fade_away / BLAST_FADE_RATE
 		if bool(explosion.get("white_out", false)):
-			var whiteout_level: float = max(0.0, float(explosion.get("white_out_level", 0.0)) - delta * NUKE_WHITEOUT_FADE_RATE)
-			explosion["white_out_level"] = whiteout_level
-			if whiteout_level <= 0.0:
+			var whiteout_level: float = float(explosion.get("white_out_level", 0.0)) - delta * NUKE_WHITEOUT_FADE_RATE
+			explosion["white_out_level"] = max(0.0, whiteout_level)
+			if whiteout_level < 0.0:
 				explosion["white_out"] = false
-	_explosions = _explosions.filter(func(explosion: Dictionary) -> bool: return float(explosion["life"]) > 0.0)
+	_explosions = _explosions.filter(func(explosion: Dictionary) -> bool: return float(explosion.get("fade_away", 0.0)) >= 0.0)
+
+
+func _update_trail_segments(delta: float) -> void:
+	for segment in _trail_segments:
+		segment["fade"] = float(segment.get("fade", TRAIL_INITIAL_FADE)) - delta * TRAIL_FADE_RATE
+	_trail_segments = _trail_segments.filter(func(segment: Dictionary) -> bool: return float(segment.get("fade", 0.0)) >= 0.0)
 
 
 func _update_smoke_particles(delta: float) -> void:
@@ -3257,7 +3582,7 @@ func _emit_jump_jet_smoke(tank: RefCounted, delta: float) -> void:
 
 func _draw() -> void:
 	_draw_classic_sky()
-	var camera_offset := _camera_offset + _camera_shake_offset
+	var camera_offset := _camera_offset + _camera_shake_offset + _quake_viewport_offset
 	draw_set_transform(-camera_offset * _camera_zoom, 0.0, Vector2(_camera_zoom, _camera_zoom))
 	_draw_terrain()
 	for index in range(_participants.size()):
@@ -3267,6 +3592,8 @@ func _draw() -> void:
 			_draw_tank(tank, _participant_inventory(index))
 	_draw_aim()
 	_draw_mouse_reticle()
+	for trail_segment in _trail_segments:
+		_draw_trail_segment(trail_segment)
 	for projectile in _projectiles:
 		var projectile_position := Vector2(projectile["position"])
 		if str(projectile.get("kind", "shell")) == "machine_gun":
@@ -3274,20 +3601,96 @@ func _draw() -> void:
 				continue
 			var back_position := Vector2(projectile.get("back_position", projectile.get("previous_position", projectile_position)))
 			draw_line(back_position, projectile_position, Color.WHITE, 2.0)
+		elif _kind_uses_shell_projectile_shape(str(projectile.get("kind", "shell"))):
+			draw_polygon(_shell_projectile_draw_points(projectile_position), PackedColorArray([Color.WHITE]))
+		elif str(projectile.get("kind", "shell")) == "missile":
+			draw_polygon(
+				_missile_projectile_draw_points(projectile_position, float(projectile.get("angle", 0.0))),
+				PackedColorArray([Color.WHITE])
+			)
 		else:
 			draw_circle(projectile_position, 5.0, GroundfireTheme.COLOR_WARN)
 	for explosion in _explosions:
-		var explosion_color := Color("#f59e0b66")
-		if bool(explosion.get("white_out", false)):
-			explosion_color = Color("#ffffff99")
-		draw_circle(Vector2(explosion["position"]), float(explosion["radius"]), explosion_color)
+		_draw_blast_explosion(explosion)
 	for smoke in _smoke_particles:
 		_draw_smoke_particle(smoke)
 	_draw_map_bounds()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_draw_whiteout_overlay()
-	if _phase == PHASE_ROUND_OVER and _living_participant_count() <= 1:
+	if _phase == PHASE_ROUND_STARTING:
 		_draw_round_banner()
+	elif _phase == PHASE_ROUND_OVER and _living_participant_count() <= 1:
+		_draw_round_banner()
+
+
+func _draw_trail_segment(segment: Dictionary) -> void:
+	var fade: float = clamp(float(segment.get("fade", 0.0)), 0.0, 1.0)
+	if fade <= 0.0:
+		return
+	draw_polygon(
+		_trail_segment_draw_points(segment),
+		PackedColorArray([Color(1.0, 1.0, 1.0, fade)]),
+		_trail_segment_draw_uvs(),
+		TRAIL_TEXTURE
+	)
+
+
+func _trail_segment_draw_points(segment: Dictionary) -> PackedVector2Array:
+	var center: Vector2 = Vector2(segment.get("position", Vector2.ZERO))
+	var width: float = float(segment.get("width", TRAIL_SEGMENT_WIDTH))
+	var height: float = TRAIL_SEGMENT_BASE_HEIGHT + float(segment.get("length", TRAIL_SEGMENT_LENGTH))
+	var rotation: float = -deg_to_rad(float(segment.get("angle", 0.0)))
+	var axis_x: Vector2 = Vector2(cos(rotation), sin(rotation)) * (width * 0.5)
+	var axis_y: Vector2 = Vector2(-sin(rotation), cos(rotation)) * (height * 0.5)
+	return PackedVector2Array([
+		center - axis_x - axis_y,
+		center + axis_x - axis_y,
+		center + axis_x + axis_y,
+		center - axis_x + axis_y,
+	])
+
+
+func _trail_segment_draw_uvs() -> PackedVector2Array:
+	var texture_size := TRAIL_TEXTURE.get_size()
+	return PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(texture_size.x, 0.0),
+		texture_size,
+		Vector2(0.0, texture_size.y),
+	])
+
+
+func _draw_blast_explosion(explosion: Dictionary) -> void:
+	var fade: float = clamp(float(explosion.get("fade_away", BLAST_INITIAL_FADE)), 0.0, 1.0)
+	if fade <= 0.0:
+		return
+	draw_polygon(
+		_blast_draw_points(explosion),
+		PackedColorArray([Color(1.0, 1.0, 1.0, fade)]),
+		_blast_draw_uvs(),
+		BLAST_TEXTURE
+	)
+
+
+func _blast_draw_points(explosion: Dictionary) -> PackedVector2Array:
+	var center: Vector2 = Vector2(explosion.get("position", Vector2.ZERO))
+	var radius: float = max(1.0, float(explosion.get("radius", 1.0)))
+	return PackedVector2Array([
+		center + Vector2(-radius, -radius),
+		center + Vector2(radius, -radius),
+		center + Vector2(radius, radius),
+		center + Vector2(-radius, radius),
+	])
+
+
+func _blast_draw_uvs() -> PackedVector2Array:
+	var texture_size := BLAST_TEXTURE.get_size()
+	return PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(texture_size.x, 0.0),
+		texture_size,
+		Vector2(0.0, texture_size.y),
+	])
 
 
 func _draw_smoke_particle(smoke: Dictionary) -> void:
@@ -3297,8 +3700,8 @@ func _draw_smoke_particle(smoke: Dictionary) -> void:
 	draw_polygon(
 		_smoke_particle_draw_points(smoke),
 		PackedColorArray([Color(1.0, 1.0, 1.0, fade)]),
-		_smoke_particle_draw_uvs(),
-		SMOKE_TEXTURE
+		_smoke_particle_draw_uvs(smoke),
+		_smoke_particle_texture(smoke)
 	)
 
 
@@ -3316,8 +3719,14 @@ func _smoke_particle_draw_points(smoke: Dictionary) -> PackedVector2Array:
 	])
 
 
-func _smoke_particle_draw_uvs() -> PackedVector2Array:
-	var texture_size := SMOKE_TEXTURE.get_size()
+func _smoke_particle_texture(smoke: Dictionary) -> Texture2D:
+	if int(smoke.get("texture_id", TankState.SMOKE_TEXTURE_ID)) == TankState.BOOST_SMOKE_TEXTURE_ID:
+		return EXHAUST_TEXTURE
+	return SMOKE_TEXTURE
+
+
+func _smoke_particle_draw_uvs(smoke: Dictionary = {}) -> PackedVector2Array:
+	var texture_size := _smoke_particle_texture(smoke).get_size()
 	return PackedVector2Array([
 		Vector2.ZERO,
 		Vector2(texture_size.x, 0.0),
@@ -3455,11 +3864,56 @@ func _draw_mouse_reticle() -> void:
 	var target := _mouse_world_position
 	if target == Vector2.ZERO:
 		target = _screen_to_world(get_local_mouse_position())
-	draw_circle(target, 9.0, Color("#7dd3fc44"))
-	draw_line(target + Vector2(-13.0, 0.0), target + Vector2(-4.0, 0.0), GroundfireTheme.COLOR_CYAN, 2.0)
-	draw_line(target + Vector2(4.0, 0.0), target + Vector2(13.0, 0.0), GroundfireTheme.COLOR_CYAN, 2.0)
-	draw_line(target + Vector2(0.0, -13.0), target + Vector2(0.0, -4.0), GroundfireTheme.COLOR_CYAN, 2.0)
-	draw_line(target + Vector2(0.0, 4.0), target + Vector2(0.0, 13.0), GroundfireTheme.COLOR_CYAN, 2.0)
+	draw_polygon(
+		_mouse_cursor_draw_points(target),
+		PackedColorArray([Color.WHITE]),
+		_mouse_cursor_draw_uvs(),
+		CURSOR_TEXTURE
+	)
+
+
+func _mouse_cursor_draw_points(target: Vector2) -> PackedVector2Array:
+	var texture_size := Vector2(CURSOR_TEXTURE.get_size())
+	return PackedVector2Array([
+		target,
+		target + Vector2(texture_size.x, 0.0),
+		target + texture_size,
+		target + Vector2(0.0, texture_size.y),
+	])
+
+
+func _should_use_classic_mouse_cursor() -> bool:
+	return _mouse_aim_enabled \
+			and _phase == PHASE_AIM \
+			and _participant_is_human(_turn_index) \
+			and not _is_paused
+
+
+func _sync_classic_mouse_cursor_mode() -> void:
+	var should_hide := _should_use_classic_mouse_cursor()
+	if should_hide and not _classic_mouse_cursor_active:
+		_classic_mouse_cursor_previous_mode = Input.get_mouse_mode()
+		Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+		_classic_mouse_cursor_active = true
+	elif not should_hide and _classic_mouse_cursor_active:
+		_restore_classic_mouse_cursor_mode()
+
+
+func _restore_classic_mouse_cursor_mode() -> void:
+	if not _classic_mouse_cursor_active:
+		return
+	Input.set_mouse_mode(_classic_mouse_cursor_previous_mode)
+	_classic_mouse_cursor_active = false
+
+
+func _mouse_cursor_draw_uvs() -> PackedVector2Array:
+	var texture_size := Vector2(CURSOR_TEXTURE.get_size())
+	return PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(texture_size.x, 0.0),
+		texture_size,
+		Vector2(0.0, texture_size.y),
+	])
 
 
 func _draw_round_banner() -> void:
@@ -3519,18 +3973,27 @@ func _update_hud() -> void:
 func _cycle_weapon(direction := 1) -> void:
 	if _phase != PHASE_AIM or not _participant_is_human(_turn_index):
 		return
+	if _weapon_switch_delay_remaining > 0.0:
+		return
 	_message = "Weapon selected: %s." % str(_turn_inventory().call("cycle", direction))
+	_weapon_switch_delay_remaining = WEAPON_SWITCH_DELAY
 
 
-func _splash_damage(explosion_position: Vector2, target_position: Vector2, max_damage: int, radius: float) -> int:
+func _update_weapon_switch_delay(delta: float) -> void:
+	if _phase == PHASE_ROUND_STARTING:
+		return
+	if _weapon_switch_delay_remaining <= 0.0:
+		return
+	_weapon_switch_delay_remaining = max(0.0, _weapon_switch_delay_remaining - max(0.0, delta))
+
+
+func _splash_damage(explosion_position: Vector2, target_position: Vector2, max_damage: int, radius: float) -> float:
 	var distance_squared := explosion_position.distance_squared_to(target_position)
 	var radius_squared := radius * radius
 	if distance_squared > radius_squared:
-		return 0
+		return 0.0
 	var damage_multiplier := 1.0 - (distance_squared / radius_squared)
-	if _terrain_blocks_splash(explosion_position, target_position):
-		damage_multiplier *= SPLASH_OCCLUSION_MULTIPLIER
-	return int(round(float(max_damage) * clamp(damage_multiplier, 0.0, 1.0)))
+	return float(max_damage) * clamp(damage_multiplier, 0.0, 1.0)
 
 
 func _terrain_blocks_splash(explosion_position: Vector2, target_position: Vector2) -> bool:
@@ -3568,23 +4031,40 @@ func _roll_round_wind() -> void:
 func _update_quake(delta: float) -> void:
 	if _phase == PHASE_SHOP or _phase == PHASE_SCORE or _phase == PHASE_WINNER or _phase == PHASE_ROUND_OVER:
 		_stop_quake_audio()
+		_reset_quake_viewport_offset()
 		return
 	_quake_countdown -= delta
 	if _quake_active:
 		_play_quake_audio()
 		_terrain.drop_terrain(delta * QUAKE_DROP_RATE)
-		_add_camera_shake(QUAKE_CAMERA_SHAKE)
+		_update_quake_viewport_offset()
 		_message = "Quake! Terrain dropping."
 		if _quake_countdown < 0.0:
 			_quake_active = false
 			_quake_countdown = QUAKE_TIME_BETWEEN
 			_stop_quake_audio()
+			_reset_quake_viewport_offset()
 			_message = "Quake settled. %s." % _wind_status()
 	elif _quake_countdown < 0.0:
 		_quake_active = true
 		_quake_countdown = QUAKE_DURATION
 		_play_quake_audio()
 		_message = "Quake! Terrain dropping."
+
+
+func _update_quake_viewport_offset() -> void:
+	if not _screen_shake_enabled:
+		_reset_quake_viewport_offset()
+		return
+	var quake_elapsed := QUAKE_DURATION - _quake_countdown
+	_quake_viewport_offset = Vector2(
+		sin(quake_elapsed * QUAKE_SHAKE_FREQUENCY) * QUAKE_SHAKE_AMPLITUDE,
+		0.0
+	)
+
+
+func _reset_quake_viewport_offset() -> void:
+	_quake_viewport_offset = Vector2.ZERO
 
 
 func _play_quake_audio() -> void:
@@ -3597,6 +4077,7 @@ func _play_quake_audio() -> void:
 func _prepare_for_shutdown() -> void:
 	_shutting_down = true
 	set_process(false)
+	_restore_classic_mouse_cursor_mode()
 	_stop_all_audio()
 	_release_audio_stream(_quake_audio)
 	_release_audio_stream(_jump_jets_audio)
@@ -3834,7 +4315,7 @@ func _constrain_camera_offset(offset: Vector2, zoom: float) -> Vector2:
 
 
 func _screen_to_world(screen_position: Vector2) -> Vector2:
-	return screen_position / _camera_zoom + _camera_offset + _camera_shake_offset
+	return screen_position / _camera_zoom + _camera_offset + _camera_shake_offset + _quake_viewport_offset
 
 
 func _add_camera_shake(strength: float) -> void:

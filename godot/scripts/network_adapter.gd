@@ -12,7 +12,17 @@ const MESSAGE_PONG := "pong"
 const MESSAGE_DISCONNECT := "disconnect"
 const MESSAGE_ERROR := "error"
 const PROTOCOL_VERSION := 1
+const MIN_SUPPORTED_PROTOCOL := 1
+const MAX_SUPPORTED_PROTOCOL := PROTOCOL_VERSION
 const PLAYER_NAME_DEFAULT := "GodotPlayer"
+const SERVER_ERROR_CATEGORY_CREDENTIALS := "credentials"
+const SERVER_ERROR_CATEGORY_CAPACITY := "capacity"
+const SERVER_ERROR_CATEGORY_SERVER_STATE := "server_state"
+const SERVER_ERROR_CATEGORY_ACCESS := "access"
+const SERVER_ERROR_CATEGORY_MATCH := "match"
+const SERVER_ERROR_CATEGORY_TRANSIENT := "transient"
+const SERVER_ERROR_CATEGORY_PROTOCOL := "protocol"
+const SERVER_ERROR_CATEGORY_UNKNOWN := "unknown"
 const FATAL_SERVER_ERRORS := [
 	"invalid_password",
 	"authentication_failed",
@@ -95,26 +105,29 @@ static func error_message(message: String) -> Dictionary:
 	return {"type": MESSAGE_ERROR, "protocol": PROTOCOL_VERSION, "message": message}
 
 
+static func client_supports_protocol(protocol_version: int) -> bool:
+	return protocol_version >= MIN_SUPPORTED_PROTOCOL and protocol_version <= MAX_SUPPORTED_PROTOCOL
+
+
+static func negotiated_protocol(message: Dictionary) -> int:
+	var server_protocols := _server_supported_protocols(message)
+	for protocol_version in range(MAX_SUPPORTED_PROTOCOL, MIN_SUPPORTED_PROTOCOL - 1, -1):
+		if server_protocols.has(protocol_version):
+			return protocol_version
+	return 0
+
+
 static func server_supports_client_protocol(message: Dictionary) -> bool:
-	var supported_protocols: Variant = message.get("supported_protocols", null)
-	if typeof(supported_protocols) == TYPE_ARRAY:
-		for raw_protocol in Array(supported_protocols):
-			if _protocol_value(raw_protocol, -1) == PROTOCOL_VERSION:
-				return true
-		return false
-	if message.has("min_protocol") or message.has("max_protocol"):
-		var min_protocol := _protocol_value(message.get("min_protocol", PROTOCOL_VERSION), 2147483647)
-		var max_protocol := _protocol_value(message.get("max_protocol", PROTOCOL_VERSION), -2147483648)
-		return PROTOCOL_VERSION >= min_protocol and PROTOCOL_VERSION <= max_protocol
-	return _protocol_value(message.get("protocol", -1), -1) == PROTOCOL_VERSION
+	return negotiated_protocol(message) != 0
 
 
 static func protocol_status_message(message: Dictionary) -> String:
-	if server_supports_client_protocol(message):
+	var protocol_version := negotiated_protocol(message)
+	if protocol_version != 0:
 		var snapshot_schema := int(message.get("match_snapshot_schema", 0))
 		var event_schema := int(message.get("event_schema", 0))
 		return "Protocol %d accepted. Snapshot schema %d, event schema %d." % [
-			PROTOCOL_VERSION,
+			protocol_version,
 			snapshot_schema,
 			event_schema,
 		]
@@ -128,27 +141,68 @@ static func is_fatal_server_error(error_name: String) -> bool:
 	return FATAL_SERVER_ERRORS.has(error_name)
 
 
+static func server_error_category(error_name: String) -> String:
+	match error_name:
+		"invalid_password", "authentication_failed":
+			return SERVER_ERROR_CATEGORY_CREDENTIALS
+		"server_full":
+			return SERVER_ERROR_CATEGORY_CAPACITY
+		"server_closed":
+			return SERVER_ERROR_CATEGORY_SERVER_STATE
+		"server_unavailable":
+			return SERVER_ERROR_CATEGORY_TRANSIENT
+		"banned":
+			return SERVER_ERROR_CATEGORY_ACCESS
+		"join_rejected", "match_not_found":
+			return SERVER_ERROR_CATEGORY_MATCH
+		"missing_protocol", "invalid_protocol", "protocol_mismatch":
+			return SERVER_ERROR_CATEGORY_PROTOCOL
+		_:
+			return SERVER_ERROR_CATEGORY_UNKNOWN
+
+
+static func server_error_recovery_hint(error_name: String) -> String:
+	match server_error_category(error_name):
+		SERVER_ERROR_CATEGORY_CREDENTIALS:
+			return "Check credentials or request a fresh session token."
+		SERVER_ERROR_CATEGORY_CAPACITY:
+			return "Wait for a slot or choose another server."
+		SERVER_ERROR_CATEGORY_SERVER_STATE:
+			return "Wait for joins to reopen or choose another server."
+		SERVER_ERROR_CATEGORY_ACCESS:
+			return "Choose another server or contact the server host."
+		SERVER_ERROR_CATEGORY_MATCH:
+			return "Refresh the server list and choose an available match."
+		SERVER_ERROR_CATEGORY_TRANSIENT:
+			return "Try reconnecting later."
+		SERVER_ERROR_CATEGORY_PROTOCOL:
+			return "Update the client or choose a compatible server."
+		_:
+			return "Try again or choose another server."
+
+
 static func server_error_status_message(message: Dictionary) -> String:
 	var error_name := str(message.get("message", "unknown"))
+	var recovery_hint := server_error_recovery_hint(error_name)
 	match error_name:
 		"invalid_password":
-			return "Join failed: password rejected. Go back and try another password."
+			return "Join failed: password rejected. %s" % recovery_hint
 		"authentication_failed":
-			return "Join failed: authentication was rejected."
+			return "Join failed: authentication was rejected. %s" % recovery_hint
 		"server_full":
-			return "Join failed: server is full."
+			return "Join failed: server is full. %s" % recovery_hint
 		"server_closed":
-			return "Join failed: server is closed."
+			return "Join failed: server is closed. %s" % recovery_hint
 		"server_unavailable":
-			return "Join failed: server is unavailable."
+			return "Join failed: server is unavailable. %s" % recovery_hint
 		"banned":
-			return "Join failed: access was rejected."
+			return "Join failed: access was rejected. %s" % recovery_hint
 		"join_rejected":
-			return "Join failed: server rejected the player."
+			return "Join failed: server rejected the player. %s" % recovery_hint
 		"match_not_found":
-			return "Join failed: match was not found."
+			return "Join failed: match was not found. %s" % recovery_hint
 		_:
-			return "Server error: %s." % error_name
+			return "Server error: %s. %s" % [error_name, recovery_hint]
 
 
 static func encode_message(message: Dictionary) -> String:
@@ -165,10 +219,13 @@ static func parse_message(payload: String) -> Dictionary:
 		var missing := error_message("missing_protocol")
 		missing["expected_protocol"] = PROTOCOL_VERSION
 		return missing
-	if int(parsed.get("protocol", 0)) != PROTOCOL_VERSION:
+	var protocol_version := int(parsed.get("protocol", 0))
+	if not client_supports_protocol(protocol_version):
 		var error := error_message("protocol_mismatch")
 		error["expected_protocol"] = PROTOCOL_VERSION
-		error["received_protocol"] = int(parsed.get("protocol", 0))
+		error["min_protocol"] = MIN_SUPPORTED_PROTOCOL
+		error["max_protocol"] = MAX_SUPPORTED_PROTOCOL
+		error["received_protocol"] = protocol_version
 		return error
 	return parsed
 
@@ -179,6 +236,28 @@ static func _protocol_value(value: Variant, fallback: int) -> int:
 	if typeof(value) == TYPE_FLOAT and float(value) == float(int(value)):
 		return int(value)
 	return fallback
+
+
+static func _server_supported_protocols(message: Dictionary) -> Array[int]:
+	var protocols: Array[int] = []
+	var supported_protocols: Variant = message.get("supported_protocols", null)
+	if typeof(supported_protocols) == TYPE_ARRAY:
+		for raw_protocol in Array(supported_protocols):
+			var protocol_version := _protocol_value(raw_protocol, 0)
+			if protocol_version > 0 and not protocols.has(protocol_version):
+				protocols.append(protocol_version)
+		return protocols
+	if message.has("min_protocol") or message.has("max_protocol"):
+		var min_protocol := _protocol_value(message.get("min_protocol", PROTOCOL_VERSION), PROTOCOL_VERSION)
+		var max_protocol := _protocol_value(message.get("max_protocol", PROTOCOL_VERSION), PROTOCOL_VERSION)
+		for protocol_version in range(min_protocol, max_protocol + 1):
+			if protocol_version > 0:
+				protocols.append(protocol_version)
+		return protocols
+	var protocol_version := _protocol_value(message.get("protocol", -1), -1)
+	if protocol_version > 0:
+		protocols.append(protocol_version)
+	return protocols
 
 
 static func _protocol_support_label(message: Dictionary) -> String:

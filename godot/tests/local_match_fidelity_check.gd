@@ -16,6 +16,7 @@ class FlatTerrain:
 	var ground_y = 100.0
 	var slope_angle = 0.0
 	var bounds = Vector2(30.0, 190.0)
+	var craters: Array = []
 
 	func height_at(_x: float) -> float:
 		return ground_y
@@ -28,6 +29,43 @@ class FlatTerrain:
 
 	func playable_bounds() -> Vector2:
 		return bounds
+
+	func apply_crater(position: Vector2, radius: float) -> void:
+		craters.append({"position": position, "radius": radius})
+
+
+class CollisionTerrain:
+	extends TerrainModel
+
+	var collision_result := {"hit": true, "position": Vector2.ZERO, "distance": 0.0}
+	var craters: Array = []
+
+	func _init(position := Vector2.ZERO) -> void:
+		collision_result = {"hit": true, "position": position, "distance": 0.0}
+
+	func ground_collision(_start: Vector2, _end: Vector2) -> Dictionary:
+		return collision_result.duplicate()
+
+	func height_at(_x: float) -> float:
+		return 1000.0
+
+	func apply_crater(position: Vector2, radius: float) -> void:
+		craters.append({"position": position, "radius": radius})
+
+
+class TargetScoringTerrain:
+	extends FlatTerrain
+
+	var blocked_target_x := INF
+
+	func _init(blocked_x := INF) -> void:
+		blocked_target_x = blocked_x
+		ground_y = 1000.0
+
+	func ground_collision(_start: Vector2, end: Vector2) -> Dictionary:
+		if abs(end.x - blocked_target_x) <= 1.0:
+			return {"hit": true, "position": end, "distance": 0.0}
+		return {"hit": false, "position": Vector2.ZERO, "distance": INF}
 
 
 class SlopedTerrain:
@@ -75,6 +113,15 @@ class TrackStepTerrain:
 		return 0.0
 
 
+class MainMenuHost:
+	extends Node
+
+	var main_menu_calls := 0
+
+	func _show_main_menu() -> void:
+		main_menu_calls += 1
+
+
 func _init() -> void:
 	call_deferred("_run")
 
@@ -91,14 +138,39 @@ func _run() -> void:
 	var half_radius_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(125.0, 100.0), 40, 50.0))
 	var edge_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(150.0, 100.0), 40, 50.0))
 	var beyond_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(151.0, 100.0), 40, 50.0))
+	var fractional_damage = float(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(113.0, 100.0), 40, 50.0))
 
 	assert(direct_damage == 40)
 	assert(half_radius_damage == 30)
 	assert(edge_damage == 0)
 	assert(beyond_damage == 0)
+	assert(abs(fractional_damage - 37.296) < 0.001)
 	assert(not bool(local_match.call("_terrain_blocks_splash", Vector2(100.0, 40.0), Vector2(100.0, 41.0))))
+	var saved_terrain: RefCounted = local_match.get("_terrain")
+	local_match.set("_terrain", CollisionTerrain.new(Vector2(125.0, 100.0)))
+	assert(bool(local_match.call("_terrain_blocks_splash", Vector2(100.0, 100.0), Vector2(125.0, 100.0))))
+	var blocked_half_radius_damage = int(local_match.call("_splash_damage", Vector2(100.0, 100.0), Vector2(125.0, 100.0), 40, 50.0))
+	assert(blocked_half_radius_damage == 30)
+	local_match.set("_terrain", saved_terrain)
 	var player_tank: RefCounted = local_match.get("_player")
 	var enemy_tank: RefCounted = local_match.get("_enemy")
+	var starting_inventory: RefCounted = local_match.get("_inventory")
+	assert(str(local_match.get("_phase")) == "round_starting")
+	var initial_round_start_delay := float(local_match.get("_round_start_delay"))
+	var initial_shell_cooldown := float(starting_inventory.call("current_cooldown"))
+	assert(initial_round_start_delay > 0.0 and initial_round_start_delay <= 2.0)
+	assert(abs(initial_shell_cooldown - initial_round_start_delay) < 0.1)
+	local_match.call("_fire_player")
+	assert(Array(local_match.get("_projectiles")).is_empty())
+	var half_round_start_delay := initial_round_start_delay * 0.5
+	local_match.call("_update_weapon_cooldowns", half_round_start_delay)
+	local_match.call("_update_round_starting", half_round_start_delay)
+	assert(str(local_match.get("_phase")) == "round_starting")
+	assert(float(starting_inventory.call("current_cooldown")) > 0.0)
+	local_match.call("_update_weapon_cooldowns", half_round_start_delay + 0.1)
+	local_match.call("_update_round_starting", half_round_start_delay + 0.1)
+	assert(str(local_match.get("_phase")) == "aim")
+	assert(bool(starting_inventory.call("is_current_ready")))
 	player_tank.position = Vector2(120.0, 120.0)
 	enemy_tank.position = Vector2(240.0, 120.0)
 	var shell_death_audio: AudioStreamPlayer = local_match.get_node("ShellDeathAudio")
@@ -114,7 +186,46 @@ func _run() -> void:
 	assert(str(local_match.call("_segment_tank_hit_owner", Vector2(60.0, 102.0), Vector2(300.0, 102.0))) == "Player")
 	assert(str(local_match.call("_segment_tank_hit_owner", Vector2(60.0, 102.0), Vector2(300.0, 102.0), "Player")) == "Enemy")
 	assert(str(local_match.call("_segment_tank_hit_owner", Vector2(180.0, 102.0), Vector2(300.0, 102.0))) == "Enemy")
+	var player_launch_origin: Vector2 = player_tank.call("launch_origin")
+	assert(str(local_match.call("_segment_tank_hit_owner", player_launch_origin, player_launch_origin + Vector2(0.0, -80.0))) == "")
+	assert(str(local_match.call("_segment_tank_hit_owner", player_launch_origin + Vector2(0.0, -80.0), player_tank.position + Vector2(0.0, -12.0))) == "Player")
 	assert(abs(float(local_match.call("_explosion_damage_for_target", Vector2(10.0, 10.0), Vector2(400.0, 400.0), 40, 4.0, "Enemy", "Enemy")) - 40.0) < 0.01)
+	assert(Vector2(local_match.call("_tank_damage_center", enemy_tank)).distance_to(Vector2(enemy_tank.call("tank_center"))) < 0.01)
+	var direct_hit_terrain := FlatTerrain.new()
+	direct_hit_terrain.ground_y = 1000.0
+	local_match.set("_terrain", direct_hit_terrain)
+	_clear_projectiles(local_match)
+	player_tank.health = TankState.TANK_MAX_HEALTH
+	var away_machine_gun := {
+		"position": player_launch_origin,
+		"launch_position": player_launch_origin,
+		"launch_velocity": Vector2(0.0, -500.0),
+		"owner": "Player",
+		"player_owned": true,
+		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
+		"kind": "machine_gun",
+		"back_position": player_launch_origin,
+	}
+	local_match.call("_update_machine_gun_projectile", away_machine_gun, player_launch_origin, Vector2(0.0, -500.0), 0.1)
+	assert(int(player_tank.health) == TankState.TANK_MAX_HEALTH)
+	var self_hit_start := player_launch_origin + Vector2(0.0, -80.0)
+	var self_hit_end := self_hit_start + Vector2(0.0, 1100.0 + 9.5) * 0.1
+	assert(str(local_match.call("_segment_tank_hit_owner", self_hit_start, self_hit_end)) == "Player")
+	var self_hit_machine_gun := {
+		"position": self_hit_start,
+		"launch_position": self_hit_start,
+		"launch_velocity": Vector2(0.0, 1100.0),
+		"owner": "Player",
+		"player_owned": true,
+		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
+		"kind": "machine_gun",
+		"back_position": self_hit_start,
+	}
+	local_match.call("_update_machine_gun_projectile", self_hit_machine_gun, self_hit_start, Vector2(0.0, 1100.0), 0.1)
+	assert(int(player_tank.health) == TankState.TANK_MAX_HEALTH - 2)
+	assert(bool(self_hit_machine_gun.get("kill_next_frame", false)))
+	_clear_explosions(local_match)
+	local_match.set("_terrain", saved_terrain)
 	enemy_tank.health = TankState.TANK_MAX_HEALTH
 	player_tank.health = TankState.TANK_MAX_HEALTH
 	local_match.set("_score", 0)
@@ -126,9 +237,19 @@ func _run() -> void:
 		"Enemy"
 	)
 	assert(int(enemy_tank.health) == TankState.TANK_MAX_HEALTH - 40)
-	assert(int(local_match.get("_score")) == 40)
-	assert(int(local_match.get("_credits")) == 40)
+	assert(int(local_match.get("_score")) == 0)
+	assert(int(local_match.get("_credits")) == 0)
 	assert(shell_death_audio.playing)
+	_clear_explosions(local_match)
+	enemy_tank.health = TankState.TANK_MAX_HEALTH
+	var fractional_explosion_position: Vector2 = Vector2(local_match.call("_tank_damage_center", enemy_tank)) + Vector2(-13.0, 0.0)
+	local_match.call(
+		"_apply_explosion",
+		fractional_explosion_position,
+		{"weapon": {"name": "Shell", "kind": "shell", "damage": 40, "blast": 50.0}, "player_owned": true},
+		""
+	)
+	assert(abs(float(enemy_tank.health) - (float(TankState.TANK_MAX_HEALTH) - 37.296)) < 0.01)
 	local_match.call("_set_paused", true)
 	assert(shell_death_audio.stream_paused)
 	local_match.call("_set_paused", false)
@@ -159,8 +280,8 @@ func _run() -> void:
 		"Enemy"
 	)
 	assert(int(enemy_tank.health) == TankState.TANK_MAX_HEALTH - 20)
-	assert(int(local_match.get("_score")) == 20)
-	assert(int(local_match.get("_credits")) == 20)
+	assert(int(local_match.get("_score")) == 0)
+	assert(int(local_match.get("_credits")) == 0)
 	enemy_tank.shield_active = false
 	_clear_explosions(local_match)
 	local_match.set("_score", 0)
@@ -173,7 +294,7 @@ func _run() -> void:
 		"Player"
 	)
 	assert(int(player_tank.health) == TankState.TANK_MAX_HEALTH - 40)
-	assert(int(local_match.get("_enemy_score")) == 40)
+	assert(int(local_match.get("_enemy_score")) == 0)
 	_clear_explosions(local_match)
 
 	var full_roster_match = LocalMatchScene.instantiate()
@@ -206,8 +327,8 @@ func _run() -> void:
 		"Slot 3"
 	)
 	assert(int(roster_scout_tank.health) == TankState.TANK_MAX_HEALTH - 2)
-	assert(int(full_roster_match.get("_score")) == 2)
-	assert(int(full_roster_match.get("_credits")) == 2)
+	assert(int(full_roster_match.get("_score")) == 0)
+	assert(int(full_roster_match.get("_credits")) == 0)
 	assert(str(full_roster_match.get("_message")).contains("Scout"))
 	assert(str(full_roster_match.call("_participant_hud_summary")).contains("Alive 3/3"))
 	var full_roster_hud: Node = full_roster_match.get("_hud")
@@ -215,8 +336,14 @@ func _run() -> void:
 	full_roster_match.call("_update_hud")
 	var full_roster_hud_snapshot: Dictionary = full_roster_hud.get("_snapshot")
 	assert(str(full_roster_hud_snapshot.get("player_name", "")) == "Gunner")
-	assert(str(full_roster_hud_snapshot.get("target_name", "")) == "Pilot")
+	assert(str(full_roster_hud_snapshot.get("target_name", "")) == "Scout")
 	assert(str(full_roster_hud_snapshot.get("participant_summary", "")).contains("Alive 3/3"))
+	roster_enemy_tank.position = Vector2(200.0, 200.0)
+	roster_player_tank.position = Vector2(250.0, 200.0)
+	roster_scout_tank.position = Vector2(520.0, 160.0)
+	var target_scoring_terrain := TargetScoringTerrain.new(roster_player_tank.position.x)
+	full_roster_match.set("_terrain", target_scoring_terrain)
+	assert(int(full_roster_match.call("_target_index_for_attacker", 1)) == 2)
 	await _free_node(full_roster_match)
 
 	_clear_projectiles(local_match)
@@ -225,7 +352,7 @@ func _run() -> void:
 		Vector2(200.0, 120.0),
 		Vector2(100.0, -40.0),
 		"Player",
-		{"name": "MIRV", "kind": "mirv", "damage": 22, "blast": 34.0, "fragments": WeaponInventory.MIRV_FRAGMENTS, "spread": WeaponInventory.MIRV_SPREAD}
+		{"name": "MIRV", "kind": "mirv", "damage": WeaponInventory.MIRV_DAMAGE, "blast": 34.0, "fragments": WeaponInventory.MIRV_FRAGMENTS, "spread": WeaponInventory.MIRV_SPREAD}
 	)
 	var mirv_children: Array = local_match.get("_projectiles")
 	assert(mirv_children.size() == WeaponInventory.MIRV_FRAGMENTS)
@@ -242,12 +369,22 @@ func _run() -> void:
 	_clear_projectiles(local_match)
 
 	var inventory = WeaponInventory.new()
+	assert(inventory.ammo_for(WeaponInventory.MACHINE_GUN) == 0)
+	assert(inventory.stock_for(WeaponInventory.MACHINE_GUN) == 0)
+	assert(not inventory.select_by_name(WeaponInventory.MACHINE_GUN))
+	assert(inventory.add_ammo(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_SHOP_PACK)
+	assert(inventory.stock_for(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_SHOP_PACK)
+	assert(inventory.ammo_for(WeaponInventory.MACHINE_GUN) == 0)
+	assert(not inventory.select_by_name(WeaponInventory.MACHINE_GUN))
+	inventory.reset_round_ammo()
 	assert(inventory.select_by_name(WeaponInventory.MACHINE_GUN))
 	assert(inventory.ammo_for(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_ROUND_AMMO)
 	assert(inventory.consume_current())
 	assert(inventory.ammo_for(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_ROUND_AMMO - WeaponInventory.MACHINE_GUN_VOLLEY)
+	assert(inventory.stock_for(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_ROUND_AMMO - WeaponInventory.MACHINE_GUN_VOLLEY)
 	assert(inventory.consume_current_amount(WeaponInventory.DEFAULT_AMMO_SPEND))
 	assert(inventory.ammo_for(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_ROUND_AMMO - WeaponInventory.MACHINE_GUN_VOLLEY - 1)
+	assert(inventory.stock_for(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_ROUND_AMMO - WeaponInventory.MACHINE_GUN_VOLLEY - 1)
 	assert(inventory.ammo_pack_size(WeaponInventory.MACHINE_GUN) == WeaponInventory.MACHINE_GUN_SHOP_PACK)
 	assert(inventory.ammo_pack_size(WeaponInventory.MIRV) == WeaponInventory.MIRV_SHOP_PACK)
 	assert(inventory.ammo_pack_size(WeaponInventory.MISSILE) == WeaponInventory.MISSILE_SHOP_PACK)
@@ -257,18 +394,97 @@ func _run() -> void:
 	assert(inventory.ammo_pack_size(WeaponInventory.DEATHS_HEAD) == WeaponInventory.DEATHS_HEAD_SHOP_PACK)
 	assert(inventory.ammo_pack_size(WeaponInventory.HOVER_COIL) == WeaponInventory.HOVER_COIL_SHOP_PACK)
 	assert(inventory.ammo_pack_size(WeaponInventory.CORBOMITE) == WeaponInventory.CORBOMITE_SHOP_PACK)
+	assert(inventory.ammo_for(WeaponInventory.ROLLING_MINES) == 0)
+	assert(inventory.ammo_for(WeaponInventory.AIRSTRIKE) == 0)
+	assert(inventory.ammo_for(WeaponInventory.DEATHS_HEAD) == 0)
+	assert(inventory.ammo_for(WeaponInventory.HOVER_COIL) == 0)
+	assert(inventory.ammo_for(WeaponInventory.CORBOMITE) == 0)
+	assert(not inventory.select_by_name(WeaponInventory.CORBOMITE))
 	assert(abs(float(inventory.weapon_by_name(WeaponInventory.MACHINE_GUN).get("tracer_gravity", -1.0)) - WeaponInventory.MACHINE_GUN_TRACER_GRAVITY) < 0.01)
 	assert(abs(WeaponInventory.MACHINE_GUN_TRACER_GRAVITY - 190.0) < 0.01)
 	assert(abs(float(inventory.weapon_by_name(WeaponInventory.MIRV).get("min_fragment_spread_speed", -1.0)) - WeaponInventory.MIRV_MIN_FRAGMENT_SPREAD_SPEED) < 0.01)
+	assert(int(inventory.weapon_by_name(WeaponInventory.MIRV).get("damage", 0)) == WeaponInventory.MIRV_DAMAGE)
+	assert(WeaponInventory.MIRV_DAMAGE == 30)
 	assert(abs(float(inventory.weapon_by_name(WeaponInventory.MISSILE).get("powered_speed", -1.0)) - WeaponInventory.MISSILE_CLASSIC_SPEED) < 0.01)
+	assert(inventory.add_ammo(WeaponInventory.MIRV) == WeaponInventory.MIRV_SHOP_PACK)
+	assert(inventory.ammo_for(WeaponInventory.MIRV) == 0)
+	inventory.reset_round_ammo()
 	assert(inventory.select_by_name(WeaponInventory.MIRV))
 	assert(inventory.ammo_for(WeaponInventory.MIRV) == WeaponInventory.MIRV_ROUND_AMMO)
 	var depleted_inventory = WeaponInventory.new()
+	depleted_inventory.add_ammo(WeaponInventory.MISSILE)
+	depleted_inventory.add_ammo(WeaponInventory.NUKE)
+	depleted_inventory.reset_round_ammo()
 	assert(depleted_inventory.select_by_name(WeaponInventory.MISSILE))
 	assert(depleted_inventory.ammo_for(WeaponInventory.NUKE) > 0)
 	assert(depleted_inventory.consume_current_amount(depleted_inventory.ammo_for(WeaponInventory.MISSILE)))
 	assert(depleted_inventory.ammo_for(WeaponInventory.MISSILE) == 0)
 	assert(depleted_inventory.current_name() == WeaponInventory.SHELL)
+
+	var switch_inventory: RefCounted = local_match.get("_inventory")
+	switch_inventory.call("add_ammo", WeaponInventory.MACHINE_GUN)
+	switch_inventory.call("add_ammo", WeaponInventory.MIRV)
+	switch_inventory.call("reset_round_ammo")
+	local_match.call("_set_turn_index", 0)
+	local_match.set("_phase", "round_starting")
+	local_match.set("_weapon_switch_delay_remaining", 0.0)
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.SHELL)
+	local_match.call("_cycle_weapon", 1)
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.SHELL)
+	assert(abs(float(local_match.get("_weapon_switch_delay_remaining"))) < 0.01)
+	local_match.set("_phase", "aim")
+	local_match.set("_weapon_switch_delay_remaining", 0.0)
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.SHELL)
+	local_match.call("_cycle_weapon", 1)
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.MACHINE_GUN)
+	assert(abs(float(local_match.get("_weapon_switch_delay_remaining")) - 0.2) < 0.01)
+	local_match.call("_cycle_weapon", 1)
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.MACHINE_GUN)
+	local_match.call("_update_weapon_switch_delay", 0.19)
+	local_match.call("_cycle_weapon", 1)
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.MACHINE_GUN)
+	local_match.call("_update_weapon_switch_delay", 0.02)
+	assert(abs(float(local_match.get("_weapon_switch_delay_remaining"))) < 0.01)
+	local_match.call("_cycle_weapon", 1)
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.MIRV)
+	assert(abs(float(local_match.get("_weapon_switch_delay_remaining")) - 0.2) < 0.01)
+
+	_clear_projectiles(local_match)
+	local_match.set("_phase", "aim")
+	local_match.set("_weapon_switch_delay_remaining", 0.0)
+	switch_inventory.call("update_current_cooldown", WeaponInventory.MIRV_COOLDOWN)
+	local_match.call("_fire_player")
+	assert(str(switch_inventory.call("current_name")) == WeaponInventory.SHELL)
+	assert(int(switch_inventory.call("ammo_for", WeaponInventory.MIRV)) == 0)
+	var last_limited_projectiles: Array = local_match.get("_projectiles")
+	assert(last_limited_projectiles.size() == 1)
+	var last_limited_projectile: Dictionary = last_limited_projectiles[0]
+	assert(str(last_limited_projectile.get("kind", "")) == "mirv")
+	assert(str(Dictionary(last_limited_projectile.get("weapon", {})).get("name", "")) == WeaponInventory.MIRV)
+	assert(str(local_match.get("_message")).contains("fired MIRV"))
+	_clear_projectiles(local_match)
+	local_match.set("_phase", "aim")
+	local_match.call("_stop_fire_shell_audio")
+
+	var cooldown_inventory: RefCounted = local_match.get("_inventory")
+	_clear_projectiles(local_match)
+	local_match.set("_phase", "aim")
+	local_match.call("_set_turn_index", 0)
+	cooldown_inventory.call("select_shell")
+	assert(abs(float(cooldown_inventory.call("current_cooldown")) - WeaponInventory.SHELL_COOLDOWN) < 0.01)
+	assert(not bool(cooldown_inventory.call("is_current_ready")))
+	local_match.call("_fire_player")
+	assert(str(local_match.get("_phase")) == "aim")
+	assert(Array(local_match.get("_projectiles")).is_empty())
+	assert(str(local_match.get("_message")).contains("not ready"))
+	cooldown_inventory.call("update_current_cooldown", WeaponInventory.SHELL_COOLDOWN)
+	assert(bool(cooldown_inventory.call("is_current_ready")))
+	local_match.call("_fire_player")
+	assert(str(local_match.get("_phase")) == "projectile")
+	assert(Array(local_match.get("_projectiles")).size() == 1)
+	_clear_projectiles(local_match)
+	local_match.set("_phase", "aim")
+	local_match.call("_stop_fire_shell_audio")
 
 	local_match.set("_wind", 0.0)
 	local_match.set("_wind_gust", 0.0)
@@ -278,16 +494,24 @@ func _run() -> void:
 		0.0,
 		10.0,
 		true,
-		{"name": "MIRV", "kind": "mirv", "damage": 22, "blast": 34.0, "fragments": WeaponInventory.MIRV_FRAGMENTS, "spread": WeaponInventory.MIRV_SPREAD},
+		{"name": "MIRV", "kind": "mirv", "damage": WeaponInventory.MIRV_DAMAGE, "blast": 34.0, "fragments": WeaponInventory.MIRV_FRAGMENTS, "spread": WeaponInventory.MIRV_SPREAD},
 		Vector2.ZERO,
 		Vector2(100.0, 0.0)
 	)
 	local_match.call("_update_projectiles", 0.25)
 	mirv_children = local_match.get("_projectiles")
+	assert(mirv_children.size() == 1)
+	var mirv_at_exact_apex: Dictionary = mirv_children[0]
+	assert(str(mirv_at_exact_apex.get("kind", "")) == "mirv")
+	assert(abs(float(mirv_at_exact_apex.get("age", 0.0)) - 0.25) < 0.01)
+	assert(not bool(mirv_at_exact_apex.get("split", false)))
+	assert(Vector2(mirv_at_exact_apex.get("position", Vector2.ZERO)).distance_to(Vector2(325.0, 65.9375)) < 0.01)
+	local_match.call("_update_projectiles", 0.01)
+	mirv_children = local_match.get("_projectiles")
 	assert(mirv_children.size() == WeaponInventory.MIRV_FRAGMENTS)
 	var split_mirv_position: Vector2 = Dictionary(mirv_children[0]).get("position", Vector2.ZERO)
 	assert(abs(split_mirv_position.x - 325.0) < 0.01)
-	assert(abs(split_mirv_position.y - 71.875) < 0.01)
+	assert(abs(split_mirv_position.y - 65.9375) < 0.01)
 	for mirv_projectile in mirv_children:
 		assert(str(mirv_projectile.get("kind", "")) == "shell")
 		assert(str(Dictionary(mirv_projectile.get("weapon", {})).get("name", "")) == "MIRV Fragment")
@@ -298,7 +522,7 @@ func _run() -> void:
 		Vector2(200.0, 120.0),
 		Vector2(0.0, -80.0),
 		"Player",
-		{"name": "MIRV", "kind": "mirv", "damage": 22, "blast": 34.0, "fragments": WeaponInventory.MIRV_FRAGMENTS, "spread": WeaponInventory.MIRV_SPREAD, "min_fragment_spread_speed": WeaponInventory.MIRV_MIN_FRAGMENT_SPREAD_SPEED}
+		{"name": "MIRV", "kind": "mirv", "damage": WeaponInventory.MIRV_DAMAGE, "blast": 34.0, "fragments": WeaponInventory.MIRV_FRAGMENTS, "spread": WeaponInventory.MIRV_SPREAD, "min_fragment_spread_speed": WeaponInventory.MIRV_MIN_FRAGMENT_SPREAD_SPEED}
 	)
 	mirv_children = local_match.get("_projectiles")
 	assert(mirv_children.size() == WeaponInventory.MIRV_FRAGMENTS)
@@ -367,6 +591,20 @@ func _run() -> void:
 	}
 	local_match.call("_update_missile_projectile", recentered_missile, Vector2(120.0, 0.0), Vector2.ZERO, 0.1)
 	assert(abs(float(recentered_missile.get("angle_change", -1.0))) < 0.01)
+	var conflicting_steer_missile = {
+		"fuel": 1.0,
+		"angle": 45.0,
+		"angle_change": 90.0,
+		"steer_sensitivity": 300.0,
+		"player_owned": true,
+	}
+	Input.action_press("gf_aim_left")
+	Input.action_press("gf_aim_right")
+	local_match.call("_update_missile_projectile", conflicting_steer_missile, Vector2(120.0, 0.0), Vector2.ZERO, 0.1)
+	Input.action_release("gf_aim_left")
+	Input.action_release("gf_aim_right")
+	assert(abs(float(conflicting_steer_missile.get("angle_change", -1.0))) < 0.01)
+	assert(abs(float(conflicting_steer_missile.get("angle", 0.0)) - 45.0) < 0.01)
 	assert(abs(float(local_match.call("_short_angle_delta", 350.0, 10.0)) - 20.0) < 0.01)
 	assert(abs(float(local_match.call("_short_angle_delta", 10.0, 350.0)) + 20.0) < 0.01)
 
@@ -399,6 +637,34 @@ func _run() -> void:
 	assert(not bool(exhausting_missile.get("fuel_exhausted_this_frame", true)))
 	assert(bool(local_match.call("_missile_applies_ballistic_acceleration", exhausting_missile)))
 	assert(next_freefall_velocity.distance_to(exhausted_frame_velocity) < 0.01)
+	_clear_projectiles(local_match)
+	var missile_freefall_original_terrain = local_match.get("_terrain")
+	var missile_freefall_terrain = FlatTerrain.new()
+	missile_freefall_terrain.ground_y = 1000.0
+	local_match.set("_terrain", missile_freefall_terrain)
+	local_match.set("_wind", 0.0)
+	local_match.set("_wind_gust", 0.0)
+	local_match.set("_phase", "projectile")
+	var freefall_missile_fixture: Dictionary = {
+		"kind": "missile",
+		"weapon": {"name": "Missile", "kind": "missile", "powered_speed": WeaponInventory.MISSILE_CLASSIC_SPEED},
+		"position": Vector2(640.0, 20.0),
+		"velocity": Vector2(20.0, 30.0),
+		"fuel": -0.01,
+		"angle": 0.0,
+		"angle_change": 0.0,
+		"owner": "Player",
+	}
+	var freefall_missile_fixture_projectiles: Array[Dictionary] = [freefall_missile_fixture]
+	local_match.set("_projectiles", freefall_missile_fixture_projectiles)
+	local_match.call("_update_projectiles", 0.1)
+	var freefall_missile_projectiles: Array = local_match.get("_projectiles")
+	assert(freefall_missile_projectiles.size() == 1)
+	var freefall_missile: Dictionary = freefall_missile_projectiles[0]
+	assert(Vector2(freefall_missile.get("position", Vector2.ZERO)).distance_to(Vector2(642.0, 23.0)) < 0.01)
+	assert(Vector2(freefall_missile.get("velocity", Vector2.ZERO)).distance_to(Vector2(20.0, 49.0)) < 0.01)
+	_clear_projectiles(local_match)
+	local_match.set("_terrain", missile_freefall_original_terrain)
 
 	local_match.call(
 		"_fire_from",
@@ -449,7 +715,140 @@ func _run() -> void:
 	assert(gravity_projectiles.size() == 1)
 	var gravity_projectile: Dictionary = gravity_projectiles[0]
 	assert(abs(Vector2(gravity_projectile.get("velocity", Vector2.ZERO)).y - 19.0) < 0.01)
+	assert(Vector2(gravity_projectile.get("position", Vector2.ZERO)).distance_to(Vector2(300.0, 30.95)) < 0.01)
 	_clear_projectiles(local_match)
+
+	local_match.get("_trail_segments").clear()
+	var trail_spacing := 0.2 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+	var trail_projectile := {
+		"kind": "shell",
+		"trail_active": true,
+		"trail_last_position": Vector2.ZERO,
+	}
+	local_match.call("_lay_projectile_trail", trail_projectile, Vector2(0.61 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 0.0))
+	var trail_segments: Array = local_match.get("_trail_segments")
+	assert(trail_segments.size() == 3)
+	assert(Vector2(trail_projectile.get("trail_last_position", Vector2.ZERO)).distance_to(Vector2(0.6 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 0.0)) < 0.01)
+	for trail_index in range(trail_segments.size()):
+		var trail_segment: Dictionary = trail_segments[trail_index]
+		assert(Vector2(trail_segment.get("position", Vector2.ZERO)).distance_to(Vector2(trail_spacing * float(trail_index + 1), 0.0)) < 0.01)
+		assert(abs(float(trail_segment.get("fade", 0.0)) - 0.8) < 0.01)
+		assert(abs(float(trail_segment.get("length", 0.0)) - trail_spacing) < 0.01)
+		assert(abs(float(trail_segment.get("angle", 0.0)) + 90.0) < 0.01)
+	var trail_points: PackedVector2Array = local_match.call("_trail_segment_draw_points", trail_segments[0])
+	assert(trail_points.size() == 4)
+	var trail_uvs: PackedVector2Array = local_match.call("_trail_segment_draw_uvs")
+	assert(trail_uvs.size() == 4)
+	assert(trail_uvs[0] == Vector2.ZERO)
+	local_match.call("_update_trail_segments", 4.0)
+	trail_segments = local_match.get("_trail_segments")
+	assert(trail_segments.size() == 3)
+	assert(abs(float(Dictionary(trail_segments[0]).get("fade", -1.0))) < 0.01)
+	local_match.call("_update_trail_segments", 0.01)
+	assert(Array(local_match.get("_trail_segments")).is_empty())
+	var spent_missile_trail_projectile := {
+		"kind": "missile",
+		"trail_active": true,
+		"trail_last_position": Vector2.ZERO,
+		"fuel": -0.1,
+		"fuel_exhausted_this_frame": false,
+	}
+	local_match.call("_lay_projectile_trail", spent_missile_trail_projectile, Vector2(0.61 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 0.0))
+	assert(Array(local_match.get("_trail_segments")).is_empty())
+	spent_missile_trail_projectile["fuel_exhausted_this_frame"] = true
+	local_match.call("_lay_projectile_trail", spent_missile_trail_projectile, Vector2(0.61 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 0.0))
+	assert(Array(local_match.get("_trail_segments")).size() == 3)
+	local_match.get("_trail_segments").clear()
+	var shell_projectile_points: PackedVector2Array = local_match.call("_shell_projectile_draw_points", Vector2(100.0, 200.0))
+	assert(shell_projectile_points.size() == 3)
+	assert(shell_projectile_points[0].distance_to(Vector2(100.0, 200.0 + 0.018 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE)) < 0.01)
+	assert(shell_projectile_points[1].distance_to(Vector2(100.0 + 0.03 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 200.0 - 0.018 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE)) < 0.01)
+	assert(shell_projectile_points[2].distance_to(Vector2(100.0 - 0.03 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 200.0 - 0.018 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE)) < 0.01)
+	assert(bool(local_match.call("_kind_uses_shell_projectile_shape", "shell")))
+	assert(bool(local_match.call("_kind_uses_shell_projectile_shape", "mirv")))
+	assert(bool(local_match.call("_kind_uses_shell_projectile_shape", "nuke")))
+	assert(not bool(local_match.call("_kind_uses_shell_projectile_shape", "missile")))
+	var missile_projectile_points: PackedVector2Array = local_match.call("_missile_projectile_draw_points", Vector2(100.0, 200.0), 90.0)
+	assert(missile_projectile_points.size() == 5)
+	assert(missile_projectile_points[0].distance_to(Vector2(100.0 - 0.08 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 200.0)) < 0.01)
+	assert(missile_projectile_points[1].distance_to(Vector2(100.0, 200.0 - 0.08 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE)) < 0.01)
+	assert(missile_projectile_points[2].distance_to(Vector2(100.0 + 0.16 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 200.0 - 0.08 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE)) < 0.01)
+	assert(missile_projectile_points[3].distance_to(Vector2(100.0 + 0.16 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE, 200.0 + 0.08 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE)) < 0.01)
+	assert(missile_projectile_points[4].distance_to(Vector2(100.0, 200.0 + 0.08 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE)) < 0.01)
+	var mouse_cursor_points: PackedVector2Array = local_match.call("_mouse_cursor_draw_points", Vector2(320.0, 160.0))
+	assert(mouse_cursor_points.size() == 4)
+	assert(mouse_cursor_points[0] == Vector2(320.0, 160.0))
+	assert(mouse_cursor_points[1] == Vector2(352.0, 160.0))
+	assert(mouse_cursor_points[2] == Vector2(352.0, 192.0))
+	assert(mouse_cursor_points[3] == Vector2(320.0, 192.0))
+	var mouse_cursor_uvs: PackedVector2Array = local_match.call("_mouse_cursor_draw_uvs")
+	assert(mouse_cursor_uvs.size() == 4)
+	assert(mouse_cursor_uvs[0] == Vector2.ZERO)
+	assert(mouse_cursor_uvs[2] == Vector2(32.0, 32.0))
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	local_match.set("_mouse_aim_enabled", true)
+	local_match.set("_phase", "aim")
+	local_match.call("_set_turn_index", 0)
+	assert(bool(local_match.call("_should_use_classic_mouse_cursor")))
+	local_match.call("_sync_classic_mouse_cursor_mode")
+	assert(bool(local_match.get("_classic_mouse_cursor_active")))
+	local_match.call("_set_paused", true)
+	assert(not bool(local_match.get("_classic_mouse_cursor_active")))
+	local_match.set("_mouse_aim_enabled", false)
+	local_match.call("_set_paused", false)
+	local_match.call("_sync_classic_mouse_cursor_mode")
+	assert(not bool(local_match.get("_classic_mouse_cursor_active")))
+
+	_clear_explosions(local_match)
+	local_match.call("_stop_shell_death_audio")
+	local_match.set("_phase", "projectile")
+	local_match.set("_score", 0)
+	local_match.set("_credits", 0)
+	local_match.call(
+		"_fire_from",
+		Vector2(1275.0, 30.0),
+		0.0,
+		0.0,
+		true,
+		{"name": "Shell", "kind": "shell", "damage": 40, "blast": 48.0, "speed": 4.2},
+		Vector2.ZERO,
+		Vector2(200.0, 0.0)
+	)
+	local_match.call("_update_projectiles", 0.1)
+	assert(Array(local_match.get("_projectiles")).is_empty())
+	assert(Array(local_match.get("_explosions")).is_empty())
+	assert(str(local_match.get("_phase")) == "round_over")
+	assert(int(local_match.get("_score")) == 0)
+	assert(int(local_match.get("_credits")) == 0)
+	assert(not shell_death_audio.playing)
+
+	var original_terrain = local_match.get("_terrain")
+	var terrain_first_collision = CollisionTerrain.new(Vector2(-1000.0, -1000.0))
+	local_match.set("_terrain", terrain_first_collision)
+	enemy_tank.position = Vector2(550.0, 48.0)
+	enemy_tank.health = TankState.TANK_MAX_HEALTH
+	enemy_tank.state = TankState.STATE_ALIVE
+	_clear_explosions(local_match)
+	_clear_projectiles(local_match)
+	local_match.set("_phase", "projectile")
+	local_match.call(
+		"_fire_from",
+		Vector2(300.0, 30.0),
+		0.0,
+		0.0,
+		true,
+		{"name": "Shell", "kind": "shell", "damage": 40, "blast": 1.0, "speed": 4.2},
+		Vector2.ZERO,
+		Vector2(3000.0, 0.0)
+	)
+	local_match.call("_update_projectiles", 0.1)
+	assert(Array(local_match.get("_projectiles")).is_empty())
+	assert(Array(local_match.get("_explosions")).size() == 1)
+	assert(int(enemy_tank.health) == TankState.TANK_MAX_HEALTH)
+	var terrain_first_explosion: Dictionary = Array(local_match.get("_explosions"))[0]
+	assert(Vector2(terrain_first_explosion.get("position", Vector2.ZERO)).distance_to(Vector2(-1000.0, -1000.0)) < 0.01)
+	_clear_explosions(local_match)
+	local_match.set("_terrain", original_terrain)
 
 	local_match.call(
 		"_fire_weapon",
@@ -478,7 +877,7 @@ func _run() -> void:
 	var score_before = int(local_match.get("_score"))
 	local_match.call("_apply_machine_gun_damage", first_machine_gun_projectile, "Enemy")
 	assert(int(enemy_tank.health) == enemy_health_before - 2)
-	assert(int(local_match.get("_score")) == score_before + 2)
+	assert(int(local_match.get("_score")) == score_before)
 	assert(metal_hit_audio.playing)
 	local_match.call("_set_paused", true)
 	assert(metal_hit_audio.stream_paused)
@@ -560,6 +959,60 @@ func _run() -> void:
 	assert(Vector2(falling_machine_gun_projectile.get("back_position", Vector2.ZERO)).distance_to(expected_falling_machine_gun_back_position) < 0.01)
 	assert(not bool(falling_machine_gun_projectile.get("expired", false)))
 
+	var exiting_machine_gun_projectile = {
+		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
+		"position": Vector2(1275.0, 30.0),
+		"owner": "Player",
+		"age": 0.1,
+		"launch_position": Vector2(1275.0, 30.0),
+		"launch_velocity": Vector2(200.0, 0.0),
+	}
+	local_match.call("_update_machine_gun_projectile", exiting_machine_gun_projectile, Vector2(1275.0, 30.0), Vector2(200.0, 0.0), 0.1)
+	assert(bool(exiting_machine_gun_projectile.get("kill_next_frame", false)))
+	assert(not bool(exiting_machine_gun_projectile.get("expired", false)))
+	assert(float(Vector2(exiting_machine_gun_projectile.get("position", Vector2.ZERO)).x) > float(local_match.get("_world_size").x))
+	local_match.call("_update_machine_gun_projectile", exiting_machine_gun_projectile, Vector2(exiting_machine_gun_projectile.get("position", Vector2.ZERO)), Vector2(exiting_machine_gun_projectile.get("velocity", Vector2.ZERO)), 0.1)
+	assert(bool(exiting_machine_gun_projectile.get("expired", false)))
+
+	player_tank.position = Vector2(120.0, 120.0)
+	enemy_tank.position = Vector2(240.0, 120.0)
+	enemy_tank.health = TankState.TANK_MAX_HEALTH
+	enemy_tank.state = TankState.STATE_ALIVE
+	var hit_machine_gun_projectile = {
+		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
+		"position": Vector2(180.0, 102.0),
+		"owner": "Player",
+		"age": 0.1,
+		"launch_position": Vector2(180.0, 102.0),
+		"launch_velocity": Vector2(600.0, 0.0),
+	}
+	local_match.call("_update_machine_gun_projectile", hit_machine_gun_projectile, Vector2(180.0, 102.0), Vector2(600.0, 0.0), 0.1)
+	assert(bool(hit_machine_gun_projectile.get("kill_next_frame", false)))
+	assert(not bool(hit_machine_gun_projectile.get("expired", false)))
+	assert(int(enemy_tank.health) == TankState.TANK_MAX_HEALTH - 2)
+	local_match.call("_update_machine_gun_projectile", hit_machine_gun_projectile, Vector2(hit_machine_gun_projectile.get("position", Vector2.ZERO)), Vector2(hit_machine_gun_projectile.get("velocity", Vector2.ZERO)), 0.1)
+	assert(bool(hit_machine_gun_projectile.get("expired", false)))
+	assert(int(enemy_tank.health) == TankState.TANK_MAX_HEALTH - 2)
+	enemy_tank.health = TankState.TANK_MAX_HEALTH
+
+	local_match.set("_terrain", terrain_first_collision)
+	var terrain_first_machine_gun_projectile = {
+		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2, "tracer_gravity": 0.0},
+		"position": Vector2(300.0, 30.0),
+		"owner": "Player",
+		"age": 0.1,
+		"launch_position": Vector2(300.0, 30.0),
+		"launch_velocity": Vector2(3000.0, 0.0),
+	}
+	local_match.call("_stop_metal_hit_audio")
+	local_match.call("_update_machine_gun_projectile", terrain_first_machine_gun_projectile, Vector2(300.0, 30.0), Vector2(3000.0, 0.0), 0.1)
+	assert(bool(terrain_first_machine_gun_projectile.get("kill_next_frame", false)))
+	assert(not bool(terrain_first_machine_gun_projectile.get("expired", false)))
+	assert(Vector2(terrain_first_machine_gun_projectile.get("position", Vector2.ZERO)).distance_to(Vector2(-1000.0, -1000.0)) < 0.01)
+	assert(int(enemy_tank.health) == TankState.TANK_MAX_HEALTH)
+	assert(not metal_hit_audio.playing)
+	local_match.set("_terrain", original_terrain)
+
 	var delayed_machine_gun_projectile = {
 		"delay": WeaponInventory.MACHINE_GUN_COOLDOWN,
 		"position": Vector2(320.0, 160.0),
@@ -573,7 +1026,41 @@ func _run() -> void:
 	assert(Vector2(delayed_machine_gun_projectile.get("back_position", Vector2.ZERO)) == Vector2(320.0, 160.0))
 
 	var player_inventory: RefCounted = local_match.get("_inventory")
-	player_inventory.reset_round_ammo()
+	_clear_projectiles(local_match)
+	local_match.call("_reset_machine_gun_fire")
+	_stock_for_round(player_inventory, WeaponInventory.MACHINE_GUN)
+	assert(player_inventory.select_by_name(WeaponInventory.MACHINE_GUN))
+	var large_frame_machine_gun_ammo_before = int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
+	player_tank.position = Vector2(320.0, 160.0)
+	player_tank.gun_angle = 0.0
+	player_tank.airborne_velocity = Vector2.ZERO
+	local_match.call("_set_turn_index", 0)
+	local_match.set("_machine_gun_active", true)
+	local_match.set("_machine_gun_fire_held", true)
+	local_match.set("_machine_gun_player_owned", true)
+	local_match.set("_machine_gun_owner", "Player")
+	local_match.set("_machine_gun_weapon", player_inventory.weapon_by_name(WeaponInventory.MACHINE_GUN))
+	local_match.set("_machine_gun_cooldown", WeaponInventory.MACHINE_GUN_COOLDOWN)
+	local_match.set("_machine_gun_shots_fired", 0)
+	Input.action_press("gf_fire")
+	var large_machine_gun_delta := WeaponInventory.MACHINE_GUN_COOLDOWN * 3.5
+	local_match.call("_update_machine_gun_fire", large_machine_gun_delta)
+	var large_frame_machine_gun_projectiles: Array = local_match.get("_projectiles")
+	assert(large_frame_machine_gun_projectiles.size() == 3)
+	assert(abs(float(large_frame_machine_gun_projectiles[0].get("delay", 0.0)) - WeaponInventory.MACHINE_GUN_COOLDOWN) < 0.01)
+	assert(abs(float(large_frame_machine_gun_projectiles[1].get("delay", 0.0)) - WeaponInventory.MACHINE_GUN_COOLDOWN * 2.0) < 0.01)
+	assert(abs(float(large_frame_machine_gun_projectiles[2].get("delay", 0.0)) - WeaponInventory.MACHINE_GUN_COOLDOWN * 3.0) < 0.01)
+	assert(abs(float(local_match.get("_machine_gun_cooldown")) - WeaponInventory.MACHINE_GUN_COOLDOWN * 0.5) < 0.01)
+	assert(int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == large_frame_machine_gun_ammo_before - 3)
+	local_match.call("_update_projectiles", large_machine_gun_delta)
+	large_frame_machine_gun_projectiles = local_match.get("_projectiles")
+	assert(large_frame_machine_gun_projectiles.size() == 3)
+	assert(abs(float(large_frame_machine_gun_projectiles[0].get("age", 0.0)) - WeaponInventory.MACHINE_GUN_COOLDOWN * 2.5) < 0.01)
+	assert(abs(float(large_frame_machine_gun_projectiles[1].get("age", 0.0)) - WeaponInventory.MACHINE_GUN_COOLDOWN * 1.5) < 0.01)
+	assert(abs(float(large_frame_machine_gun_projectiles[2].get("age", 0.0)) - WeaponInventory.MACHINE_GUN_COOLDOWN * 0.5) < 0.01)
+	Input.action_release("gf_fire")
+	_clear_projectiles(local_match)
+	local_match.call("_reset_machine_gun_fire")
 	assert(player_inventory.select_by_name(WeaponInventory.MACHINE_GUN))
 	var held_machine_gun_ammo_before = int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
 	local_match.set("_phase", "aim")
@@ -601,6 +1088,7 @@ func _run() -> void:
 	assert(int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == held_machine_gun_ammo_before)
 	assert(str(local_match.get("_message")).contains("unselected"))
 	Input.action_release("gf_fire")
+	local_match.call("_update_weapon_switch_delay", 0.2)
 	assert(player_inventory.select_by_name(WeaponInventory.MACHINE_GUN))
 	held_machine_gun_ammo_before = int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
 	Input.action_press("gf_fire")
@@ -634,7 +1122,9 @@ func _run() -> void:
 
 	player_inventory.reset_round_ammo()
 	assert(player_inventory.select_by_name(WeaponInventory.MACHINE_GUN))
-	assert(player_inventory.consume_ammo(WeaponInventory.MACHINE_GUN, WeaponInventory.MACHINE_GUN_ROUND_AMMO - 1))
+	var machine_gun_ammo_to_leave_one := int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) - 1
+	assert(machine_gun_ammo_to_leave_one > 0)
+	assert(player_inventory.consume_ammo(WeaponInventory.MACHINE_GUN, machine_gun_ammo_to_leave_one))
 	assert(int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == 1)
 	local_match.set("_phase", "aim")
 	local_match.call("_set_turn_index", 0)
@@ -654,7 +1144,7 @@ func _run() -> void:
 	local_match.call("_reset_machine_gun_fire")
 
 	var enemy_inventory: RefCounted = local_match.get("_enemy_inventory")
-	enemy_inventory.reset_round_ammo()
+	_stock_for_round(enemy_inventory, WeaponInventory.MACHINE_GUN)
 	assert(enemy_inventory.select_by_name(WeaponInventory.MACHINE_GUN))
 	local_match.call("_set_turn_index", 1)
 	var ai_burst_weapon: Dictionary = enemy_inventory.weapon_by_name(WeaponInventory.MACHINE_GUN)
@@ -696,6 +1186,8 @@ func _run() -> void:
 	assert(not machine_gun_audio.playing)
 	_clear_projectiles(local_match)
 
+	enemy_inventory.add_ammo(WeaponInventory.NUKE)
+	enemy_inventory.reset_round_ammo()
 	var nuke_weapon: Dictionary = enemy_inventory.weapon_by_name(WeaponInventory.NUKE)
 	player_for_burst.health = 20
 	enemy_for_burst.health = TankState.TANK_MAX_HEALTH
@@ -730,9 +1222,14 @@ func _run() -> void:
 		{"name": "Machine Gun", "kind": "machine_gun", "damage": 2, "blast": 0.0, "speed": 5.8, "volley": 1, "cooldown": 0.1, "direct_damage": true}
 	)
 	local_match.call("_update_projectiles", 0.2)
-	assert(local_match.get("_projectiles").is_empty())
+	var terrain_machine_gun_projectiles: Array = local_match.get("_projectiles")
+	assert(terrain_machine_gun_projectiles.size() == 1)
+	assert(bool(Dictionary(terrain_machine_gun_projectiles[0]).get("kill_next_frame", false)))
+	assert(not bool(Dictionary(terrain_machine_gun_projectiles[0]).get("expired", false)))
 	assert(local_match.get("_explosions").is_empty())
 	assert(abs(float(match_terrain.height_at(tracer_x)) - tracer_ground_before) < 0.01)
+	local_match.call("_update_projectiles", 0.01)
+	assert(local_match.get("_projectiles").is_empty())
 	local_match.set("_phase", "aim")
 	local_match.call("_set_turn_index", 0)
 
@@ -740,8 +1237,19 @@ func _run() -> void:
 	var nuke_explosions: Array = local_match.get("_explosions")
 	assert(nuke_explosions.size() == 1)
 	var nuke_explosion: Dictionary = nuke_explosions[0]
+	var expected_nuke_radius := 96.0 * 1.1
 	assert(bool(nuke_explosion.get("white_out", false)))
 	assert(abs(float(nuke_explosion.get("white_out_level", 0.0)) - 1.0) < 0.01)
+	assert(abs(float(nuke_explosion.get("fade_away", 0.0)) - 0.8) < 0.01)
+	assert(abs(float(nuke_explosion.get("radius", 0.0)) - expected_nuke_radius) < 0.01)
+	var blast_draw_points: PackedVector2Array = local_match.call("_blast_draw_points", nuke_explosion)
+	assert(blast_draw_points.size() == 4)
+	assert(blast_draw_points[0].distance_to(Vector2(430.0 - expected_nuke_radius, 220.0 - expected_nuke_radius)) < 0.01)
+	assert(blast_draw_points[2].distance_to(Vector2(430.0 + expected_nuke_radius, 220.0 + expected_nuke_radius)) < 0.01)
+	var blast_draw_uvs: PackedVector2Array = local_match.call("_blast_draw_uvs")
+	assert(blast_draw_uvs.size() == 4)
+	assert(blast_draw_uvs[0] == Vector2.ZERO)
+	assert(blast_draw_uvs[2] == Vector2(64.0, 64.0))
 	assert(float(local_match.call("_whiteout_alpha")) > 0.99)
 	var nuke_audio: AudioStreamPlayer = local_match.get_node("NukeAudio")
 	assert(nuke_audio.stream != null)
@@ -759,7 +1267,45 @@ func _run() -> void:
 	nuke_explosion = nuke_explosions[0]
 	assert(bool(nuke_explosion.get("white_out", false)))
 	assert(float(nuke_explosion.get("white_out_level", 0.0)) < 0.5)
+	assert(abs(float(nuke_explosion.get("fade_away", 0.0)) - 0.7) < 0.01)
+	assert(abs(float(nuke_explosion.get("radius", 0.0)) - expected_nuke_radius) < 0.01)
 	assert(float(local_match.call("_whiteout_alpha")) < 0.5)
+	var exact_fade_explosions: Array[Dictionary] = [{
+		"position": Vector2(430.0, 220.0),
+		"radius": expected_nuke_radius,
+		"life": 1.0,
+		"fade_away": 0.1,
+		"white_out": false,
+		"white_out_level": 0.0,
+	}]
+	local_match.set("_explosions", exact_fade_explosions)
+	local_match.call("_update_explosions", 1.0)
+	nuke_explosions = local_match.get("_explosions")
+	assert(nuke_explosions.size() == 1)
+	assert(abs(float(Dictionary(nuke_explosions[0]).get("fade_away", -1.0))) < 0.01)
+	assert(abs(float(Dictionary(nuke_explosions[0]).get("radius", 0.0)) - expected_nuke_radius) < 0.01)
+	local_match.call("_update_explosions", 0.01)
+	assert(Array(local_match.get("_explosions")).is_empty())
+	var exact_whiteout_explosions: Array[Dictionary] = [{
+		"position": Vector2(430.0, 220.0),
+		"radius": expected_nuke_radius,
+		"life": 8.0,
+		"fade_away": 0.8,
+		"white_out": true,
+		"white_out_level": 0.6,
+	}]
+	local_match.set("_explosions", exact_whiteout_explosions)
+	local_match.call("_update_explosions", 1.0)
+	nuke_explosions = local_match.get("_explosions")
+	assert(nuke_explosions.size() == 1)
+	nuke_explosion = nuke_explosions[0]
+	assert(bool(nuke_explosion.get("white_out", false)))
+	assert(abs(float(nuke_explosion.get("white_out_level", -1.0))) < 0.01)
+	assert(abs(float(nuke_explosion.get("radius", 0.0)) - expected_nuke_radius) < 0.01)
+	local_match.call("_update_explosions", 0.01)
+	nuke_explosions = local_match.get("_explosions")
+	assert(nuke_explosions.size() == 1)
+	assert(not bool(Dictionary(nuke_explosions[0]).get("white_out", true)))
 	local_match.call("_stop_nuke_audio")
 	assert(not nuke_audio.playing)
 	_clear_explosions(local_match)
@@ -887,6 +1433,8 @@ func _run() -> void:
 	local_match.call("_stop_launch_missile_audio")
 	assert(not launch_missile_audio.playing)
 
+	local_match.call("_reset_quake_cycle")
+	assert(abs(float(local_match.get("_quake_countdown")) - 60.0) < 0.01)
 	var quake_x = 360.0
 	var before_quake_drop = float(match_terrain.height_at(quake_x))
 	local_match.set("_quake_countdown", -0.1)
@@ -900,12 +1448,92 @@ func _run() -> void:
 	assert(quake_audio.playing)
 	local_match.call("_update_quake", 1.0)
 	assert(float(match_terrain.height_at(quake_x)) > before_quake_drop)
+	var quake_offset := Vector2(local_match.get("_quake_viewport_offset"))
+	var expected_quake_offset_x := sin(50.0) * 0.05 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
+	assert(abs(quake_offset.x - expected_quake_offset_x) < 0.01)
+	assert(abs(quake_offset.y) < 0.01)
 	assert(str(local_match.get("_message")).contains("Quake"))
 	local_match.set("_quake_countdown", -0.1)
 	local_match.call("_update_quake", 0.1)
 	assert(not bool(local_match.get("_quake_active")))
-	assert(float(local_match.get("_quake_countdown")) >= 29.0)
+	assert(abs(float(local_match.get("_quake_countdown")) - 20.0) < 0.01)
+	assert(Vector2(local_match.get("_quake_viewport_offset")).distance_to(Vector2.ZERO) < 0.01)
 	assert(not quake_audio.playing)
+
+	var score_timeout_match = LocalMatchScene.instantiate()
+	score_timeout_match.setup({"total_rounds": 5})
+	root.add_child(score_timeout_match)
+	await process_frame
+	await process_frame
+	score_timeout_match.call("_update_round_starting", 2.1)
+	score_timeout_match.call("_open_round_score", "Timeout Round", 0, "Player")
+	assert(str(score_timeout_match.get("_phase")) == "score")
+	assert(abs(float(score_timeout_match.get("_score_continue_delay")) - 2.0) < 0.01)
+	score_timeout_match.call("_update_modal_activation", 11.9)
+	assert(str(score_timeout_match.get("_phase")) == "score")
+	assert(float(score_timeout_match.get("_score_continue_delay")) < 0.0)
+	assert(float(score_timeout_match.get("_score_continue_delay")) > -10.0)
+	score_timeout_match.call("_update_modal_activation", 0.1)
+	assert(str(score_timeout_match.get("_phase")) == "shop")
+	assert(not score_timeout_match.get_node("ScoreOverlay").visible)
+	assert((score_timeout_match.get("_shop_overlay") as Control).visible)
+	await _free_node(score_timeout_match)
+
+	var score_order_match = LocalMatchScene.instantiate()
+	score_order_match.setup({
+		"total_rounds": 5,
+		"roster": [
+			{"slot": 0, "name": "Alpha", "kind": "human", "controller": 0, "color": Color("#ff0000")},
+			{"slot": 1, "name": "Bravo", "kind": "computer", "controller": -1, "color": Color("#00ff00")},
+			{"slot": 2, "name": "Charlie", "kind": "computer", "controller": -1, "color": Color("#0000ff")},
+			{"slot": 3, "name": "Delta", "kind": "computer", "controller": -1, "color": Color("#ffff00")},
+		],
+	})
+	root.add_child(score_order_match)
+	await process_frame
+	await process_frame
+	score_order_match.set("_score", 300)
+	score_order_match.set("_enemy_score", 200)
+	var score_order_participants: Array = score_order_match.get("_participants")
+	var score_order_third: Dictionary = score_order_participants[2]
+	score_order_third["score"] = 200
+	score_order_participants[2] = score_order_third
+	var score_order_fourth: Dictionary = score_order_participants[3]
+	score_order_fourth["score"] = 100
+	score_order_participants[3] = score_order_fourth
+	score_order_match.set("_participants", score_order_participants)
+	var score_order_rows: Array = score_order_match.call("_score_rows_snapshot")
+	assert(score_order_rows.size() == 4)
+	assert(str(Dictionary(score_order_rows[0]).get("rank", "")) == "1st")
+	assert(str(Dictionary(score_order_rows[0]).get("name", "")) == "Alpha")
+	assert(int(Dictionary(score_order_rows[0]).get("score", 0)) == 300)
+	assert(str(Dictionary(score_order_rows[1]).get("rank", "")) == "2nd")
+	assert(str(Dictionary(score_order_rows[1]).get("name", "")) == "Bravo")
+	assert(int(Dictionary(score_order_rows[1]).get("score", 0)) == 200)
+	assert(str(Dictionary(score_order_rows[2]).get("rank", "")) == " = ")
+	assert(str(Dictionary(score_order_rows[2]).get("name", "")) == "Charlie")
+	assert(int(Dictionary(score_order_rows[2]).get("score", 0)) == 200)
+	assert(str(Dictionary(score_order_rows[3]).get("rank", "")) == "4th")
+	assert(str(Dictionary(score_order_rows[3]).get("name", "")) == "Delta")
+	assert(int(Dictionary(score_order_rows[3]).get("score", 0)) == 100)
+	score_order_match.call("_rebuild_score_rows")
+	var score_order_container = score_order_match.get("_score_rows_container") as VBoxContainer
+	assert(score_order_container.get_child_count() == 5)
+	var score_order_header = score_order_container.get_child(0) as HBoxContainer
+	assert((score_order_header.get_child(0) as Label).text == "Rank")
+	assert((score_order_header.get_child(1) as Label).text == "Player")
+	assert((score_order_header.get_child(2) as Label).text == "Scoring for Round")
+	assert((score_order_header.get_child(3) as Label).text == "Total Score")
+	var score_order_tie_row = score_order_container.get_child(3) as HBoxContainer
+	assert((score_order_tie_row.get_child(0) as Label).text == " = ")
+	var score_order_tie_player_panel = score_order_tie_row.get_child(1) as PanelContainer
+	var score_order_tie_player_cell = score_order_tie_player_panel.get_child(0) as HBoxContainer
+	assert((score_order_tie_player_cell.get_child(1) as Label).text == "Charlie")
+	var score_order_tie_total_panel = score_order_tie_row.get_child(3) as PanelContainer
+	assert((score_order_tie_total_panel.get_child(0) as Label).text == "200")
+	var score_order_fourth_row = score_order_container.get_child(4) as HBoxContainer
+	assert((score_order_fourth_row.get_child(0) as Label).text == "4th")
+	await _free_node(score_order_match)
 
 	local_match.set("_score", 40)
 	local_match.set("_enemy_score", 60)
@@ -917,7 +1545,21 @@ func _run() -> void:
 	local_match.set("_participants", leader_participants)
 	enemy_tank.state = TankState.STATE_DEAD
 	local_match.call("_record_round_defeat", "Player", "Enemy")
+	local_match.call("_play_jump_jets_audio")
+	assert(bool(local_match.get("_jump_jets_active")))
+	assert((local_match.get_node("JumpJetsAudio") as AudioStreamPlayer).playing)
+	local_match.set("_machine_gun_active", true)
+	local_match.set("_machine_gun_fire_held", true)
+	local_match.set("_machine_gun_ai_burst_remaining", 3)
+	local_match.call("_play_machine_gun_audio")
+	assert((local_match.get_node("MachineGunAudio") as AudioStreamPlayer).playing)
 	local_match.call("_open_round_score", "Round Won", 100, "Player")
+	assert(not bool(local_match.get("_jump_jets_active")))
+	assert(not (local_match.get_node("JumpJetsAudio") as AudioStreamPlayer).playing)
+	assert(not bool(local_match.get("_machine_gun_active")))
+	assert(not bool(local_match.get("_machine_gun_fire_held")))
+	assert(int(local_match.get("_machine_gun_ai_burst_remaining")) == 0)
+	assert(not (local_match.get_node("MachineGunAudio") as AudioStreamPlayer).playing)
 	assert(str(local_match.get("_phase")) == "score")
 	assert(abs(float(local_match.get("_score_continue_delay")) - 2.0) < 0.01)
 	assert(int(local_match.get("_score")) == 340)
@@ -993,63 +1635,56 @@ func _run() -> void:
 	local_match.call("_update_modal_activation", 0.4)
 	assert(abs(float(local_match.get("_shop_input_delay"))) < 0.01)
 	local_match.call("_continue_from_shop")
-	assert(str(local_match.get("_phase")) == "aim")
+	assert(str(local_match.get("_phase")) == "shop")
+	assert(not bool(local_match.get("_shop_finish_pending")))
+	local_match.call("_update_modal_activation", 0.01)
+	assert(float(local_match.get("_shop_input_delay")) < 0.0)
+	local_match.call("_continue_from_shop")
+	assert(str(local_match.get("_phase")) == "shop")
+	assert(bool(local_match.get("_shop_finish_pending")))
+	assert(str(local_match.get("_message")).ends_with("is done shopping."))
+	local_match.call("_buy_shop_weapon", WeaponInventory.MACHINE_GUN)
+	assert(bool(local_match.get("_shop_finish_pending")))
+	local_match.call("_update_modal_activation", 0.0)
+	assert(str(local_match.get("_phase")) == "round_starting")
+	assert(not bool(local_match.get("_shop_finish_pending")))
 	assert(int(local_match.get("_round")) == 2)
 	enemy_tank.state = TankState.STATE_ALIVE
 	assert(not match_shop_overlay.visible)
 	assert(str(local_match.get("_message")).contains("Round 2 ready"))
+	local_match.call("_update_round_starting", 2.1)
+	assert(str(local_match.get("_phase")) == "aim")
 
 	var enemy_shop_inventory: RefCounted = local_match.get("_enemy_inventory") as RefCounted
+	var enemy_machine_gun_before_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
 	var enemy_missile_before_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
 	var enemy_mirv_before_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV))
-	local_match.set("_ai_difficulty", "normal")
-	local_match.call("_set_shop_credits", 1, 100)
-	local_match.call("_run_computer_shop_for_participant", 1)
-	assert(int(local_match.call("_shop_credits", 1)) == 0)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE)) == enemy_missile_before_shop + WeaponInventory.MISSILE_SHOP_PACK)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV)) == enemy_mirv_before_shop + WeaponInventory.MIRV_SHOP_PACK)
-	assert(str(local_match.get("_message")).contains("Enemy bought"))
-	local_match.set("_ai_difficulty", "easy")
-	var easy_shop_priority: Array = local_match.call("_computer_shop_priority")
-	assert(str(easy_shop_priority[0]) == WeaponInventory.MACHINE_GUN)
-	var enemy_machine_gun_before_easy_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
-	var enemy_missile_before_easy_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
-	var enemy_fuel_reserve_before_easy_shop = float(enemy_tank.fuel_reserve)
-	local_match.call("_set_shop_credits", 1, 100)
-	local_match.call("_run_computer_shop_for_participant", 1)
-	assert(int(local_match.call("_shop_credits", 1)) == 0)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == enemy_machine_gun_before_easy_shop + WeaponInventory.MACHINE_GUN_SHOP_PACK)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE)) == enemy_missile_before_easy_shop + WeaponInventory.MISSILE_SHOP_PACK)
-	assert(abs(float(enemy_tank.fuel_reserve) - enemy_fuel_reserve_before_easy_shop) < 0.01)
-	assert(str(local_match.get("_message")).contains("Machine Gun, Missile"))
-	assert(not str(local_match.get("_message")).contains("Jump Jet"))
+	var enemy_nuke_before_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.NUKE))
+	var enemy_fuel_reserve_before_shop = float(enemy_tank.fuel_reserve)
 	local_match.set("_ai_difficulty", "hard")
-	var hard_shop_priority: Array = local_match.call("_computer_shop_priority")
-	assert(str(hard_shop_priority[0]) == WeaponInventory.NUKE)
-	var enemy_nuke_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.NUKE))
-	var enemy_mirv_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV))
-	var enemy_missile_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE))
-	var enemy_machine_gun_before_hard_shop = int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
-	var enemy_fuel_reserve_before_hard_shop = float(enemy_tank.fuel_reserve)
 	local_match.call("_set_shop_credits", 1, 250)
 	local_match.call("_run_computer_shop_for_participant", 1)
-	assert(int(local_match.call("_shop_credits", 1)) == 0)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.NUKE)) == enemy_nuke_before_hard_shop + WeaponInventory.NUKE_SHOP_PACK)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV)) == enemy_mirv_before_hard_shop + WeaponInventory.MIRV_SHOP_PACK)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE)) == enemy_missile_before_hard_shop + WeaponInventory.MISSILE_SHOP_PACK)
-	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == enemy_machine_gun_before_hard_shop + WeaponInventory.MACHINE_GUN_SHOP_PACK)
-	assert(abs(float(enemy_tank.fuel_reserve) - (enemy_fuel_reserve_before_hard_shop + TankState.TANK_FUEL_PURCHASE_AMOUNT)) < 0.01)
-	assert(str(local_match.get("_message")).contains("Nuke, MIRV, Missile, Machine Gun, Jump Jet"))
-	local_match.call("_set_shop_credits", 1, 10)
-	local_match.call("_run_computer_shop_for_participant", 1)
-	assert(int(local_match.call("_shop_credits", 1)) == 10)
-	assert(str(local_match.get("_message")) == "Enemy saved credits.")
+	assert(int(local_match.call("_shop_credits", 1)) == 250)
+	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == enemy_machine_gun_before_shop)
+	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MISSILE)) == enemy_missile_before_shop)
+	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.MIRV)) == enemy_mirv_before_shop)
+	assert(int(enemy_shop_inventory.ammo_for(WeaponInventory.NUKE)) == enemy_nuke_before_shop)
+	assert(abs(float(enemy_tank.fuel_reserve) - enemy_fuel_reserve_before_shop) < 0.01)
+	assert(str(local_match.get("_message")) == "Enemy is done shopping.")
 
 	local_match.set("_round", int(local_match.get("_total_rounds")))
 	local_match.set("_score", 180)
 	local_match.set("_enemy_score", 80)
 	local_match.set("_credits", 4)
 	local_match.call("_open_round_score", "Round Won", 100, "Player")
+	var final_round_leader_participants: Array = local_match.get("_participants")
+	var final_player_leader: Dictionary = final_round_leader_participants[0]
+	final_player_leader["leader"] = false
+	final_round_leader_participants[0] = final_player_leader
+	var final_enemy_leader: Dictionary = final_round_leader_participants[1]
+	final_enemy_leader["leader"] = true
+	final_round_leader_participants[1] = final_enemy_leader
+	local_match.set("_participants", final_round_leader_participants)
 	assert(abs(float(local_match.get("_score_continue_delay")) - 2.0) < 0.01)
 	var score_final_continue_button = local_match.get("_score_continue_button") as Button
 	assert(score_final_continue_button.text == "Continue to Final Result")
@@ -1060,6 +1695,9 @@ func _run() -> void:
 	assert(not score_final_continue_button.disabled)
 	local_match.call("_continue_from_score")
 	assert(str(local_match.get("_phase")) == "winner")
+	var final_round_after_continue_participants: Array = local_match.get("_participants")
+	assert(not bool(Dictionary(final_round_after_continue_participants[0]).get("leader", true)))
+	assert(bool(Dictionary(final_round_after_continue_participants[1]).get("leader", false)))
 	assert(abs(float(local_match.get("_winner_continue_delay")) - 2.0) < 0.01)
 	assert(not local_match.get_node("ScoreOverlay").visible)
 	var winner_overlay = local_match.get_node("WinnerOverlay") as Control
@@ -1173,6 +1811,76 @@ func _run() -> void:
 	winner_rows_container = local_match.get("_winner_rows_container") as VBoxContainer
 	assert(not winner_rows_container.visible)
 	assert(winner_rows_container.get_child_count() == 0)
+
+	var five_winner_match = LocalMatchScene.instantiate()
+	five_winner_match.setup({
+		"total_rounds": 1,
+		"roster": [
+			{"slot": 0, "name": "P1", "kind": "human", "controller": 0, "color": Color("#ff4040")},
+			{"slot": 1, "name": "P2", "kind": "human", "controller": 1, "color": Color("#40ff40")},
+			{"slot": 2, "name": "P3", "kind": "human", "controller": 2, "color": Color("#4040ff")},
+			{"slot": 3, "name": "P4", "kind": "human", "controller": 3, "color": Color("#ffff40")},
+			{"slot": 4, "name": "P5", "kind": "human", "controller": 4, "color": Color("#ff40ff")},
+		],
+	})
+	root.add_child(five_winner_match)
+	await process_frame
+	await process_frame
+	five_winner_match.set("_score", 500)
+	five_winner_match.set("_enemy_score", 500)
+	var five_winner_participants: Array = five_winner_match.get("_participants")
+	for participant_index in range(2, 5):
+		var five_winner_participant: Dictionary = five_winner_participants[participant_index]
+		five_winner_participant["score"] = 500
+		five_winner_participants[participant_index] = five_winner_participant
+	five_winner_match.set("_participants", five_winner_participants)
+	five_winner_match.call("_open_winner_overlay")
+	var five_winner_title = five_winner_match.get("_winner_title_label") as Label
+	assert(five_winner_title.text == "It's a tie!")
+	var five_winner_cards: Array = five_winner_match.call("_winner_card_snapshots")
+	assert(five_winner_cards.size() == 5)
+	var five_winner_container = five_winner_match.get("_winner_cards_container") as VBoxContainer
+	assert(five_winner_container.get_child_count() == 2)
+	var five_winner_first_row = five_winner_container.get_child(0) as HBoxContainer
+	var five_winner_second_row = five_winner_container.get_child(1) as HBoxContainer
+	assert(five_winner_first_row.alignment == BoxContainer.ALIGNMENT_CENTER)
+	assert(five_winner_second_row.alignment == BoxContainer.ALIGNMENT_CENTER)
+	assert(five_winner_first_row.get_child_count() == 4)
+	assert(five_winner_second_row.get_child_count() == 1)
+	var five_winner_first_card = five_winner_first_row.get_child(0) as VBoxContainer
+	var five_winner_last_card = five_winner_second_row.get_child(0) as VBoxContainer
+	assert((five_winner_first_card.get_child(1) as Label).text == "P1")
+	assert((five_winner_last_card.get_child(1) as Label).text == "P5")
+	var five_winner_rows_container = five_winner_match.get("_winner_rows_container") as VBoxContainer
+	assert(not five_winner_rows_container.visible)
+	assert(five_winner_rows_container.get_child_count() == 0)
+	await _free_node(five_winner_match)
+
+	var computer_winner_host := MainMenuHost.new()
+	root.add_child(computer_winner_host)
+	var computer_winner_match = LocalMatchScene.instantiate()
+	computer_winner_match.setup({
+		"total_rounds": 1,
+		"roster": [
+			{"slot": 0, "name": "CPU A", "kind": "computer", "controller": -1, "color": Color("#ff00ff")},
+			{"slot": 1, "name": "CPU B", "kind": "computer", "controller": -1, "color": Color("#4d95ff")},
+		],
+	})
+	computer_winner_host.add_child(computer_winner_match)
+	await process_frame
+	await process_frame
+	computer_winner_match.call("_open_winner_overlay")
+	assert(abs(float(computer_winner_match.get("_winner_continue_delay")) - 4.0) < 0.01)
+	assert(not bool(computer_winner_match.get("_winner_exit_pending")))
+	computer_winner_match.call("_update_modal_activation", 4.0)
+	assert(int(computer_winner_host.main_menu_calls) == 0)
+	assert(abs(float(computer_winner_match.get("_winner_continue_delay"))) < 0.01)
+	assert(bool(computer_winner_match.get("_winner_exit_pending")))
+	computer_winner_match.call("_update_modal_activation", 0.0)
+	assert(int(computer_winner_host.main_menu_calls) == 1)
+	assert(not bool(computer_winner_match.get("_winner_exit_pending")))
+	await _free_node(computer_winner_host)
+
 	local_match.call("_hide_winner_overlay")
 	local_match.set("_round", 1)
 
@@ -1181,7 +1889,7 @@ func _run() -> void:
 	assert(shop.call("_format_pack", 5) == "+5")
 	assert(Array(shop.call("_classic_catalog_rows")).is_empty())
 	var disabled_shop_items: Array = shop.call("_disabled_shop_items")
-	assert(disabled_shop_items.size() == 0)
+	assert(disabled_shop_items.size() == 5)
 	root.add_child(shop)
 	await process_frame
 	shop.refresh({
@@ -1195,7 +1903,7 @@ func _run() -> void:
 		"inventory": [
 			{"name": "Shell", "cost": 0, "ammo": -1, "damage": 40, "blast": 48},
 			{"name": "Machine Gun", "cost": 50, "ammo": 50, "shop_pack": 50, "damage": 2, "blast": 0},
-			{"name": "MIRV", "cost": 50, "ammo": 1, "shop_pack": 1, "damage": 22, "blast": 34},
+			{"name": "MIRV", "cost": 50, "ammo": 1, "shop_pack": 1, "damage": WeaponInventory.MIRV_DAMAGE, "blast": 34},
 			{"name": "Missile", "cost": 50, "ammo": 0, "shop_pack": 5, "damage": 40, "blast": 48},
 			{"name": "Nuke", "cost": 50, "ammo": 1, "shop_pack": 1, "damage": 90, "blast": 96},
 			{"name": "Rolling Mines", "cost": 50, "ammo": 5, "shop_pack": 5, "damage": 30, "blast": 36},
@@ -1234,8 +1942,12 @@ func _run() -> void:
 	assert(first_locked_cost.text == "$50")
 	var first_locked_item = first_locked_row.get_child(1) as Label
 	assert(str(first_locked_item.text).begins_with("Rolling Mines"))
+	var first_locked_button = first_locked_row.get_child(2) as Button
+	assert(first_locked_button.text == "Locked")
+	assert(first_locked_button.disabled)
+	assert(shop_weapon_list.get_child_count() == 11)
 	var shop_focus_buttons: Array = shop.get("_focus_buttons")
-	assert(shop_focus_buttons.size() == 9)
+	assert(shop_focus_buttons.size() == 6)
 	var first_shop_button: Button = shop_focus_buttons[0]
 	var second_shop_button: Button = shop_focus_buttons[1]
 	var third_shop_button: Button = shop_focus_buttons[2]
@@ -1249,10 +1961,32 @@ func _run() -> void:
 	var shop_continue_button = shop.get("_continue_button") as Button
 	assert(shop_continue_button.text == "Done!")
 	var classic_rows: Array = shop.call("_classic_catalog_rows")
-	assert(classic_rows.size() == 10)
-	assert(str(Dictionary(classic_rows[0]).get("name", "")) == "Machine Gun")
-	assert(str(Dictionary(classic_rows[1]).get("name", "")) == "Jump Jet")
-	assert(str(Dictionary(classic_rows[9]).get("name", "")) == "Corbomite")
+	assert(classic_rows.size() == 5)
+	var expected_classic_rows := [
+		{"name": "Machine Gun", "cost": 50},
+		{"name": "Jump Jet", "cost": 50},
+		{"name": "MIRV", "cost": 50},
+		{"name": "Missile", "cost": 50},
+		{"name": "Nuke", "cost": 50},
+	]
+	for row_index in range(expected_classic_rows.size()):
+		var expected_row: Dictionary = expected_classic_rows[row_index]
+		var actual_row: Dictionary = classic_rows[row_index]
+		assert(str(actual_row.get("name", "")) == str(expected_row.get("name", "")))
+		assert(int(actual_row.get("cost", 0)) == int(expected_row.get("cost", 0)))
+	var expected_disabled_rows := [
+		{"name": "Rolling Mines", "cost": 50},
+		{"name": "Airstrike", "cost": 100},
+		{"name": "Death's Head", "cost": 200},
+		{"name": "Hover Coil", "cost": 150},
+		{"name": "Corbomite", "cost": 20},
+	]
+	assert(disabled_shop_items.size() == expected_disabled_rows.size())
+	for row_index in range(expected_disabled_rows.size()):
+		var expected_disabled_row: Dictionary = expected_disabled_rows[row_index]
+		var actual_disabled_row: Dictionary = disabled_shop_items[row_index]
+		assert(str(actual_disabled_row.get("name", "")) == str(expected_disabled_row.get("name", "")))
+		assert(int(actual_disabled_row.get("cost", 0)) == int(expected_disabled_row.get("cost", 0)))
 	shop.refresh({
 		"title": "Round Won",
 		"round": 2,
@@ -1288,7 +2022,7 @@ func _run() -> void:
 		"inventory": [
 			{"name": "Shell", "cost": 0, "ammo": -1, "damage": 40, "blast": 48},
 			{"name": "Machine Gun", "cost": 50, "ammo": 50, "shop_pack": 50, "damage": 2, "blast": 0},
-			{"name": "MIRV", "cost": 50, "ammo": 1, "shop_pack": 1, "damage": 22, "blast": 34},
+			{"name": "MIRV", "cost": 50, "ammo": 1, "shop_pack": 1, "damage": WeaponInventory.MIRV_DAMAGE, "blast": 34},
 			{"name": "Missile", "cost": 50, "ammo": 0, "shop_pack": 5, "damage": 40, "blast": 48},
 			{"name": "Nuke", "cost": 50, "ammo": 1, "shop_pack": 1, "damage": 90, "blast": 96},
 		],
@@ -1306,6 +2040,7 @@ func _run() -> void:
 	var shop_player_tank: RefCounted = local_match.get("_player")
 	local_match.set("_credits", 4)
 	local_match.set("_phase", "shop")
+	local_match.set("_shop_input_delay", -0.01)
 	local_match.call("_buy_shop_weapon", "Jump Jet")
 	assert(str(local_match.get("_message")) == "Need $50 for Jump Jet.")
 	assert(abs(float(local_match.get("_shop_input_delay")) - 0.2) < 0.01)
@@ -1313,6 +2048,11 @@ func _run() -> void:
 	local_match.set("_credits", 50)
 	var active_fuel_before_buy = float(shop_player_tank.fuel)
 	var fuel_reserve_before_buy = float(shop_player_tank.fuel_reserve)
+	local_match.call("_buy_shop_weapon", "Jump Jet")
+	assert(int(local_match.get("_credits")) == 50)
+	assert(abs(float(shop_player_tank.fuel_reserve) - fuel_reserve_before_buy) < 0.01)
+	local_match.call("_update_modal_activation", 0.01)
+	assert(float(local_match.get("_shop_input_delay")) < 0.0)
 	local_match.call("_buy_shop_weapon", "Jump Jet")
 	assert(int(local_match.get("_credits")) == 0)
 	assert(abs(float(shop_player_tank.fuel_reserve) - (fuel_reserve_before_buy + TankState.TANK_FUEL_PURCHASE_AMOUNT)) < 0.01)
@@ -1326,6 +2066,7 @@ func _run() -> void:
 	assert(str(Dictionary(shop_items[0]).get("current", "")).contains("reserve"))
 
 	local_match.call("_update_modal_activation", 0.2)
+	local_match.call("_update_modal_activation", 0.01)
 	local_match.set("_credits", 1000)
 	var classic_shop_inventory: RefCounted = local_match.get("_inventory")
 	var classic_shop_cases = [
@@ -1337,38 +2078,35 @@ func _run() -> void:
 	]
 	for shop_case in classic_shop_cases:
 		var item_name = str(Dictionary(shop_case).get("name", ""))
-		var item_cost = int(Dictionary(shop_case).get("cost", 0))
-		var item_pack = int(Dictionary(shop_case).get("pack", 0))
 		var credits_before_item_buy = int(local_match.get("_credits"))
 		var ammo_before_item_buy = int(classic_shop_inventory.ammo_for(item_name))
 		local_match.call("_buy_shop_weapon", item_name)
-		assert(int(local_match.get("_credits")) == credits_before_item_buy - item_cost)
-		assert(classic_shop_inventory.ammo_for(item_name) == ammo_before_item_buy + item_pack)
-		assert(str(local_match.get("_message")).contains("Bought %s ammo" % item_name))
+		assert(int(local_match.get("_credits")) == credits_before_item_buy)
+		assert(classic_shop_inventory.ammo_for(item_name) == ammo_before_item_buy)
+		assert(abs(float(local_match.get("_shop_input_delay")) - 0.2) < 0.01)
+		assert(str(local_match.get("_message")) == "%s is not available in the classic shop." % item_name)
 		local_match.call("_update_modal_activation", 0.2)
-	local_match.set("_credits", 19)
-	var corbomite_before_failed_buy = int(classic_shop_inventory.ammo_for(WeaponInventory.CORBOMITE))
-	local_match.call("_buy_shop_weapon", WeaponInventory.CORBOMITE)
-	assert(int(local_match.get("_credits")) == 19)
-	assert(classic_shop_inventory.ammo_for(WeaponInventory.CORBOMITE) == corbomite_before_failed_buy)
-	assert(str(local_match.get("_message")) == "Need $20 for Corbomite.")
-	local_match.call("_update_modal_activation", 0.2)
+		assert(abs(float(local_match.get("_shop_input_delay"))) < 0.01)
+		local_match.call("_update_modal_activation", 0.01)
 
 	var buy_inventory = WeaponInventory.new()
-	assert(buy_inventory.select_by_name(WeaponInventory.MIRV))
-	var mirv_before_buy = int(buy_inventory.ammo_for(WeaponInventory.MIRV))
+	assert(not buy_inventory.select_by_name(WeaponInventory.MIRV))
+	var mirv_before_buy = int(buy_inventory.stock_for(WeaponInventory.MIRV))
 	assert(buy_inventory.add_ammo(WeaponInventory.MIRV) == mirv_before_buy + WeaponInventory.MIRV_SHOP_PACK)
-	var missile_before_buy = int(buy_inventory.ammo_for(WeaponInventory.MISSILE))
+	assert(buy_inventory.ammo_for(WeaponInventory.MIRV) == 0)
+	buy_inventory.reset_round_ammo()
+	assert(buy_inventory.select_by_name(WeaponInventory.MIRV))
+	var missile_before_buy = int(buy_inventory.stock_for(WeaponInventory.MISSILE))
 	assert(buy_inventory.add_ammo(WeaponInventory.MISSILE) == missile_before_buy + WeaponInventory.MISSILE_SHOP_PACK)
-	var rolling_mines_before_buy = int(buy_inventory.ammo_for(WeaponInventory.ROLLING_MINES))
+	var rolling_mines_before_buy = int(buy_inventory.stock_for(WeaponInventory.ROLLING_MINES))
 	assert(buy_inventory.add_ammo(WeaponInventory.ROLLING_MINES) == rolling_mines_before_buy + WeaponInventory.ROLLING_MINES_SHOP_PACK)
-	var airstrike_before_buy = int(buy_inventory.ammo_for(WeaponInventory.AIRSTRIKE))
+	var airstrike_before_buy = int(buy_inventory.stock_for(WeaponInventory.AIRSTRIKE))
 	assert(buy_inventory.add_ammo(WeaponInventory.AIRSTRIKE) == airstrike_before_buy + WeaponInventory.AIRSTRIKE_SHOP_PACK)
-	var deaths_head_before_buy = int(buy_inventory.ammo_for(WeaponInventory.DEATHS_HEAD))
+	var deaths_head_before_buy = int(buy_inventory.stock_for(WeaponInventory.DEATHS_HEAD))
 	assert(buy_inventory.add_ammo(WeaponInventory.DEATHS_HEAD) == deaths_head_before_buy + WeaponInventory.DEATHS_HEAD_SHOP_PACK)
-	var hover_coil_before_buy = int(buy_inventory.ammo_for(WeaponInventory.HOVER_COIL))
+	var hover_coil_before_buy = int(buy_inventory.stock_for(WeaponInventory.HOVER_COIL))
 	assert(buy_inventory.add_ammo(WeaponInventory.HOVER_COIL) == hover_coil_before_buy + WeaponInventory.HOVER_COIL_SHOP_PACK)
-	var corbomite_before_buy = int(buy_inventory.ammo_for(WeaponInventory.CORBOMITE))
+	var corbomite_before_buy = int(buy_inventory.stock_for(WeaponInventory.CORBOMITE))
 	assert(buy_inventory.add_ammo(WeaponInventory.CORBOMITE) == corbomite_before_buy + WeaponInventory.CORBOMITE_SHOP_PACK)
 
 	var tank = TankState.new()
@@ -1383,11 +2121,19 @@ func _run() -> void:
 	tank.boost(0.5)
 	assert(abs(tank.fuel - 0.9) < 0.01)
 	assert(abs(tank.fuel_reserve - 1.9) < 0.01)
+	tank.tank_angle = -12.0
+	tank.airborne_velocity = Vector2(20.0, -15.0)
+	tank.on_ground = false
+	tank.boost_detach_pending = true
 	tank.reset_round(360.0, match_terrain, "Player", Color.WHITE)
 	assert(abs(tank.tank_angle) < 0.01)
 	assert(abs(tank.fuel - TankState.TANK_FULL_FUEL) < 0.01)
 	assert(abs(tank.fuel_reserve - 1.9) < 0.01)
-	assert(not tank.on_ground)
+	assert(tank.on_ground)
+	assert(tank.airborne_velocity == Vector2.ZERO)
+	assert(not tank.boost_detach_pending)
+	assert(abs(tank.position.x - 360.0) < 0.01)
+	assert(abs(tank.position.y - match_terrain.move_to_ground(360.0, tank.position.y)) < 0.01)
 	tank.health = TankState.TANK_MAX_HEALTH
 	assert(not bool(tank.apply_damage(100)))
 	assert(tank.health == 0)
@@ -1408,6 +2154,8 @@ func _run() -> void:
 	assert(abs(float(ground_smoke.get("rotation_rate", 0.0)) - TankState.SMOKE_ROTATION_RATE) < 0.01)
 	assert(abs(float(ground_smoke.get("growth_rate", 0.0)) - TankState.GROUND_SMOKE_GROWTH_RATE) < 0.01)
 	assert(abs(float(ground_smoke.get("fade_rate", 0.0)) - TankState.GROUND_SMOKE_FADE_RATE) < 0.01)
+	var ground_smoke_uvs: PackedVector2Array = local_match.call("_smoke_particle_draw_uvs", ground_smoke)
+	assert(ground_smoke_uvs[2] == Vector2(64.0, 64.0))
 	assert(abs(float(tank.exhaust_time) - 0.5) < 0.01)
 	local_match.call("_emit_tank_burn_smoke", tank, 0.1)
 	assert(abs(float(tank.exhaust_time) - 0.4) < 0.01)
@@ -1446,6 +2194,8 @@ func _run() -> void:
 	assert(abs(float(boost_smoke.get("rotation_rate", -1.0)) - TankState.BOOST_SMOKE_ROTATION_RATE) < 0.01)
 	assert(abs(float(boost_smoke.get("growth_rate", -1.0)) - TankState.BOOST_SMOKE_GROWTH_RATE) < 0.01)
 	assert(abs(float(boost_smoke.get("fade_rate", 0.0)) - TankState.BOOST_SMOKE_FADE_RATE) < 0.01)
+	var boost_smoke_uvs: PackedVector2Array = local_match.call("_smoke_particle_draw_uvs", boost_smoke)
+	assert(boost_smoke_uvs[2] == Vector2(128.0, 128.0))
 	assert(abs(float(boost_smoke_tank.exhaust_time) + 0.05) < 0.01)
 	boost_smoke_tank.exhaust_time = 0.03
 	local_match.call("_emit_jump_jet_smoke", boost_smoke_tank, 0.1)
@@ -1464,6 +2214,27 @@ func _run() -> void:
 	assert(smoke_draw_uvs.size() == 4)
 	assert(smoke_draw_uvs[0] == Vector2.ZERO)
 	assert(smoke_draw_uvs[2] == Vector2(64.0, 64.0))
+	local_match.get("_smoke_particles").clear()
+	local_match.get("_smoke_particles").append({
+		"position": Vector2(1.0, 2.0),
+		"velocity": Vector2(3.0, 4.0),
+		"rotation": 0.0,
+		"rotation_rate": 0.1,
+		"size": 0.25,
+		"growth_rate": 0.3,
+		"fade": 0.7,
+		"fade_rate": 0.7,
+	})
+	local_match.call("_update_smoke_particles", 1.0)
+	var updated_smoke_particles: Array = local_match.get("_smoke_particles")
+	assert(updated_smoke_particles.size() == 1)
+	var updated_smoke: Dictionary = updated_smoke_particles[0]
+	assert(Vector2(updated_smoke.get("position", Vector2.ZERO)).distance_to(Vector2(4.0, 6.0)) < 0.01)
+	assert(abs(float(updated_smoke.get("rotation", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(updated_smoke.get("size", 0.0)) - 0.55) < 0.01)
+	assert(abs(float(updated_smoke.get("fade", -1.0))) < 0.01)
+	local_match.call("_update_smoke_particles", 0.1)
+	assert(Array(local_match.get("_smoke_particles")).is_empty())
 	var shield_tank = TankState.new()
 	shield_tank.fuel = TankState.TANK_FULL_FUEL
 	shield_tank.fuel_reserve = TankState.TANK_FULL_FUEL
@@ -1495,6 +2266,26 @@ func _run() -> void:
 	assert(tank.gun_power_change_speed == 0.0)
 	assert(abs(tank.gun_angle - TankState.GUN_ANGLE_DEFAULT) < 0.01)
 	assert(abs(tank.gun_power - TankState.GUN_POWER_DEFAULT) < 0.01)
+	local_match.call("_set_turn_index", 0)
+	local_match.set("_phase", "aim")
+	player_tank.gun_angle = 10.0
+	player_tank.gun_angle_change_speed = 30.0
+	player_tank.gun_power = TankState.GUN_POWER_DEFAULT
+	player_tank.gun_power_change_speed = 12.0
+	Input.action_press("gf_aim_left")
+	Input.action_press("gf_aim_right")
+	Input.action_press("gf_power_up")
+	Input.action_press("gf_power_down")
+	local_match.call("_handle_player_input", 0.1)
+	Input.action_release("gf_aim_left")
+	Input.action_release("gf_aim_right")
+	Input.action_release("gf_power_up")
+	Input.action_release("gf_power_down")
+	var expected_conflict_power_speed = 12.0 + TankState.GUN_POWER_CHANGE_ACCELERATION * 0.1
+	assert(abs(player_tank.gun_angle_change_speed) < 0.01)
+	assert(abs(player_tank.gun_angle - 10.0) < 0.01)
+	assert(abs(player_tank.gun_power_change_speed - expected_conflict_power_speed) < 0.01)
+	assert(abs(player_tank.gun_power - (TankState.GUN_POWER_DEFAULT + expected_conflict_power_speed * 0.1)) < 0.01)
 	tank.update_gun(0.5, 1.0, 1.0)
 	assert(abs(tank.gun_angle_change_speed - 30.0) < 0.01)
 	assert(abs(tank.gun_power_change_speed - 10.0) < 0.01)
@@ -1525,6 +2316,34 @@ func _run() -> void:
 	assert(abs(tank.airborne_velocity.y + 57.5907) < 0.01)
 	assert(abs(tank.fuel - 0.9) < 0.01)
 	assert(abs(tank.tank_angle) < 0.01)
+	var first_boost_frame_terrain = FlatTerrain.new()
+	first_boost_frame_terrain.ground_y = 100.0
+	tank.position = Vector2(120.0, 100.0)
+	tank.tank_angle = 0.0
+	tank.fuel = 1.0
+	tank.fuel_reserve = 1.0
+	tank.on_ground = true
+	tank.airborne_velocity = Vector2.ZERO
+	tank.boost(0.1)
+	var first_boost_velocity: Vector2 = tank.airborne_velocity
+	tank.settle_on_terrain(first_boost_frame_terrain, 0.1)
+	assert(not tank.on_ground)
+	assert(tank.position.distance_to(Vector2(120.0, 100.0)) < 0.01)
+	assert(tank.airborne_velocity.distance_to(first_boost_velocity) < 0.01)
+	tank.settle_on_terrain(first_boost_frame_terrain, 0.1)
+	assert(abs(tank.airborne_velocity.y - (first_boost_velocity.y + TankState.TANK_AIR_GRAVITY * 0.1)) < 0.01)
+	assert(abs(tank.position.y - (100.0 + tank.airborne_velocity.y * 0.1)) < 0.01)
+	tank.fuel = 0.05
+	tank.fuel_reserve = 0.05
+	tank.tank_angle = 0.0
+	tank.on_ground = false
+	tank.airborne_velocity = Vector2.ZERO
+	tank.boost(0.5)
+	assert(abs(tank.fuel - (0.05 - TankState.BOOST_FUEL_USAGE_RATE * 0.5)) < 0.01)
+	assert(abs(tank.fuel_reserve - (0.05 - TankState.BOOST_FUEL_USAGE_RATE * 0.5)) < 0.01)
+	assert(tank.fuel < 0.0)
+	assert(tank.fuel_reserve < 0.0)
+	assert(abs(tank.add_fuel_reserve() - (0.05 - TankState.BOOST_FUEL_USAGE_RATE * 0.5 + TankState.TANK_FUEL_PURCHASE_AMOUNT)) < 0.01)
 	tank.tank_angle = 0.0
 	tank.fuel = 1.0
 	tank.on_ground = true
@@ -1533,6 +2352,20 @@ func _run() -> void:
 	assert(abs(tank.tank_angle - 9.0) < 0.01)
 	tank.boost(0.1, 1.0)
 	assert(abs(tank.tank_angle) < 0.01)
+	tank.tank_angle = 14.9
+	tank.fuel = 1.0
+	tank.fuel_reserve = 1.0
+	tank.on_ground = false
+	tank.airborne_velocity = Vector2.ZERO
+	tank.boost(0.1, -1.0)
+	assert(abs(tank.tank_angle - 23.9) < 0.01)
+	tank.tank_angle = -14.9
+	tank.fuel = 1.0
+	tank.fuel_reserve = 1.0
+	tank.on_ground = false
+	tank.airborne_velocity = Vector2.ZERO
+	tank.boost(0.1, 1.0)
+	assert(abs(tank.tank_angle + 23.9) < 0.01)
 	tank.position = Vector2(120.0, 80.0)
 	tank.tank_angle = 30.0
 	tank.gun_angle = -20.0
@@ -1622,6 +2455,51 @@ func _run() -> void:
 	assert(abs(float(stacked_ground_terrain.move_to_ground(35.0, 30.0)) - 20.0) < 0.01)
 	assert(abs(float(stacked_ground_terrain.move_to_ground(35.0, 50.0)) - 60.0) < 0.01)
 	assert(abs(float(stacked_ground_terrain.move_to_ground(35.0, 80.0)) - 60.0) < 0.01)
+	var angle_ground_terrain: RefCounted = TerrainModel.new()
+	angle_ground_terrain.set("_step", 10.0)
+	angle_ground_terrain.set("_height", 120.0)
+	var angle_zero_chunk: Dictionary = angle_ground_terrain.call("_make_chunk", 50.0, 30.0, 100.0, 100.0, false, Color.WHITE, Color.WHITE)
+	angle_ground_terrain.set("_chunks", [[angle_zero_chunk]])
+	var angle_zero_result: Vector2 = angle_ground_terrain.call("move_to_ground_at_angle", 5.0, 45.0, 0.0)
+	assert(abs(angle_zero_result.x - 5.0) < 0.01)
+	assert(abs(angle_zero_result.y - 40.0) < 0.01)
+	var positive_angle_result: Vector2 = angle_ground_terrain.call("move_to_ground_at_angle", 5.0, 45.0, PI / 4.0)
+	assert(abs(positive_angle_result.x - (10.0 / 3.0)) < 0.01)
+	assert(abs(positive_angle_result.y - (130.0 / 3.0)) < 0.01)
+	var negative_angle_terrain: RefCounted = TerrainModel.new()
+	negative_angle_terrain.set("_step", 10.0)
+	negative_angle_terrain.set("_height", 120.0)
+	var negative_angle_chunk: Dictionary = negative_angle_terrain.call("_make_chunk", 30.0, 50.0, 100.0, 100.0, false, Color.WHITE, Color.WHITE)
+	negative_angle_terrain.set("_chunks", [[negative_angle_chunk]])
+	var negative_angle_result: Vector2 = negative_angle_terrain.call("move_to_ground_at_angle", 5.0, 45.0, -PI / 4.0)
+	assert(abs(negative_angle_result.x - (20.0 / 3.0)) < 0.01)
+	assert(abs(negative_angle_result.y - (130.0 / 3.0)) < 0.01)
+	var collision_terrain: RefCounted = TerrainModel.new()
+	collision_terrain.set("_width", 30.0)
+	collision_terrain.set("_height", 160.0)
+	collision_terrain.set("_step", 10.0)
+	var collision_chunk_a: Dictionary = collision_terrain.call("_make_chunk", 100.0, 100.0, 140.0, 140.0, false, Color.WHITE, Color.WHITE)
+	var collision_chunk_b: Dictionary = collision_terrain.call("_make_chunk", 100.0, 100.0, 140.0, 140.0, false, Color.WHITE, Color.WHITE)
+	var collision_chunk_c: Dictionary = collision_terrain.call("_make_chunk", 100.0, 100.0, 140.0, 140.0, false, Color.WHITE, Color.WHITE)
+	collision_terrain.set("_chunks", [[collision_chunk_a], [collision_chunk_b], [collision_chunk_c]])
+	var vertical_collision: Dictionary = collision_terrain.ground_collision(Vector2(5.0, 80.0), Vector2(5.0, 120.0))
+	assert(bool(vertical_collision["hit"]))
+	assert(abs(Vector2(vertical_collision["position"]).x - 5.0) < 0.01)
+	assert(abs(Vector2(vertical_collision["position"]).y - 100.0) < 0.01)
+	var left_to_right_collision: Dictionary = collision_terrain.ground_collision(Vector2(5.0, 80.0), Vector2(25.0, 120.0))
+	assert(bool(left_to_right_collision["hit"]))
+	assert(abs(Vector2(left_to_right_collision["position"]).x - 15.0) < 0.01)
+	assert(abs(Vector2(left_to_right_collision["position"]).y - 100.0) < 0.01)
+	var right_to_left_collision: Dictionary = collision_terrain.ground_collision(Vector2(25.0, 80.0), Vector2(5.0, 120.0))
+	assert(bool(right_to_left_collision["hit"]))
+	assert(abs(Vector2(right_to_left_collision["position"]).x - 15.0) < 0.01)
+	assert(abs(Vector2(right_to_left_collision["position"]).y - 100.0) < 0.01)
+	var miss_collision: Dictionary = collision_terrain.ground_collision(Vector2(5.0, 40.0), Vector2(15.0, 60.0))
+	assert(not bool(miss_collision["hit"]))
+	var single_slice_collision: Dictionary = collision_terrain.ground_collision(Vector2(2.0, 80.0), Vector2(8.0, 120.0))
+	assert(bool(single_slice_collision["hit"]))
+	assert(abs(Vector2(single_slice_collision["position"]).x - 5.0) < 0.01)
+	assert(abs(Vector2(single_slice_collision["position"]).y - 100.0) < 0.01)
 	var stacked_landing_tank = TankState.new()
 	stacked_landing_tank.position = Vector2(35.0, 65.0)
 	stacked_landing_tank.airborne_velocity = Vector2.ZERO
@@ -1689,6 +2567,7 @@ func _run() -> void:
 	tank.settle_on_terrain(flat_terrain, 1.0)
 	assert(abs(tank.position.x - 120.0) < 0.01)
 	var positive_slope_terrain = SlopedTerrain.new(120.0, 100.0, 31.0)
+	positive_slope_terrain.bounds = Vector2(-1000.0, 1000.0)
 	var passive_positive_delta = -TankState.TANK_MOVE_SPEED * (31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
 	var passive_positive_x = 120.0 + cos(deg_to_rad(31.0)) * passive_positive_delta
 	tank.tank_angle = 31.0
@@ -1698,6 +2577,7 @@ func _run() -> void:
 	assert(abs(tank.position.y - positive_slope_terrain.height_at(passive_positive_x)) < 0.01)
 	assert(abs(tank.tank_angle - 31.0) < 0.01)
 	var negative_slope_terrain = SlopedTerrain.new(120.0, 100.0, -31.0)
+	negative_slope_terrain.bounds = Vector2(-1000.0, 1000.0)
 	var passive_negative_delta = -TankState.TANK_MOVE_SPEED * (-31.0 / TankState.TANK_SLOPE_DRAG_SCALE)
 	var passive_negative_x = 120.0 + cos(deg_to_rad(-31.0)) * passive_negative_delta
 	tank.tank_angle = -31.0
@@ -1727,6 +2607,20 @@ func _run() -> void:
 	assert(abs(tank.position.y - positive_slope_terrain.height_at(left_expected_x)) < 0.01)
 	flat_terrain.ground_y = 200.0
 	flat_terrain.slope_angle = 0.0
+	tank.tank_angle = 0.0
+	tank.on_ground = true
+	tank.position = Vector2(31.0, 200.0)
+	tank.airborne_velocity = Vector2(-22.0, 0.0)
+	tank.move_on_terrain(-1.0, 1.0, flat_terrain)
+	assert(abs(tank.position.x - 30.0) < 0.01)
+	assert(abs(tank.airborne_velocity.x) < 0.01)
+	assert(tank.on_ground)
+	tank.position = Vector2(189.0, 200.0)
+	tank.airborne_velocity = Vector2(22.0, 0.0)
+	tank.move_on_terrain(1.0, 1.0, flat_terrain)
+	assert(abs(tank.position.x - 190.0) < 0.01)
+	assert(abs(tank.airborne_velocity.x) < 0.01)
+	assert(tank.on_ground)
 	tank.position = Vector2(20.0, 80.0)
 	tank.airborne_velocity = Vector2(-30.0, 0.0)
 	tank.on_ground = false
@@ -1751,6 +2645,27 @@ func _run() -> void:
 		assert(abs(after_drop - (before_drop + 12.0)) < 0.01)
 	terrain.drop_terrain(10000.0)
 	assert(abs(float(terrain.height_at(terrain_x)) - floor_y) < 0.01)
+	var asymmetric_drop_terrain: RefCounted = TerrainModel.new()
+	asymmetric_drop_terrain.rebuild(100.0, 100.0)
+	var asymmetric_floor_y = float(asymmetric_drop_terrain.call("_world_height_to_screen", TerrainModel.CLASSIC_MIN_LAND_HEIGHT))
+	var asymmetric_drop_chunk: Dictionary = asymmetric_drop_terrain.call(
+		"_make_chunk",
+		asymmetric_floor_y - 1.0,
+		asymmetric_floor_y - 20.0,
+		asymmetric_floor_y + 10.0,
+		asymmetric_floor_y + 30.0,
+		false,
+		Color.WHITE,
+		Color.GRAY
+	)
+	asymmetric_drop_terrain.set("_chunks", [[asymmetric_drop_chunk]])
+	asymmetric_drop_terrain.drop_terrain(2.0)
+	var asymmetric_drop_chunks: Array = asymmetric_drop_terrain.get("_chunks")
+	var asymmetric_drop_result: Dictionary = Array(asymmetric_drop_chunks[0])[0]
+	assert(abs(float(asymmetric_drop_result.get("top_left", 0.0)) - asymmetric_floor_y) < 0.01)
+	assert(abs(float(asymmetric_drop_result.get("top_right", 0.0)) - (asymmetric_floor_y - 18.0)) < 0.01)
+	assert(abs(float(asymmetric_drop_result.get("bottom_left", 0.0)) - (asymmetric_floor_y + 10.0)) < 0.01)
+	assert(abs(float(asymmetric_drop_result.get("bottom_right", 0.0)) - (asymmetric_floor_y + 30.0)) < 0.01)
 
 	var min_land_clip_terrain: RefCounted = TerrainModel.new()
 	min_land_clip_terrain.set("_height", 100.0)
@@ -4237,7 +5152,9 @@ func _run() -> void:
 	local_match.call("_set_turn_index", 0)
 	var p_inventory: RefCounted = local_match.get("_inventory")
 	p_inventory.reset_round_ammo()
-	p_inventory.select_by_name("Corbomite")
+	p_inventory.add_ammo("Corbomite")
+	p_inventory.reset_round_ammo()
+	assert(p_inventory.select_by_name("Corbomite"))
 	player_tank.corbomite_active = false
 	local_match.call("_fire_player")
 	assert(player_tank.corbomite_active, "Corbomite activation must set corbomite_active on tank")
@@ -4348,3 +5265,8 @@ func _clear_explosions(local_match: Node) -> void:
 	var explosions: Array = local_match.get("_explosions")
 	explosions.clear()
 	local_match.set("_explosions", explosions)
+
+
+func _stock_for_round(inventory: RefCounted, weapon_name: String, amount := -1) -> void:
+	inventory.call("add_ammo", weapon_name, amount)
+	inventory.call("reset_round_ammo")

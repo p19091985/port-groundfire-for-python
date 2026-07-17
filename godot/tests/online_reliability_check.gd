@@ -48,6 +48,15 @@ func _run() -> void:
 	online.set("_endpoint", "ws://127.0.0.1:9")
 	online.call("_force_reconnect", "snapshot_timeout")
 	assert(str(online.get("_status")).contains("snapshot_timeout"))
+	assert(int(online.get("_reconnect_attempt")) == 1)
+	online.call("_on_websocket_status_changed", "websocket_connected")
+	assert(int(online.get("_reconnect_attempt")) == 1)
+	online.call("_schedule_reconnect", "hello_timeout")
+	assert(int(online.get("_reconnect_attempt")) == 2)
+	assert(str(online.get("_status")).contains("(2/5)"))
+	online.call("_mark_session_healthy")
+	assert(int(online.get("_reconnect_attempt")) == 0)
+	assert(abs(float(online.get("_reconnect_timer"))) < 0.01)
 
 	online.set("_render_entities", {
 		42: {

@@ -28,9 +28,11 @@ fi
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/main.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --check-only --script res://scripts/server_browser.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/browser_store_check.gd
+"$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/network_adapter_protocol_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/server_directory_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/terrain_collision_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/local_match_fidelity_check.gd
+"$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/test_weapon_inventory_ammo.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/online_reliability_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/runtime_smoke_check.gd
 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --scene res://scenes/main.tscn --quit-after 3

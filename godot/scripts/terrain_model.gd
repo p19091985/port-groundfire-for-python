@@ -159,6 +159,74 @@ func move_to_ground(x: float, y: float) -> float:
 	return height
 
 
+func move_to_ground_at_angle(x_ref: float, y_ref: float, angle: float) -> Vector2:
+	if _samples.is_empty() and _chunks.is_empty():
+		return Vector2(x_ref, _base_height_at(x_ref))
+	if _chunks.is_empty():
+		return Vector2(x_ref, height_at(x_ref))
+	var sample_position: float = x_ref / _step
+	var slice_index: int = int(floor(sample_position))
+	var slice_offset: float = sample_position - float(slice_index)
+	var x := x_ref
+	var y := y_ref
+	var done := false
+	while not done and slice_index >= 0 and slice_index < _chunks.size():
+		var found := false
+		for chunk_variant in _chunks[slice_index]:
+			var chunk: Dictionary = chunk_variant
+			var state := _chunk_state_at_offset(chunk, slice_offset, y)
+			if state != 0:
+				continue
+			found = true
+			if is_zero_approx(angle):
+				y = _chunk_top_at_offset(chunk, slice_offset)
+				done = true
+			elif angle > 0.0:
+				var left_x := float(slice_index) * _step
+				var left_edge_y := y - ((x - left_x) / tan(angle))
+				if left_edge_y < float(chunk["top_left"]):
+					var left_collision := _segment_intersection(
+						Vector2(x, y),
+						Vector2(left_x, left_edge_y),
+						Vector2(left_x, float(chunk["top_left"])),
+						Vector2(left_x + _step, float(chunk["top_right"]))
+					)
+					if bool(left_collision["hit"]):
+						var left_point: Vector2 = left_collision["position"]
+						x = left_point.x
+						y = left_point.y
+					done = true
+				else:
+					x = left_x
+					y = left_edge_y
+					slice_offset = 1.0
+					slice_index -= 1
+			else:
+				var right_x := float(slice_index + 1) * _step
+				var right_edge_y := y - ((right_x - x) / tan(-angle))
+				if right_edge_y < float(chunk["top_right"]):
+					var right_collision := _segment_intersection(
+						Vector2(x, y),
+						Vector2(right_x, right_edge_y),
+						Vector2(float(slice_index) * _step, float(chunk["top_left"])),
+						Vector2(right_x, float(chunk["top_right"]))
+					)
+					if bool(right_collision["hit"]):
+						var right_point: Vector2 = right_collision["position"]
+						x = right_point.x
+						y = right_point.y
+					done = true
+				else:
+					x = right_x
+					y = right_edge_y
+					slice_offset = 0.0
+					slice_index += 1
+			break
+		if not found:
+			done = true
+	return Vector2(x, y)
+
+
 func _chunk_height_at(x: float) -> float:
 	var clamped_x: float = clamp(x, 0.0, _width - 0.01)
 	var sample_position: float = clamped_x / _step

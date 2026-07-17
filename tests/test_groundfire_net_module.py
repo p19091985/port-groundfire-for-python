@@ -5,24 +5,11 @@ import json
 import struct
 import threading
 import unittest
-from contextlib import redirect_stdout
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
-
-from src.groundfire.network.codec import decode_message, encode_message
-from src.groundfire.network.messages import (
-    ClientCommandEnvelope,
-    HelloRequest,
-    JoinAccept,
-    JoinRequest,
-    ServerSnapshotEnvelope,
-)
-from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
-from src.groundfire.sim.world import ReplicatedEntityState
 
 from groundfire_net import (
     DirectoryServiceConfig,
@@ -33,6 +20,8 @@ from groundfire_net import (
 )
 from groundfire_net.directory_service import (
     build_parser as build_directory_parser,
+)
+from groundfire_net.directory_service import (
     directory_diagnostics,
     directory_server_errors,
     load_directory_payload,
@@ -40,22 +29,35 @@ from groundfire_net.directory_service import (
     response_etag,
 )
 from groundfire_net.websocket_gateway import (
-    DEFAULT_SESSION_TOKEN_TTL_SECONDS,
+    EVENT_SCHEMA_REQUIRED_FIELDS,
     EVENT_SCHEMA_VERSION,
-    INPUT_COMMAND_FIELDS,
+    MATCH_SNAPSHOT_SCHEMA_REQUIRED_FIELDS,
     MATCH_SNAPSHOT_SCHEMA_VERSION,
     MAX_PROTOCOL_VERSION,
     MIN_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
-    SESSION_TOKEN_VERSION,
+    REPLICATED_ENTITY_SCHEMA_REQUIRED_FIELDS,
+    REPLICATED_PLAYER_SCHEMA_REQUIRED_FIELDS,
+    SUPPORTED_PROTOCOL_VERSIONS,
+    TERRAIN_PATCH_SCHEMA_REQUIRED_FIELDS,
     GatewayJoinRegistry,
     WebSocketGateway,
     WebSocketGatewaySession,
+    _snapshot_state_for_session,
     build_parser,
     generate_join_token,
-    main,
     validate_join_token,
 )
+from src.groundfire.network.codec import decode_message, encode_message
+from src.groundfire.network.messages import (
+    ClientCommandEnvelope,
+    HelloRequest,
+    JoinAccept,
+    JoinRequest,
+    ServerSnapshotEnvelope,
+)
+from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
+from src.groundfire.sim.world import ReplicatedEntityState, TerrainPatch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -534,6 +536,61 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertIsNone(session.prepare_join({"player_name": "Alice", "auth_token": token}))
         self.assertEqual(session.player_name, "Alice")
 
+    def test_websocket_gateway_advertises_protocol_compatibility_window(self):
+        hello = WebSocketGatewaySession().hello_response()
+
+        self.assertEqual(hello["protocol"], PROTOCOL_VERSION)
+        self.assertEqual(hello["min_protocol"], MIN_PROTOCOL_VERSION)
+        self.assertEqual(hello["max_protocol"], MAX_PROTOCOL_VERSION)
+        self.assertEqual(hello["supported_protocols"], list(SUPPORTED_PROTOCOL_VERSIONS))
+        self.assertEqual(
+            hello["supported_protocols"],
+            list(range(MIN_PROTOCOL_VERSION, MAX_PROTOCOL_VERSION + 1)),
+        )
+        self.assertEqual(hello["match_snapshot_schema"], MATCH_SNAPSHOT_SCHEMA_VERSION)
+        self.assertEqual(hello["event_schema"], EVENT_SCHEMA_VERSION)
+
+    def test_websocket_gateway_versions_schema_one_snapshot_payloads(self):
+        session = WebSocketGatewaySession()
+        session.player_name = "GodotPlayer"
+        session._player_number = 1
+        session.last_input_sequence = 3
+        session.last_input = {"move_right": True}
+        envelope = _snapshot_envelope(
+            "GodotPlayer",
+            snapshot_sequence=7,
+            acknowledged_command_sequence=3,
+            terrain_patches=(
+                TerrainPatch(
+                    patch_id=1,
+                    chunk_index=2,
+                    operation="explosion",
+                    payload={"revision": 7, "radius": 4.0},
+                ),
+            ),
+            events=({"event_type": "terrain_explosion", "payload": {"position": [1.0, 2.0]}},),
+        )
+
+        state = _snapshot_state_for_session(session, envelope, server_time_msec=123456)
+        snapshot = state["match_snapshot"]
+        player = snapshot["players"][0]
+        entity = snapshot["entities"][0]
+        terrain_patch = state["terrain_patches"][0]
+        event = state["events"][0]
+
+        self.assertEqual(state["match_snapshot_schema"], MATCH_SNAPSHOT_SCHEMA_VERSION)
+        self.assertEqual(state["event_schema"], EVENT_SCHEMA_VERSION)
+        self.assertTrue(MATCH_SNAPSHOT_SCHEMA_REQUIRED_FIELDS.issubset(snapshot))
+        self.assertTrue(REPLICATED_PLAYER_SCHEMA_REQUIRED_FIELDS.issubset(player))
+        self.assertTrue(REPLICATED_ENTITY_SCHEMA_REQUIRED_FIELDS.issubset(entity))
+        self.assertTrue(TERRAIN_PATCH_SCHEMA_REQUIRED_FIELDS.issubset(terrain_patch))
+        self.assertTrue(EVENT_SCHEMA_REQUIRED_FIELDS.issubset(event))
+        self.assertEqual(event["schema"], EVENT_SCHEMA_VERSION)
+        self.assertEqual(event["event_type"], "terrain_explosion")
+        self.assertEqual(event["payload"], {"position": [1.0, 2.0]})
+        self.assertEqual(state["last_input"], {"move_right": True})
+        self.assertEqual(state["server_time_msec"], 123456)
+
     def test_websocket_gateway_speaks_contract_over_real_frames_and_udp_proxy(self):
         messages, udp_messages = asyncio.run(_exercise_websocket_gateway_over_tcp())
 
@@ -627,6 +684,10 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertIn("Current protocol: `1`", doc)
         self.assertIn("Supported protocol range: `1..1`", doc)
         self.assertIn("supported_protocols", doc)
+        self.assertIn("Compatibility Policy", doc)
+        self.assertIn("highest mutually supported protocol", doc)
+        self.assertIn("No silent downgrade or upgrade", doc)
+        self.assertIn("normal public compatibility window keeps the current published protocol and the previous public protocol", doc)
         self.assertIn("password_required", doc)
         self.assertIn("auth_required", doc)
         self.assertIn("auth_token", doc)
@@ -730,6 +791,8 @@ def _snapshot_envelope(
     *,
     snapshot_sequence: int,
     acknowledged_command_sequence: int = 0,
+    terrain_patches: tuple[TerrainPatch, ...] = (),
+    events: tuple[dict[str, object], ...] = (),
 ) -> ServerSnapshotEnvelope:
     snapshot = MatchSnapshot(
         authority="server",
@@ -767,6 +830,8 @@ def _snapshot_envelope(
         simulation_tick=snapshot_sequence,
         acknowledged_command_sequences={1: acknowledged_command_sequence},
         snapshot=snapshot,
+        terrain_patches=terrain_patches,
+        events=events,
     )
 
 

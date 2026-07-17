@@ -14,6 +14,7 @@ fi
 "$PYTHON_BIN" -m pytest -q \
     "$ROOT_DIR/tests/test_godot_migration_scaffold.py" \
     "$ROOT_DIR/tests/test_groundfire_net_module.py" \
+    "$ROOT_DIR/tests/test_hosted_deployment_verifier.py" \
     "$ROOT_DIR/tests/test_replicated_scene.py" \
     "$ROOT_DIR/tests/test_port_fidelity.py" \
     "$ROOT_DIR/tests/test_landscape_fidelity.py"

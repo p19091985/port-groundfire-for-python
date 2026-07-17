@@ -2,7 +2,20 @@ extends Control
 
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
 
-const DISABLED_CLASSIC_ITEMS := []
+const DISABLED_CLASSIC_ITEMS := [
+	{"name": "Rolling Mines", "cost": 50},
+	{"name": "Airstrike", "cost": 100},
+	{"name": "Death's Head", "cost": 200},
+	{"name": "Hover Coil", "cost": 150},
+	{"name": "Corbomite", "cost": 20},
+]
+const DISABLED_CLASSIC_ITEM_NAMES := {
+	"Rolling Mines": true,
+	"Airstrike": true,
+	"Death's Head": true,
+	"Hover Coil": true,
+	"Corbomite": true,
+}
 const CLASSIC_SHOP_ORDER := [
 	"Machine Gun",
 	"Jump Jet",
@@ -34,6 +47,7 @@ var _continue_button: Button
 var _focus_buttons: Array[Button] = []
 var _state := {}
 var _preferred_focus_name := ""
+var _roster_money_container: HBoxContainer
 
 
 func _ready() -> void:
@@ -121,9 +135,16 @@ func _build() -> void:
 	_continue_button.pressed.connect(func() -> void: continue_requested.emit())
 	stack.add_child(_continue_button)
 
+	_roster_money_container = HBoxContainer.new()
+	_roster_money_container.add_theme_constant_override("separation", 16)
+	_roster_money_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.add_child(_roster_money_container)
+
 
 func _rebuild_weapon_rows() -> void:
 	for child in _weapon_list.get_children():
+		child.queue_free()
+	for child in _roster_money_container.get_children():
 		child.queue_free()
 	_focus_buttons.clear()
 	var credits := int(_state.get("credits", 0))
@@ -135,6 +156,15 @@ func _rebuild_weapon_rows() -> void:
 		else:
 			_add_weapon_row(item_data, credits, input_locked)
 	_add_disabled_catalog_rows()
+
+	var participants: Array = _state.get("participants", [])
+	for p_data in participants:
+		var p: Dictionary = p_data
+		var money_label := Label.new()
+		money_label.text = "%s: $%d" % [str(p.get("name", "Player")), int(p.get("credits", 0))]
+		GroundfireTheme.apply_label(money_label, 14, p.get("color", Color.WHITE))
+		_roster_money_container.add_child(money_label)
+
 	_continue_button.disabled = input_locked
 	_focus_buttons.append(_continue_button)
 	_wire_vertical_focus(_focus_buttons)
@@ -161,12 +191,16 @@ func _classic_catalog_rows() -> Array[Dictionary]:
 	for weapon in Array(_state.get("inventory", [])):
 		var weapon_data: Dictionary = weapon
 		if int(weapon_data.get("cost", 0)) > 0:
-			by_name[str(weapon_data.get("name", ""))] = weapon_data.duplicate(true)
+			var weapon_name := str(weapon_data.get("name", ""))
+			if not DISABLED_CLASSIC_ITEM_NAMES.has(weapon_name):
+				by_name[weapon_name] = weapon_data.duplicate(true)
 	for shop_item in Array(_state.get("shop_items", [])):
 		var item_data: Dictionary = shop_item
 		var copy := item_data.duplicate(true)
 		copy["is_shop_item"] = true
-		by_name[str(copy.get("name", ""))] = copy
+		var item_name := str(copy.get("name", ""))
+		if not DISABLED_CLASSIC_ITEM_NAMES.has(item_name):
+			by_name[item_name] = copy
 	var ordered: Array[Dictionary] = []
 	for name in CLASSIC_SHOP_ORDER:
 		if by_name.has(name):
@@ -184,10 +218,11 @@ func _add_weapon_row(weapon_data: Dictionary, credits: int, input_locked := fals
 
 	row.add_child(_cost_cell(cost))
 
+	var stock_amount := int(weapon_data.get("stock", weapon_data.get("ammo", -1)))
 	var label := Label.new()
-	label.text = "%s  Ammo %s  Pack %s  Damage %d  Blast %d" % [
+	label.text = "%s  Stock %s  Pack %s  Damage %d  Blast %d" % [
 		_catalog_display_name(weapon_name),
-		_format_ammo(int(weapon_data.get("ammo", -1))),
+		_format_ammo(stock_amount),
 		_format_pack(pack_size),
 		int(weapon_data.get("damage", 0)),
 		int(weapon_data.get("blast", 0)),

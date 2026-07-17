@@ -10,6 +10,7 @@ from src.mirv import Mirv
 from src.missile import Missile
 from src.player import Player
 from src.shell import Shell
+from src.smoke import Smoke
 from src.soundentity import SoundEntity
 from src.tank import Tank
 from src.weapons_impl import MachineGunWeapon
@@ -17,6 +18,7 @@ from tests.support import (
     PROJECT_ROOT,
     CommandPlayer,
     DummyGameForTank,
+    FlatLandscape,
     RecordingWeapon,
 )
 
@@ -62,6 +64,37 @@ class TankFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(vel_x, 1.5 - deg_sin(-20.0) * 12.0)
         self.assertAlmostEqual(vel_y, -0.5 + deg_cos(-20.0) * 12.0)
 
+    def test_gun_launch_origin_is_outside_classic_direct_hit_shape(self):
+        # Fidelity target: tank.py gun_launch_position() and intersect_tank().
+        #
+        # Classic projectiles do not ignore their owner, but the launch point is
+        # outside the tank polygon, so a shot moving away from the barrel does
+        # not immediately self-hit. A segment that comes back through the body
+        # is still a normal direct hit.
+        self.tank._x = 0.0
+        self.tank._y = 0.0
+        self.tank._tank_angle = 0.0
+        self.tank._gun_angle = 0.0
+
+        launch_x, launch_y = self.tank.gun_launch_position()
+
+        self.assertFalse(
+            self.tank.intersect_tank(
+                launch_x,
+                launch_y,
+                launch_x,
+                launch_y + (self.tank._tank_size * 0.5),
+            )
+        )
+        self.assertTrue(
+            self.tank.intersect_tank(
+                launch_x,
+                launch_y + (self.tank._tank_size * 0.5),
+                launch_x,
+                self.tank._tank_size * 0.4,
+            )
+        )
+
     def test_machine_gun_launch_velocity_uses_fixed_weapon_speed(self):
         # Fidelity target: MachineGunWeapon.update() uses
         # gun_launch_velocity_at_power(MachineGunWeapon.OPTION_Speed).
@@ -100,6 +133,32 @@ class TankFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(high_power_round._x_launch_vel, expected_x)
         self.assertAlmostEqual(high_power_round._y_launch_vel, expected_y)
 
+    def test_machine_gun_large_update_spawns_multiple_backdated_rounds(self):
+        # Fidelity target: MachineGunWeapon.update() cooldown loop.
+        #
+        # A slow frame that crosses several 0.1s firing intervals emits every
+        # missed tracer, and each round receives a launch_time backdated by the
+        # remaining negative cooldown overshoot.
+        weapon = self.tank._weapons[Tank.MACHINEGUN]
+        weapon._quantity = 10
+        weapon._available_quantity = 10
+        weapon._cooldown = MachineGunWeapon.OPTION_CooldownTime
+        self.tank._firing = True
+        self.game.set_time(12.0)
+
+        weapon.update(MachineGunWeapon.OPTION_CooldownTime * 3.5)
+
+        rounds = [
+            entity for entity in self.game._entities if isinstance(entity, MachineGunRound)
+        ]
+        self.assertEqual(len(rounds), 3)
+        self.assertAlmostEqual(rounds[0]._launch_time, 11.75)
+        self.assertAlmostEqual(rounds[1]._launch_time, 11.85)
+        self.assertAlmostEqual(rounds[2]._launch_time, 11.95)
+        self.assertAlmostEqual(weapon._cooldown, MachineGunWeapon.OPTION_CooldownTime * 0.5)
+        self.assertEqual(weapon._quantity, 7)
+        self.assertEqual(weapon._available_quantity, 7)
+
     def test_machine_gun_round_trajectory_uses_classic_gravity(self):
         # Fidelity target: MachineGunRound.update() uses the same classic
         # parabolic y formula as Shell.update(), including the 5.0 * t^2 term.
@@ -130,6 +189,38 @@ class TankFidelityTests(unittest.TestCase):
             machine_gun_round._y_back,
             2.0 + t_back * (4.0 - 5.0 * t_back),
         )
+
+    def test_machine_gun_round_expires_one_frame_after_horizontal_exit(self):
+        # Fidelity target: MachineGunRound.update() out-of-bounds branch.
+        #
+        # The classic tracer is kept alive for the frame where it leaves the
+        # landscape and returns False only on the next update.
+        class NarrowLandscape:
+            def get_landscape_width(self):
+                return 1.0
+
+            def ground_collision(self, _old_x, _old_y, _new_x, _new_y):
+                return (False, 0.0, 0.0)
+
+        self.game.get_landscape = lambda: NarrowLandscape()
+        self.game.get_players = lambda: []
+        machine_gun_round = MachineGunRound(
+            self.game,
+            self.player,
+            0.0,
+            0.0,
+            4.0,
+            0.0,
+            100.0,
+            2,
+        )
+        self.game.set_time(100.5)
+
+        self.assertTrue(machine_gun_round.update(0.05))
+        self.assertTrue(machine_gun_round._kill_next_frame)
+        self.assertAlmostEqual(machine_gun_round._x, 2.0)
+
+        self.assertFalse(machine_gun_round.update(0.05))
 
     def test_machine_gun_round_tank_hit_queues_classic_metal_sound(self):
         # Fidelity target: MachineGunRound.update() queues SoundEntity(..., 9,
@@ -188,6 +279,74 @@ class TankFidelityTests(unittest.TestCase):
         self.assertEqual(sound_entities[0]._sound._sound_id, 9)
         self.assertFalse(sound_entities[0]._looping)
         self.assertFalse(sound_entities[0]._sound._looping)
+
+    def test_projectile_ground_collision_takes_priority_over_tank_hit(self):
+        # Fidelity target: Shell.update() and MachineGunRound.update()
+        # resolve terrain collisions before tank intersections.
+        #
+        # If the same frame segment also crosses a tank, the classic path
+        # records a terrain hit/miss instead of applying direct-hit tank damage.
+        class AlwaysHitLandscape:
+            def __init__(self, position):
+                self.position = position
+
+            def get_landscape_width(self):
+                return 100.0
+
+            def ground_collision(self, _old_x, _old_y, _new_x, _new_y):
+                return (True, self.position[0], self.position[1])
+
+        class HitTank:
+            def __init__(self):
+                self.damage_calls = []
+
+            def intersect_tank(self, _old_x, _old_y, _new_x, _new_y):
+                return True
+
+            def do_damage(self, damage):
+                self.damage_calls.append(damage)
+                return False
+
+        class HitPlayer:
+            def __init__(self, tank):
+                self._tank = tank
+
+            def get_tank(self):
+                return self._tank
+
+        target_tank = HitTank()
+        self.game.get_players = lambda: [HitPlayer(target_tank)]
+        self.game._landscape = AlwaysHitLandscape((1.25, 2.5))
+        shell = Shell(self.game, self.player, 0.0, 0.0, 4.0, 0.0, 0.0, 0.3, 40.0, False)
+        self.game.set_time(0.5)
+
+        self.assertFalse(shell.update(0.05))
+        self.assertEqual(target_tank.damage_calls, [])
+        self.assertEqual(self.game._explosions[-1][4], -1)
+        self.assertEqual(self.player.recorded_shots[-1], (1.25, 2.5, -1))
+
+        self.game._entities.clear()
+        self.game._explosions.clear()
+        target_tank.damage_calls.clear()
+        self.game._landscape = AlwaysHitLandscape((1.5, 2.75))
+        machine_gun_round = MachineGunRound(
+            self.game,
+            self.player,
+            0.0,
+            0.0,
+            4.0,
+            0.0,
+            0.0,
+            2,
+        )
+        self.game.set_time(0.5)
+
+        self.assertTrue(machine_gun_round.update(0.05))
+        self.assertTrue(machine_gun_round._kill_next_frame)
+        self.assertAlmostEqual(machine_gun_round._x, 1.5)
+        self.assertAlmostEqual(machine_gun_round._y, 2.75)
+        self.assertEqual(target_tank.damage_calls, [])
+        self.assertFalse(any(isinstance(entity, SoundEntity) for entity in self.game._entities))
 
     def test_mirv_vertical_split_does_not_add_minimum_horizontal_spread(self):
         # Fidelity target: Mirv.update() fragment spread formula.
@@ -259,6 +418,43 @@ class TankFidelityTests(unittest.TestCase):
         finally:
             Missile.OPTION_Speed = original_speed
 
+    def test_missile_steering_clamps_and_conflicting_input_recenters(self):
+        # Fidelity target: Missile.update() steering branch.
+        #
+        # Classic missiles clamp accumulated turn speed to +/-500 and treat
+        # both steer buttons held together like no steer input, recentering the
+        # angle-change speed by 3 * SteerSensitivity.
+        self.game.get_players = lambda: []
+        missile = Missile(self.game, self.player, 1.0, 2.0, 45.0, 0.3, 40.0)
+        missile._angle_change = 490.0
+        self.player.commands = {Player.CMD_GUNLEFT: True}
+
+        missile.update(1.0)
+
+        self.assertAlmostEqual(missile._angle_change, 500.0)
+        self.assertAlmostEqual(missile._angle, 545.0)
+
+        missile = Missile(self.game, self.player, 1.0, 2.0, -45.0, 0.3, 40.0)
+        missile._angle_change = -490.0
+        self.player.commands = {Player.CMD_GUNRIGHT: True}
+
+        missile.update(1.0)
+
+        self.assertAlmostEqual(missile._angle_change, -500.0)
+        self.assertAlmostEqual(missile._angle, -545.0)
+
+        missile = Missile(self.game, self.player, 1.0, 2.0, 45.0, 0.3, 40.0)
+        missile._angle_change = 90.0
+        self.player.commands = {
+            Player.CMD_GUNLEFT: True,
+            Player.CMD_GUNRIGHT: True,
+        }
+
+        missile.update(0.1)
+
+        self.assertAlmostEqual(missile._angle_change, 0.0)
+        self.assertAlmostEqual(missile._angle, 45.0)
+
     def test_missile_exhaustion_starts_freefall_after_powered_frame(self):
         # Fidelity target: Missile.update() fuel exhaustion ordering.
         #
@@ -276,6 +472,24 @@ class TankFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(missile._fuel, -0.05)
         self.assertAlmostEqual(missile._x_vel, 0.0)
         self.assertAlmostEqual(missile._y_vel, powered_speed)
+
+    def test_missile_freefall_moves_before_gravity_updates_velocity(self):
+        # Fidelity target: Missile.update() free-fall branch.
+        #
+        # Once fuel is already negative, the classic missile first moves using
+        # stored velocity, then applies gravity to _y_vel for the next frame.
+        self.game.get_players = lambda: []
+        missile = Missile(self.game, self.player, 1.0, 2.0, 0.0, 0.3, 40.0)
+        missile._fuel = -0.01
+        missile._x_vel = 2.0
+        missile._y_vel = 3.0
+
+        self.assertTrue(missile.update(0.2))
+
+        self.assertAlmostEqual(missile._x, 1.0 + 2.0 * 0.2)
+        self.assertAlmostEqual(missile._y, 2.0 + 3.0 * 0.2)
+        self.assertAlmostEqual(missile._x_vel, 2.0)
+        self.assertAlmostEqual(missile._y_vel, 3.0 - 10.0 * 0.2)
 
     def test_projectile_explosions_use_classic_death_sound_ids(self):
         # Fidelity target: Shell.explode()/Missile.explode() sound id routing.
@@ -346,6 +560,59 @@ class TankFidelityTests(unittest.TestCase):
         self.assertFalse(self.tank._firing)
         self.assertEqual(weapons[Tank.SHELLS].select_calls, 1)
         self.assertTrue(all(weapon.ammo_round_calls == 1 for weapon in weapons))
+
+    def test_set_position_on_ground_completes_classic_round_start_placement(self):
+        # Fidelity target: GameSession.start_round() calls Tank.do_pre_round()
+        # and then Tank.set_position_on_ground(), so the countdown starts with
+        # the tank already grounded and airborne velocity cleared.
+        self.game._landscape = FlatLandscape(ground_y=3.5)
+        self.tank._tank_angle = 12.0
+        self.tank._airbourne_x_vel = 8.0
+        self.tank._airbourne_y_vel = -4.0
+        self.tank._on_ground = False
+
+        self.assertTrue(self.tank.do_pre_round())
+        self.assertFalse(self.tank._on_ground)
+
+        self.tank._tank_angle = -9.0
+        self.tank._airbourne_x_vel = 6.0
+        self.tank._airbourne_y_vel = 7.0
+        self.tank.set_position_on_ground(4.25)
+
+        self.assertAlmostEqual(self.tank._x, 4.25)
+        self.assertAlmostEqual(self.tank._y, 3.5)
+        self.assertEqual(self.tank._tank_angle, 0.0)
+        self.assertTrue(self.tank._on_ground)
+        self.assertEqual(self.tank._airbourne_x_vel, 0.0)
+        self.assertEqual(self.tank._airbourne_y_vel, 0.0)
+
+    def test_do_post_round_stops_firing_and_boost_audio(self):
+        # Fidelity target: Tank.do_post_round().
+        #
+        # The classic post-round cleanup releases held fire and marks any
+        # looping jump-jet sound inactive before the score/shop flow proceeds.
+        class RecordingBoostSound:
+            def __init__(self):
+                self.inactive_calls = 0
+
+            def set_inactive(self):
+                self.inactive_calls += 1
+
+        weapons = [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS)]
+        self.tank._weapons = weapons
+        self.tank._selected_weapon = Tank.MACHINEGUN
+        self.tank._firing = True
+        self.tank._boosting = True
+        boost_sound = RecordingBoostSound()
+        self.tank._boosting_sound = boost_sound
+
+        self.assertTrue(self.tank.do_post_round())
+
+        self.assertEqual(weapons[Tank.MACHINEGUN].fire_calls, [(False, 0.0)])
+        self.assertFalse(self.tank._firing)
+        self.assertEqual(boost_sound.inactive_calls, 1)
+        self.assertFalse(self.tank._boosting)
+        self.assertIsNone(self.tank._boosting_sound)
 
     def test_move_tank_passive_steep_slope_slide_matches_classic_direction(self):
         # Fidelity target: Tank.move_tank() passive slope branch.
@@ -435,6 +702,42 @@ class TankFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(self.tank._fuel, 0.5)
         self.assertAlmostEqual(self.tank._total_fuel, 0.5)
 
+    def test_update_clamps_grounded_tank_to_classic_bounds_and_stops_x_velocity(self):
+        # Fidelity target: Tank.update() post-move world bounds clamp.
+        #
+        # The classic update clamps x to the playable [-10, 10] range after
+        # grounded movement and clears the stored airborne x velocity at either
+        # edge, even though the tank is currently on the ground.
+        weapons = [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS)]
+        self.tank._weapons = weapons
+        self.tank._selected_weapon = Tank.SHELLS
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = True
+        self.tank._tank_angle = 0.0
+        self.tank._x = -9.95
+        self.tank._y = 0.0
+        self.tank._airbourne_x_vel = -6.0
+        self.player.commands = {Tank.CMD_TANKLEFT: True}
+
+        self.tank.update(1.0)
+
+        self.assertEqual(self.tank._x, -10.0)
+        self.assertEqual(self.tank._airbourne_x_vel, 0.0)
+        self.assertTrue(self.tank._on_ground)
+
+        self.tank._on_ground = True
+        self.tank._tank_angle = 0.0
+        self.tank._x = 9.95
+        self.tank._y = 0.0
+        self.tank._airbourne_x_vel = 6.0
+        self.player.commands = {Tank.CMD_TANKRIGHT: True}
+
+        self.tank.update(1.0)
+
+        self.assertEqual(self.tank._x, 10.0)
+        self.assertEqual(self.tank._airbourne_x_vel, 0.0)
+        self.assertTrue(self.tank._on_ground)
+
     def test_update_aligns_tank_tracks_using_classic_support_displacements(self):
         # Fidelity target: Tank.update() track-ground support branch.
         #
@@ -505,6 +808,30 @@ class TankFidelityTests(unittest.TestCase):
             [(True, 0.0), (False, 0.0), (True, 0.0)],
         )
 
+    def test_update_gun_conflicting_inputs_keep_classic_power_priority(self):
+        # Fidelity target: Tank.update_gun() conflicting aim/power input.
+        #
+        # Classic aim left+right cancels to a stop, but Gun Up is checked before
+        # Gun Down, so holding both power controls still increases power.
+        self.tank._gun_angle = 10.0
+        self.tank._gun_angle_change_speed = 30.0
+        self.tank._gun_power = 10.0
+        self.tank._gun_power_change_speed = 12.0
+        self.player.commands = {
+            Tank.CMD_GUNLEFT: True,
+            Tank.CMD_GUNRIGHT: True,
+            Tank.CMD_GUNUP: True,
+            Tank.CMD_GUNDOWN: True,
+        }
+
+        self.tank.update_gun(0.1)
+
+        expected_power_speed = 12.0 + self.tank._gun_power_change_acceleration * 0.1
+        self.assertAlmostEqual(self.tank._gun_angle_change_speed, 0.0)
+        self.assertAlmostEqual(self.tank._gun_angle, 10.0)
+        self.assertAlmostEqual(self.tank._gun_power_change_speed, expected_power_speed)
+        self.assertAlmostEqual(self.tank._gun_power, 10.0 + expected_power_speed * 0.1)
+
     def test_update_gun_reselects_shell_when_weapon_runs_out(self):
         weapons = [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS)]
         weapons[Tank.MISSILES] = RecordingWeapon([False])
@@ -517,6 +844,92 @@ class TankFidelityTests(unittest.TestCase):
         self.assertEqual(self.tank.get_selected_weapon(), Tank.SHELLS)
         self.assertEqual(weapons[Tank.SHELLS].select_calls, 1)
         self.assertFalse(self.tank.is_firing())
+
+    def test_update_gun_last_limited_weapon_shot_returns_to_shell_after_launch(self):
+        # Fidelity target: Tank.update_gun() with limited weapon fire().
+        #
+        # A limited weapon that spends its final shot still launches that
+        # weapon's projectile; fire() then returns False and Tank reselects
+        # Shell for the next input frame.
+        from src.mirv import Mirv
+
+        mirv_weapon = self.tank.get_weapon(Tank.MIRVS)
+        shell_weapon = self.tank.get_weapon(Tank.SHELLS)
+        mirv_weapon._quantity = 1
+        mirv_weapon._cooldown = 0.0
+        self.tank._selected_weapon = Tank.MIRVS
+        self.player.commands = {Tank.CMD_FIRE: True}
+
+        self.tank.update_gun(0.0)
+
+        mirv_projectiles = [entity for entity in self.game._entities if isinstance(entity, Mirv)]
+        self.assertEqual(len(mirv_projectiles), 1)
+        self.assertEqual(mirv_weapon._quantity, 0)
+        self.assertEqual(self.tank.get_selected_weapon(), Tank.SHELLS)
+        self.assertAlmostEqual(shell_weapon._cooldown, shell_weapon._cooldown_time)
+        self.assertFalse(self.tank.is_firing())
+
+    def test_update_applies_classic_weapon_switch_delay(self):
+        # Fidelity target: Tank.update() weapon cycling branch.
+        #
+        # Classic weapon cycling arms _switch_weapon_time for 0.2s. While that
+        # timer is positive, further WeaponUp/WeaponDown input is ignored; when
+        # the timer crosses below zero during an update, the next update is the
+        # first one allowed to switch again.
+        weapons = [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS)]
+        self.tank._weapons = weapons
+        self.tank._selected_weapon = Tank.SHELLS
+        self.tank._switch_weapon_time = 0.0
+        self.player.commands = {Tank.CMD_WEAPONUP: True}
+
+        self.tank.update(0.0)
+
+        self.assertEqual(self.tank.get_selected_weapon(), Tank.MACHINEGUN)
+        self.assertEqual(weapons[Tank.SHELLS].unselect_calls, 1)
+        self.assertEqual(weapons[Tank.MACHINEGUN].select_calls, 1)
+        self.assertAlmostEqual(self.tank._switch_weapon_time, 0.2)
+
+        self.tank.update(0.0)
+        self.assertEqual(self.tank.get_selected_weapon(), Tank.MACHINEGUN)
+        self.assertEqual(weapons[Tank.MACHINEGUN].unselect_calls, 0)
+        self.assertAlmostEqual(self.tank._switch_weapon_time, 0.2)
+
+        self.tank.update(0.19)
+        self.assertEqual(self.tank.get_selected_weapon(), Tank.MACHINEGUN)
+        self.assertAlmostEqual(self.tank._switch_weapon_time, 0.01)
+
+        self.tank.update(0.02)
+        self.assertEqual(self.tank.get_selected_weapon(), Tank.MACHINEGUN)
+        self.assertLess(self.tank._switch_weapon_time, 0.0)
+
+        self.tank.update(0.0)
+        self.assertEqual(self.tank.get_selected_weapon(), Tank.MIRVS)
+        self.assertEqual(weapons[Tank.MACHINEGUN].unselect_calls, 1)
+        self.assertEqual(weapons[Tank.MIRVS].select_calls, 1)
+        self.assertAlmostEqual(self.tank._switch_weapon_time, 0.2)
+
+    def test_round_starting_ignores_weapon_input_but_updates_selected_weapon(self):
+        # Fidelity target: Tank.update() during GameState.ROUND_STARTING.
+        #
+        # The classic round-starting countdown ignores fire and weapon-cycle
+        # commands, but still updates the selected weapon so its select cooldown
+        # drains before ROUND_IN_ACTION begins.
+        weapons = [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS)]
+        self.tank._weapons = weapons
+        self.tank._selected_weapon = Tank.SHELLS
+        self.game.set_game_state(self.game.GameState.ROUND_STARTING)
+        self.player.commands = {
+            Tank.CMD_FIRE: True,
+            Tank.CMD_WEAPONUP: True,
+            Tank.CMD_TANKRIGHT: True,
+        }
+
+        self.tank.update(0.25)
+
+        self.assertEqual(weapons[Tank.SHELLS].fire_calls, [])
+        self.assertEqual(weapons[Tank.SHELLS].unselect_calls, 0)
+        self.assertEqual(weapons[Tank.SHELLS].update_calls, [0.25])
+        self.assertEqual(self.tank.get_selected_weapon(), Tank.SHELLS)
 
     def test_burn_uses_cpp_ground_smoke_values(self):
         captured = []
@@ -562,6 +975,67 @@ class TankFidelityTests(unittest.TestCase):
         self.assertEqual((texture, rotation, growth, fade_rate), (5, 0.1, 0.3, 0.3))
         self.assertAlmostEqual(self.tank._exhaust_time, -0.05)
 
+    def test_smoke_update_keeps_exact_zero_fade_frame(self):
+        # Fidelity target: Smoke.update() keeps a smoke entity alive when
+        # fade_away reaches exactly 0.0 and removes it only after it goes
+        # negative, leaving the final fully transparent frame in the entity
+        # update contract.
+        smoke = Smoke(
+            object(),
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5,
+            0.1,
+            0.3,
+            0.7,
+        )
+
+        self.assertTrue(smoke.update(1.0))
+
+        self.assertAlmostEqual(smoke._x, 4.0)
+        self.assertAlmostEqual(smoke._y, 6.0)
+        self.assertAlmostEqual(smoke._rotate, 0.1)
+        self.assertAlmostEqual(smoke._size, 0.55)
+        self.assertAlmostEqual(smoke._fade_away, 0.0)
+        self.assertFalse(smoke.update(0.1))
+
+    def test_trail_lay_and_update_uses_classic_spacing_angle_and_fade(self):
+        # Fidelity target: Trail.lay_trail() / Trail.update().
+        #
+        # Classic projectile trails lay segments every 0.2 world units, start
+        # each segment at fade 0.8, angle horizontal right movement at -90
+        # degrees, and keep exact-zero fade segments for one update.
+        from src.trail import Trail
+
+        original_fade_rate = Trail.OPTION_TrailFadeRate
+        try:
+            Trail.OPTION_TrailFadeRate = 0.2
+            trail = Trail(None, 0.0, 0.0)
+
+            trail.lay_trail(0.61, 0.0)
+
+            self.assertEqual(len(trail._trail_segment_list), 3)
+            self.assertAlmostEqual(trail._last_x, 0.6)
+            self.assertAlmostEqual(trail._last_y, 0.0)
+            for index, segment in enumerate(trail._trail_segment_list, start=1):
+                self.assertAlmostEqual(segment.x, 0.2 * index)
+                self.assertAlmostEqual(segment.y, 0.0)
+                self.assertAlmostEqual(segment.fade_away, 0.8)
+                self.assertAlmostEqual(segment.length, 0.2)
+                self.assertAlmostEqual(segment.angle, -90.0)
+
+            self.assertTrue(trail.update(4.0))
+            self.assertEqual(len(trail._trail_segment_list), 3)
+            self.assertTrue(all(segment.fade_away == 0.0 for segment in trail._trail_segment_list))
+            self.assertTrue(trail.update(0.01))
+            self.assertEqual(trail._trail_segment_list, [])
+            trail.set_inactive()
+            self.assertFalse(trail.update(0.01))
+        finally:
+            Trail.OPTION_TrailFadeRate = original_fade_rate
+
     def test_move_tank_boost_uses_cpp_jump_jet_smoke_values(self):
         captured = []
 
@@ -589,6 +1063,85 @@ class TankFidelityTests(unittest.TestCase):
         self.assertAlmostEqual(y_vel, -4.0 - math.cos(math.radians(30.0)) * 2.0)
         self.assertEqual((texture, rotation, growth, fade_rate), (2, 0.0, 0.0, 2.5))
         self.assertAlmostEqual(self.tank._exhaust_time, -0.05)
+
+    def test_ground_boost_detaches_without_same_frame_airborne_movement(self):
+        # Fidelity target: Tank.update() + Tank.move_tank() boost ordering.
+        #
+        # When a grounded tank starts jump jets, the classic update adds boost
+        # velocity and then the track-support probe detaches the tank. The
+        # airborne gravity/position integration does not run until the next
+        # update because _on_ground was still true inside move_tank().
+        self.player.commands = {Tank.CMD_JUMPJETS: True}
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = True
+        self.tank._x = 1.0
+        self.tank._y = 0.0
+        self.tank._tank_angle = 0.0
+        self.tank._airbourne_x_vel = 0.0
+        self.tank._airbourne_y_vel = 0.0
+        self.tank._fuel = 1.0
+        self.tank._total_fuel = 1.0
+
+        self.tank.update(0.1)
+
+        self.assertFalse(self.tank._on_ground)
+        self.assertAlmostEqual(self.tank._x, 1.0)
+        self.assertAlmostEqual(self.tank._y, 0.0)
+        self.assertAlmostEqual(self.tank._airbourne_x_vel, 0.0)
+        self.assertAlmostEqual(self.tank._airbourne_y_vel, self.tank._tank_boost * 0.1)
+        self.assertAlmostEqual(self.tank._fuel, 1.0 - self.tank._fuel_usage_rate * 0.1)
+
+    def test_move_tank_boost_spends_full_frame_fuel_when_crossing_zero(self):
+        # Fidelity target: Tank.move_tank() jump-jet fuel spend.
+        #
+        # The classic boost branch subtracts time * FuelUsageRate before the
+        # next fuel gate runs, so the last powered frame can leave active and
+        # persistent fuel slightly below zero.
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = False
+        self.tank._fuel = 0.05
+        self.tank._total_fuel = 0.05
+        self.tank._tank_angle = 0.0
+        self.tank._airbourne_x_vel = 0.0
+        self.tank._airbourne_y_vel = 0.0
+
+        self.tank.move_tank(0.5, True)
+
+        self.assertAlmostEqual(self.tank._fuel, 0.05 - self.tank._fuel_usage_rate * 0.5)
+        self.assertAlmostEqual(self.tank._total_fuel, 0.05 - self.tank._fuel_usage_rate * 0.5)
+        self.assertLess(self.tank._fuel, 0.0)
+        self.assertLess(self.tank._total_fuel, 0.0)
+
+    def test_move_tank_boost_turn_limit_is_checked_before_step(self):
+        # Fidelity target: Tank.move_tank() jump-jet air rotation.
+        #
+        # The classic +/-15 degree boost turn limit is a pre-step gate, not a
+        # post-step clamp. A large frame can therefore overshoot the limit.
+        self.tank._state = Tank.TANK_ALIVE
+        self.tank._on_ground = False
+        self.tank._fuel = 1.0
+        self.tank._total_fuel = 1.0
+        self.tank._tank_angle = 14.9
+        self.tank._airbourne_x_vel = 0.0
+        self.tank._airbourne_y_vel = 0.0
+        self.tank._exhaust_time = 1.0
+        self.tank._boosting = True
+        self.player.commands = {Tank.CMD_TANKLEFT: True}
+
+        self.tank.move_tank(0.1, True)
+
+        self.assertAlmostEqual(self.tank._tank_angle, 23.9)
+
+        self.tank._fuel = 1.0
+        self.tank._total_fuel = 1.0
+        self.tank._tank_angle = -14.9
+        self.tank._airbourne_x_vel = 0.0
+        self.tank._airbourne_y_vel = 0.0
+        self.player.commands = {Tank.CMD_TANKRIGHT: True}
+
+        self.tank.move_tank(0.1, True)
+
+        self.assertAlmostEqual(self.tank._tank_angle, -23.9)
 
     def test_render_state_and_network_snapshot_expose_visual_and_sync_data(self):
         self.tank.assign_entity_id(42)
@@ -878,6 +1431,48 @@ class AIPlayerFidelityTests(unittest.TestCase):
         # aim_directly should be True when enemy is higher
         self.assertTrue(ai._aim_directly)
 
+    def test_find_new_target_prefers_clear_los_over_closer_blocked_target(self):
+        # Fidelity target: aiplayer.py:242-256
+        # Target choice uses the classic score: direct line-of-sight can beat a
+        # horizontally closer target, and later candidates win score ties.
+        _game, ai = self._make_game_and_ai()
+
+        class SelectiveLandscape:
+            def ground_collision(self, _x1, _y1, x2, _y2):
+                if abs(x2 - 0.5) < 0.001:
+                    return (True, x2, _y2)
+                return (False, 0.0, 0.0)
+
+        class FakeTank:
+            _state = Tank.TANK_ALIVE
+
+            def __init__(self, x, y):
+                self._x = x
+                self._y = y
+
+            def get_centre(self):
+                return (self._x, self._y, 0.1875)
+
+        class FakeEnemy:
+            def __init__(self, tank):
+                self._tank = tank
+
+            def get_tank(self):
+                return self._tank
+
+        closer_blocked_tank = FakeTank(0.5, 0.0)
+        farther_clear_tank = FakeTank(3.0, 1.0)
+        ai._tank._x = 0.0
+        ai._tank._y = 0.0
+        ai._tank.gun_launch_position = lambda: (0.0, 0.0)
+        _game.get_landscape = lambda: SelectiveLandscape()
+        _game._players[1] = FakeEnemy(closer_blocked_tank)
+        _game._players[2] = FakeEnemy(farther_clear_tank)
+
+        ai.find_new_target()
+
+        self.assertIs(ai._target_tank, farther_clear_tank)
+
 
 class ExplosionFidelityTests(unittest.TestCase):
     """
@@ -895,7 +1490,7 @@ class ExplosionFidelityTests(unittest.TestCase):
     """
 
     def _run_explosion(self, *, blast_x, blast_y, blast_size, damage,
-                       hit_tank_idx, tanks):
+                       hit_tank_idx, tanks, return_defeats=False):
         """
         Run gamesession.explosion() and return the damage_calls list per tank.
         """
@@ -937,10 +1532,17 @@ class ExplosionFidelityTests(unittest.TestCase):
             game._players[idx] = fp
             players_list.append(fp)
 
-        class FakePlayerRef:
-            def defeat(self, _p):
-                pass
+        defeats = []
 
+        class FakePlayerRef:
+            def __init__(self):
+                self._score = 0
+                self._money = 0
+
+            def defeat(self, p):
+                defeats.append(p)
+
+        player_ref = FakePlayerRef()
         session = GameSessionController(
             human_player_factory=lambda *a, **k: None,
             ai_player_factory=lambda *a, **k: None,
@@ -951,9 +1553,75 @@ class ExplosionFidelityTests(unittest.TestCase):
         )
         session.explosion(
             game, blast_x, blast_y, blast_size, damage, hit_tank_idx,
-            0, False, FakePlayerRef()
+            0, False, player_ref
         )
-        return [tank.damage_calls for tank in tanks]
+        damage_calls = [tank.damage_calls for tank in tanks]
+        if return_defeats:
+            return damage_calls, defeats, player_ref
+        return damage_calls
+
+    def test_blast_update_preserves_classic_fade_and_whiteout_thresholds(self):
+        # Fidelity target: Blast.update() visual lifetime and whiteout fade.
+        #
+        # Classic blasts use fade_away as the visible alpha/lifetime, keep the
+        # entity alive on the exact zero-fade frame, and only clear whiteout
+        # after white_out_level crosses below zero.
+        from src.blast import Blast
+
+        original_blast_fade = Blast.OPTION_BlastFadeRate
+        original_whiteout_fade = Blast.OPTION_WhiteoutFadeRate
+        try:
+            Blast.OPTION_BlastFadeRate = 0.1
+            Blast.OPTION_WhiteoutFadeRate = 0.5
+            blast = Blast(None, 1.0, 2.0, 0.3, 0.8, True)
+
+            self.assertTrue(blast.update(2.0))
+            self.assertAlmostEqual(blast._fade_away, 0.6)
+            self.assertAlmostEqual(blast._white_out_level, 0.0)
+            self.assertTrue(blast._white_out)
+
+            self.assertTrue(blast.update(0.01))
+            self.assertFalse(blast._white_out)
+
+            blast._fade_away = 0.1
+            self.assertTrue(blast.update(1.0))
+            self.assertAlmostEqual(blast._fade_away, 0.0)
+            self.assertFalse(blast.update(0.01))
+        finally:
+            Blast.OPTION_BlastFadeRate = original_blast_fade
+            Blast.OPTION_WhiteoutFadeRate = original_whiteout_fade
+
+    def test_blast_render_state_uses_classic_visual_size_and_alpha(self):
+        # Fidelity target: Blast.draw()/get_render_state() visual texture size.
+        #
+        # Classic blast visuals draw texture 0 centered with width
+        # `size * 1.1 * 2.0` and alpha derived directly from fade_away.
+        from src.blast import Blast
+
+        class FakeInterface:
+            def get_texture_surface(self, texture_id):
+                return object() if texture_id == 0 else None
+
+        class FakeGame:
+            def get_interface(self):
+                return FakeInterface()
+
+        blast = Blast(FakeGame(), 1.0, 2.0, 0.3, 0.8, True)
+
+        render_state = blast.get_render_state()
+
+        self.assertEqual(len(render_state.primitives), 2)
+        texture = render_state.primitives[0]
+        self.assertEqual(texture.texture_id, 0)
+        self.assertAlmostEqual(texture.x, 1.0)
+        self.assertAlmostEqual(texture.y, 2.0)
+        self.assertAlmostEqual(texture.width, 0.3 * 1.1 * 2.0)
+        self.assertEqual(texture.alpha, int(0.8 * 255))
+        overlay = render_state.primitives[1]
+        self.assertEqual(overlay.colour, (255, 255, 255, 255))
+        self.assertEqual(render_state.metadata["size"], 0.3)
+        self.assertEqual(render_state.metadata["fade_away"], 0.8)
+        self.assertTrue(render_state.metadata["white_out"])
 
     def test_direct_hit_delivers_full_damage(self):
         # Fidelity target: gamesession.py:95-97
@@ -972,6 +1640,24 @@ class ExplosionFidelityTests(unittest.TestCase):
         # nearby is also within splash radius; its damage should be less than 40
         if results[1]:
             self.assertLess(results[1][0], 40)
+
+    def test_explosion_records_defeats_without_immediate_score_or_money(self):
+        # Fidelity target: gamesession.py explosion() and player.py end_round().
+        #
+        # Explosions apply damage and record defeated players; score and money
+        # are awarded later by Player.end_round(), not immediately per damage.
+        from tests.support import ExplosionTank
+
+        direct = ExplosionTank(x=0.0, y=0.0, dies_on_damage=True)
+
+        _damage_calls, defeats, player_ref = self._run_explosion(
+            blast_x=0.0, blast_y=0.0, blast_size=0.3, damage=40,
+            hit_tank_idx=0, tanks=[direct], return_defeats=True
+        )
+
+        self.assertEqual(len(defeats), 1)
+        self.assertEqual(player_ref._score, 0)
+        self.assertEqual(player_ref._money, 0)
 
     def test_splash_damage_quadratic_falloff_formula(self):
         # Fidelity target: gamesession.py:101-104
@@ -998,6 +1684,41 @@ class ExplosionFidelityTests(unittest.TestCase):
         max_distance = (size + hit_range) ** 2
         expected_damage = damage * (1.0 - squared_distance / max_distance)
 
+        self.assertEqual(len(results[0]), 1)
+        self.assertAlmostEqual(results[0][0], expected_damage, places=5)
+
+    def test_splash_damage_uses_tank_centre_not_base_position(self):
+        # Fidelity target: gamesession.py:100-101 and tank.py:get_centre().
+        #
+        # Explosion damage is measured against Tank.get_centre(), including the
+        # tank centre offset, not any separate ground/base position on the tank.
+        class OffsetCentreTank:
+            x = 999.0
+            y = 999.0
+
+            def __init__(self):
+                self.damage_calls = []
+
+            def get_centre(self):
+                return (0.0, 0.2, 0.1875)
+
+            def do_damage(self, damage):
+                self.damage_calls.append(damage)
+                return False
+
+        tank = OffsetCentreTank()
+        results = self._run_explosion(
+            blast_x=0.0,
+            blast_y=0.0,
+            blast_size=0.3,
+            damage=40,
+            hit_tank_idx=-1,
+            tanks=[tank],
+        )
+
+        squared_distance = 0.2 ** 2
+        max_distance = (0.3 + 0.1875) ** 2
+        expected_damage = 40 * (1.0 - squared_distance / max_distance)
         self.assertEqual(len(results[0]), 1)
         self.assertAlmostEqual(results[0][0], expected_damage, places=5)
 
@@ -1311,7 +2032,10 @@ class WeaponFidelityTests(unittest.TestCase):
             def __init__(self, number):
                 self._number = number
                 self.fired_count = 0
+                self.shots = []
             def record_fired(self): self.fired_count += 1
+            def record_shot(self, x, y, hit_tank): self.shots.append((x, y, hit_tank))
+            def get_command(self, _command, _amount_out=None): return False
             def get_tank(self): return None
         
         class FakeTank:
@@ -1350,6 +2074,314 @@ class WeaponFidelityTests(unittest.TestCase):
         self.assertTrue(shells[0]._white_out)
         self.assertEqual(shells[0]._damage, NukeWeapon.OPTION_Damage)
 
+    def test_shell_update_uses_launch_time_parabola_not_frame_euler(self):
+        # Fidelity target: Shell.update() trajectory formula.
+        #
+        # Classic shells recompute position from time since launch:
+        # x = launch_x + x_vel * t, y = launch_y + y_vel * t - 5*t*t.
+        # A frame-Euler port would move y by the post-gravity velocity and land
+        # lower on the first tick.
+        shell = Shell(self.game, self.player, 0.0, 0.0, 10.0, 20.0, self.game.get_time(), 0.3, 40.0, False)
+
+        self.game.time += 0.1
+        alive = shell.update(0.1)
+
+        self.assertTrue(alive)
+        self.assertAlmostEqual(shell._x, 1.0)
+        self.assertAlmostEqual(shell._y, 1.95)
+        self.assertFalse(hasattr(self.game, "last_explosion"))
+
+    def test_shell_and_mirv_render_state_use_classic_triangle_points(self):
+        # Fidelity target: Shell.draw()/Mirv.draw() projectile geometry.
+        #
+        # Classic shell-style projectiles render as the same tiny white
+        # triangle, with fixed offsets from the projectile position.
+        shell = Shell(self.game, self.player, 1.0, 2.0, 0.0, 0.0, self.game.get_time(), 0.3, 40.0, False)
+        mirv = Mirv(self.game, self.player, 1.0, 2.0, 0.0, 10.0, self.game.get_time(), 0.3, 30.0)
+
+        expected_points = (
+            (1.0, 2.018),
+            (1.03, 1.982),
+            (0.97, 1.982),
+        )
+
+        shell_primitive = shell.get_render_state().primitives[0]
+        mirv_primitive = mirv.get_render_state().primitives[0]
+        self.assertEqual(shell_primitive.points, expected_points)
+        self.assertEqual(mirv_primitive.points, expected_points)
+        self.assertEqual(shell_primitive.colour, (255, 255, 255))
+        self.assertEqual(mirv_primitive.colour, (255, 255, 255))
+
+    def test_missile_render_state_uses_classic_rotated_rocket_points(self):
+        # Fidelity target: Missile.draw()/get_render_state() projectile geometry.
+        #
+        # Classic missiles render as a five-point white rocket polygon rotated
+        # around the projectile position by the current missile angle.
+        missile = Missile(self.game, self.player, 1.0, 2.0, 90.0, 0.3, 40.0)
+
+        primitive = missile.get_render_state().primitives[0]
+
+        expected_points = (
+            (0.92, 2.0),
+            (1.0, 1.92),
+            (1.16, 1.92),
+            (1.16, 2.08),
+            (1.0, 2.08),
+        )
+        for actual, expected in zip(primitive.points, expected_points, strict=True):
+            self.assertAlmostEqual(actual[0], expected[0])
+            self.assertAlmostEqual(actual[1], expected[1])
+        self.assertEqual(primitive.colour, (255, 255, 255))
+        self.assertEqual(missile.get_render_state().metadata["angle"], 90.0)
+
+    def test_mirv_weapon_uses_classic_configured_damage(self):
+        # Fidelity target: conf/options.ini [Mirv] Damage, loaded by
+        # MirvWeapon.read_settings() and mirrored by Godot
+        # WeaponInventory.MIRV_DAMAGE.
+        from src.weapons_impl import MirvWeapon
+
+        previous_damage = MirvWeapon.OPTION_Damage
+        try:
+            MirvWeapon.OPTION_Damage = -1.0
+            MirvWeapon.read_settings(SETTINGS)
+            self.assertEqual(MirvWeapon.OPTION_Damage, 30.0)
+        finally:
+            MirvWeapon.OPTION_Damage = previous_damage
+
+    def test_mirv_weapon_uses_classic_configured_cooldown_and_cost(self):
+        # Fidelity target: conf/options.ini [Mirv] plus [Price] Mirvs,
+        # loaded by MirvWeapon.read_settings() and mirrored by Godot
+        # WeaponInventory cooldown and catalog cost metadata.
+        from src.weapons_impl import MirvWeapon
+
+        previous_cooldown = MirvWeapon.OPTION_CooldownTime
+        previous_cost = MirvWeapon.OPTION_Cost
+        try:
+            MirvWeapon.OPTION_CooldownTime = -1.0
+            MirvWeapon.OPTION_Cost = -1
+            MirvWeapon.read_settings(SETTINGS)
+
+            self.assertEqual(MirvWeapon.OPTION_CooldownTime, 7.5)
+            self.assertEqual(MirvWeapon.OPTION_Cost, 50)
+        finally:
+            MirvWeapon.OPTION_CooldownTime = previous_cooldown
+            MirvWeapon.OPTION_Cost = previous_cost
+
+    def test_mirv_entity_uses_classic_configured_values(self):
+        # Fidelity target: conf/options.ini [Mirv], loaded by
+        # Mirv.read_settings() and mirrored by Godot WeaponInventory fragment
+        # count and horizontal spread metadata.
+        previous_fragments = Mirv.OPTION_Fragments
+        previous_spread = Mirv.OPTION_Spread
+        try:
+            Mirv.OPTION_Fragments = -1
+            Mirv.OPTION_Spread = -1.0
+            Mirv.read_settings(SETTINGS)
+
+            self.assertEqual(Mirv.OPTION_Fragments, 5)
+            self.assertEqual(Mirv.OPTION_Spread, 0.2)
+        finally:
+            Mirv.OPTION_Fragments = previous_fragments
+            Mirv.OPTION_Spread = previous_spread
+
+    def test_shell_weapon_uses_classic_configured_values(self):
+        # Fidelity target: conf/options.ini [Shell], loaded by
+        # ShellWeapon.read_settings() and mirrored by Godot WeaponInventory
+        # damage/cooldown metadata. Raw blast-size parity is tracked separately
+        # because the Godot radius is adapted into pixels.
+        from src.weapons_impl import ShellWeapon
+
+        previous_damage = ShellWeapon.OPTION_Damage
+        previous_cooldown = ShellWeapon.OPTION_CooldownTime
+        try:
+            ShellWeapon.OPTION_Damage = -1.0
+            ShellWeapon.OPTION_CooldownTime = -1.0
+            ShellWeapon.read_settings(SETTINGS)
+
+            self.assertEqual(ShellWeapon.OPTION_Damage, 40.0)
+            self.assertEqual(ShellWeapon.OPTION_CooldownTime, 4.0)
+        finally:
+            ShellWeapon.OPTION_Damage = previous_damage
+            ShellWeapon.OPTION_CooldownTime = previous_cooldown
+
+    def test_machine_gun_weapon_uses_classic_configured_values(self):
+        # Fidelity target: conf/options.ini [MachineGun], loaded by
+        # MachineGunWeapon.read_settings() and mirrored by Godot
+        # WeaponInventory constants used for tracer damage, launch speed, and
+        # held-fire cadence.
+        from src.weapons_impl import MachineGunWeapon
+
+        previous_damage = MachineGunWeapon.OPTION_Damage
+        previous_speed = MachineGunWeapon.OPTION_Speed
+        previous_cooldown = MachineGunWeapon.OPTION_CooldownTime
+        try:
+            MachineGunWeapon.OPTION_Damage = -1.0
+            MachineGunWeapon.OPTION_Speed = -1.0
+            MachineGunWeapon.OPTION_CooldownTime = -1.0
+            MachineGunWeapon.read_settings(SETTINGS)
+
+            self.assertEqual(MachineGunWeapon.OPTION_Damage, 2.0)
+            self.assertEqual(MachineGunWeapon.OPTION_Speed, 25.0)
+            self.assertEqual(MachineGunWeapon.OPTION_CooldownTime, 0.1)
+        finally:
+            MachineGunWeapon.OPTION_Damage = previous_damage
+            MachineGunWeapon.OPTION_Speed = previous_speed
+            MachineGunWeapon.OPTION_CooldownTime = previous_cooldown
+
+    def test_machine_gun_weapon_uses_classic_configured_cost(self):
+        # Fidelity target: conf/options.ini [Price] MachineGun, loaded by
+        # MachineGunWeapon.read_settings() and mirrored by Godot
+        # WeaponInventory catalog cost metadata.
+        from src.weapons_impl import MachineGunWeapon
+
+        previous_cost = MachineGunWeapon.OPTION_Cost
+        try:
+            MachineGunWeapon.OPTION_Cost = -1
+            MachineGunWeapon.read_settings(SETTINGS)
+            self.assertEqual(MachineGunWeapon.OPTION_Cost, 50)
+        finally:
+            MachineGunWeapon.OPTION_Cost = previous_cost
+
+    def test_missile_entity_uses_classic_configured_values(self):
+        # Fidelity target: conf/options.ini [Missile], loaded by
+        # Missile.read_settings() and mirrored by Godot WeaponInventory
+        # metadata used for fuel-limited steering and powered flight.
+        previous_fuel = Missile.OPTION_FuelSupply
+        previous_steer_sensitivity = Missile.OPTION_SteerSensitivity
+        previous_speed = Missile.OPTION_Speed
+        try:
+            Missile.OPTION_FuelSupply = -1.0
+            Missile.OPTION_SteerSensitivity = -1.0
+            Missile.OPTION_Speed = -1.0
+            Missile.read_settings(SETTINGS)
+
+            self.assertEqual(Missile.OPTION_FuelSupply, 3.0)
+            self.assertEqual(Missile.OPTION_SteerSensitivity, 300.0)
+            self.assertEqual(Missile.OPTION_Speed, 9.0)
+        finally:
+            Missile.OPTION_FuelSupply = previous_fuel
+            Missile.OPTION_SteerSensitivity = previous_steer_sensitivity
+            Missile.OPTION_Speed = previous_speed
+
+    def test_missile_weapon_uses_classic_configured_values(self):
+        # Fidelity target: conf/options.ini [Missile] plus [Price] Missiles,
+        # loaded by MissileWeapon.read_settings() and mirrored by Godot
+        # WeaponInventory damage, cooldown, and catalog cost metadata.
+        from src.weapons_impl import MissileWeapon
+
+        previous_damage = MissileWeapon.OPTION_Damage
+        previous_cooldown = MissileWeapon.OPTION_CooldownTime
+        previous_cost = MissileWeapon.OPTION_Cost
+        try:
+            MissileWeapon.OPTION_Damage = -1.0
+            MissileWeapon.OPTION_CooldownTime = -1.0
+            MissileWeapon.OPTION_Cost = -1
+            MissileWeapon.read_settings(SETTINGS)
+
+            self.assertEqual(MissileWeapon.OPTION_Damage, 40.0)
+            self.assertEqual(MissileWeapon.OPTION_CooldownTime, 5.0)
+            self.assertEqual(MissileWeapon.OPTION_Cost, 50)
+        finally:
+            MissileWeapon.OPTION_Damage = previous_damage
+            MissileWeapon.OPTION_CooldownTime = previous_cooldown
+            MissileWeapon.OPTION_Cost = previous_cost
+
+    def test_nuke_weapon_uses_classic_configured_values(self):
+        # Fidelity target: conf/options.ini [Nuke] plus [Price] Nukes,
+        # loaded by NukeWeapon.read_settings() and mirrored by Godot
+        # WeaponInventory damage, cooldown, and catalog cost metadata.
+        from src.weapons_impl import NukeWeapon
+
+        previous_damage = NukeWeapon.OPTION_Damage
+        previous_cooldown = NukeWeapon.OPTION_CooldownTime
+        previous_cost = NukeWeapon.OPTION_Cost
+        try:
+            NukeWeapon.OPTION_Damage = -1.0
+            NukeWeapon.OPTION_CooldownTime = -1.0
+            NukeWeapon.OPTION_Cost = -1
+            NukeWeapon.read_settings(SETTINGS)
+
+            self.assertEqual(NukeWeapon.OPTION_Damage, 90.0)
+            self.assertEqual(NukeWeapon.OPTION_CooldownTime, 10.0)
+            self.assertEqual(NukeWeapon.OPTION_Cost, 50)
+        finally:
+            NukeWeapon.OPTION_Damage = previous_damage
+            NukeWeapon.OPTION_CooldownTime = previous_cooldown
+            NukeWeapon.OPTION_Cost = previous_cost
+
+    def test_selected_weapons_wait_for_classic_configured_cooldown(self):
+        # Fidelity target: ShellWeapon.select() and MirvWeapon.select().
+        #
+        # The classic weapon select path arms the configured cooldown. Pressing
+        # fire while that cooldown is positive does not spawn a projectile or
+        # consume limited ammo; the selected weapon's update() must run it down.
+        from src.mirv import Mirv
+        from src.shell import Shell
+        from src.weapons_impl import MirvWeapon, ShellWeapon
+
+        previous_shell_cooldown = ShellWeapon.OPTION_CooldownTime
+        previous_mirv_cooldown = MirvWeapon.OPTION_CooldownTime
+        previous_mirv_damage = MirvWeapon.OPTION_Damage
+        try:
+            ShellWeapon.read_settings(SETTINGS)
+            MirvWeapon.read_settings(SETTINGS)
+
+            shell_weapon = ShellWeapon(self.game, self.tank)
+            shell_weapon.select()
+            self.assertAlmostEqual(shell_weapon._cooldown, 4.0)
+            self.assertTrue(shell_weapon.fire(True, 0.0))
+            self.assertEqual([type(entity) for entity in self.game.entities], [])
+
+            shell_weapon.update(4.1)
+            self.assertTrue(shell_weapon.fire(True, 0.0))
+            self.assertEqual(len([e for e in self.game.entities if isinstance(e, Shell)]), 1)
+
+            self.game.entities.clear()
+            mirv_weapon = MirvWeapon(self.game, self.tank)
+            mirv_weapon._quantity = 1
+            self.assertTrue(mirv_weapon.select())
+            self.assertAlmostEqual(mirv_weapon._cooldown, 7.5)
+            self.assertTrue(mirv_weapon.fire(True, 0.0))
+            self.assertEqual(mirv_weapon._quantity, 1)
+            self.assertEqual([type(entity) for entity in self.game.entities], [])
+
+            mirv_weapon.update(7.6)
+            self.assertFalse(mirv_weapon.fire(True, 0.0))
+            self.assertEqual(mirv_weapon._quantity, 0)
+            self.assertEqual(len([e for e in self.game.entities if isinstance(e, Mirv)]), 1)
+        finally:
+            ShellWeapon.OPTION_CooldownTime = previous_shell_cooldown
+            MirvWeapon.OPTION_CooldownTime = previous_mirv_cooldown
+            MirvWeapon.OPTION_Damage = previous_mirv_damage
+
+    def test_projectiles_exit_horizontal_bounds_without_exploding(self):
+        # Fidelity target: Shell.update(), Mirv.update(), and Missile.update()
+        # horizontal out-of-bounds branches.
+        #
+        # Classic projectiles that leave the landscape through the side are
+        # removed without calling Game.explosion(). Shell additionally records
+        # the shot as a miss.
+        from src.mirv import Mirv
+        from src.missile import Missile
+        from src.shell import Shell
+
+        shell = Shell(self.game, self.player, 9.0, 2.0, 2.0, 0.0, 99.0, 0.3, 40.0, False)
+        self.assertFalse(shell.update(0.1))
+        self.assertFalse(hasattr(self.game, "last_explosion"))
+        self.assertEqual(len(self.player.shots), 1)
+        self.assertAlmostEqual(self.player.shots[0][0], 11.0)
+        self.assertEqual(self.player.shots[0][2], -1)
+
+        mirv = Mirv(self.game, self.player, 9.0, 2.0, 2.0, 20.0, 99.0, 0.3, 20.0)
+        self.assertFalse(mirv.update(0.1))
+        self.assertFalse(hasattr(self.game, "last_explosion"))
+        fragments = [entity for entity in self.game.entities if isinstance(entity, Shell)]
+        self.assertEqual(fragments, [])
+
+        missile = Missile(self.game, self.player, 9.0, 2.0, -90.0, 0.3, 40.0)
+        self.assertFalse(missile.update(0.2))
+        self.assertFalse(hasattr(self.game, "last_explosion"))
+
     def test_mirv_splits_into_exact_fragment_count_at_apex(self):
         from src.mirv import Mirv
         from src.shell import Shell
@@ -1365,6 +2397,25 @@ class WeaponFidelityTests(unittest.TestCase):
         self.assertFalse(alive) # Consumed
         fragments = [e for e in self.game.entities if isinstance(e, Shell)]
         self.assertEqual(len(fragments), Mirv.OPTION_Fragments)
+
+    def test_mirv_does_not_split_at_exact_apex_time(self):
+        # Fidelity target: Mirv.update() split guard.
+        #
+        # The classic check is current_time > apex_time. At exactly the apex
+        # timestamp the MIRV is still alive; the next later update splits it.
+        from src.mirv import Mirv
+        from src.shell import Shell
+
+        mirv = Mirv(self.game, self.player, 0.0, 5.0, 2.0, 20.0, self.game.get_time(), 0.3, 20.0)
+        self.game.time = mirv._apex_time
+
+        alive = mirv.update(0.1)
+
+        self.assertTrue(alive)
+        fragments = [e for e in self.game.entities if isinstance(e, Shell)]
+        self.assertEqual(len(fragments), 0)
+        self.assertAlmostEqual(mirv._x, 4.0)
+        self.assertAlmostEqual(mirv._y, 25.0)
 
     def test_mirv_fragments_inherit_zero_vertical_velocity_and_spread_horizontally(self):
         from src.mirv import Mirv
@@ -1669,6 +2720,36 @@ class ShopMenuEconomyFidelityTests(unittest.TestCase):
             self.assertEqual(self.player.get_money(), 0)
             self.assertEqual(weapon.get_ammo(), initial_ammo + amount)
 
+    def test_shop_stock_is_copied_to_round_available_ammo_on_pre_round(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = -1.0
+        shop._player_select_pos[0] = 3 # Missiles
+
+        missile = self.tank.get_weapon(Tank.MISSILES)
+        self.assertEqual(missile.get_ammo(), 0)
+        self.assertEqual(missile._available_quantity, 0)
+
+        self.player.set_money(missile.get_cost())
+        self.player.commands[Player.CMD_FIRE] = True
+        shop.update(0.0)
+
+        self.assertEqual(missile.get_ammo(), 5)
+        self.assertEqual(missile._available_quantity, 0)
+
+        self.tank.do_pre_round()
+        self.assertEqual(missile._available_quantity, 5)
+
+        missile._quantity -= 2
+        missile.set_ammo_for_round()
+        self.assertEqual(missile._available_quantity, 3)
+
     def test_shop_purchase_prevents_buy_without_sufficient_funds(self):
         from src.shopmenu import ShopMenu
         from src.player import Player
@@ -1692,6 +2773,111 @@ class ShopMenuEconomyFidelityTests(unittest.TestCase):
         # Money not deducted, ammo not added
         self.assertEqual(self.player.get_money(), cost - 1)
         self.assertEqual(mg.get_ammo(), initial_ammo)
+
+    def test_shop_ai_style_gunup_from_machine_gun_goes_to_done_without_purchase(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = -1.0
+        shop._player_select_pos[0] = 0
+
+        mg = self.tank.get_weapon(Tank.MACHINEGUN)
+        cost = mg.get_cost()
+        self.player.set_money(cost)
+        initial_ammo = mg.get_ammo()
+        self.player.commands[Player.CMD_GUNUP] = True
+
+        shop.update(0.0)
+
+        self.assertEqual(shop._player_select_pos[0], 10)
+        self.assertEqual(self.player.get_money(), cost)
+        self.assertEqual(mg.get_ammo(), initial_ammo)
+        self.assertEqual(shop._player_select_delay[0], 0.2)
+
+    def test_shop_gray_catalog_positions_do_not_purchase(self):
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time): pass
+
+        shop = MockShopMenu(self.game)
+        initial_ammo = {
+            Tank.MACHINEGUN: self.tank.get_weapon(Tank.MACHINEGUN).get_ammo(),
+            Tank.MIRVS: self.tank.get_weapon(Tank.MIRVS).get_ammo(),
+            Tank.MISSILES: self.tank.get_weapon(Tank.MISSILES).get_ammo(),
+            Tank.NUKES: self.tank.get_weapon(Tank.NUKES).get_ammo(),
+        }
+        initial_fuel = self.tank.get_total_fuel()
+
+        for pos in range(5, 10):
+            shop._player_select_delay[0] = -1.0
+            shop._player_select_pos[0] = pos
+            self.player.set_money(1000)
+            self.player.commands[Player.CMD_FIRE] = True
+
+            shop.update(0.0)
+
+            self.assertEqual(self.player.get_money(), 1000)
+            self.assertAlmostEqual(self.tank.get_total_fuel(), initial_fuel)
+            for weapon_index, ammo in initial_ammo.items():
+                self.assertEqual(self.tank.get_weapon(weapon_index).get_ammo(), ammo)
+            self.assertEqual(shop._player_select_delay[0], 0.2)
+
+    def test_shop_draw_uses_classic_catalog_order_and_prices(self):
+        # Fidelity target: ShopMenu.draw() catalog text.
+        #
+        # The classic shop draws five active purchasable rows, five gray legacy
+        # rows, and the final Done! row in a fixed vertical order with a
+        # separate $cost column.
+        from src.shopmenu import ShopMenu
+
+        class RecordingUi:
+            def __init__(self):
+                self.text_calls = []
+
+            def style(self, *_args, **kwargs):
+                return kwargs
+
+            def draw_centered_text(self, x, y, text, *, style):
+                self.text_calls.append((x, y, text, style))
+
+        class MockShopMenu(ShopMenu):
+            def draw_background(self):
+                pass
+
+            def draw_game_polygon(self, points, color):
+                pass
+
+        ui = RecordingUi()
+        self.game.get_ui = lambda: ui
+        shop = MockShopMenu(self.game)
+        shop.draw()
+
+        expected_rows = [
+            (4.0, "Machine Gun", "$50"),
+            (3.2, "Jump Jet", "$50"),
+            (2.4, "Mirvs", "$50"),
+            (1.6, "Missiles", "$50"),
+            (0.8, "Nukes", "$50"),
+            (0.0, "Rolling Mines", "$50"),
+            (-0.8, "Airstrike", "$100"),
+            (-1.6, "Death's Head", "$200"),
+            (-2.4, "Hover Coil", "$150"),
+            (-3.2, "Corbomite", "$20"),
+        ]
+
+        drawn_text = [(x, round(y, 1), text) for x, y, text, _style in ui.text_calls]
+        for y, name, cost in expected_rows:
+            self.assertIn((7.0, y, name), drawn_text)
+            self.assertIn((4.0, y, cost), drawn_text)
+        self.assertIn((7.0, -4.0, "Done!"), drawn_text)
 
     def test_shop_input_delay_prevents_duplicate_buy_actions(self):
         from src.shopmenu import ShopMenu
@@ -1720,6 +2906,43 @@ class ShopMenuEconomyFidelityTests(unittest.TestCase):
         # Frame 2: User holds FIRE, delay > 0, so no second purchase
         shop.update(0.05)
         self.assertEqual(self.player.get_money(), cost)
+        self.assertEqual(mg.get_ammo(), initial_ammo + 50)
+
+    def test_shop_input_delay_requires_negative_value_before_action(self):
+        # Fidelity target: ShopMenu.update() input-delay gate.
+        #
+        # Classic shop input is accepted only when _player_select_delay < 0.0.
+        # A delay of exactly zero is still locked for that update.
+        from src.shopmenu import ShopMenu
+        from src.player import Player
+        from src.tank import Tank
+
+        class MockShopMenu(ShopMenu):
+            def update_background(self, time):
+                pass
+
+        shop = MockShopMenu(self.game)
+        shop._player_select_delay[0] = 0.0
+        shop._player_select_pos[0] = 0
+
+        mg = self.tank.get_weapon(Tank.MACHINEGUN)
+        cost = mg.get_cost()
+        self.player.set_money(cost)
+        initial_ammo = mg.get_ammo()
+        self.player.commands[Player.CMD_FIRE] = True
+
+        shop.update(0.0)
+        self.assertEqual(self.player.get_money(), cost)
+        self.assertEqual(mg.get_ammo(), initial_ammo)
+        self.assertEqual(shop._player_select_delay[0], 0.0)
+
+        shop.update(0.01)
+        self.assertEqual(self.player.get_money(), cost)
+        self.assertEqual(mg.get_ammo(), initial_ammo)
+        self.assertLess(shop._player_select_delay[0], 0.0)
+
+        shop.update(0.0)
+        self.assertEqual(self.player.get_money(), 0)
         self.assertEqual(mg.get_ammo(), initial_ammo + 50)
 
     def test_shop_done_position_marks_player_ready(self):
@@ -1765,12 +2988,23 @@ class WinnerMenuFidelityTests(unittest.TestCase):
         self.game = FakeGame()
         
         class MockPlayer:
-            def __init__(self, name, score):
+            class MockTank:
+                def __init__(self, color):
+                    self._color = color
+
+                def get_colour(self):
+                    return self._color
+
+            def __init__(self, name, score, color=(255, 255, 255)):
                 self.name = name
                 self._score = score
                 self.commands = [False] * 11
+                self._tank = self.MockTank(color)
+
             def get_score(self): return self._score
             def get_command(self, cmd): return self.commands[cmd]
+            def get_tank(self): return self._tank
+            def get_name(self): return self.name
             
         self.MockPlayer = MockPlayer
 
@@ -1800,6 +3034,72 @@ class WinnerMenuFidelityTests(unittest.TestCase):
         self.assertEqual(len(menu._winners), 2)
         self.assertEqual(menu._winners[0].name, "P1")
         self.assertEqual(menu._winners[1].name, "P2")
+
+    def test_winner_menu_draw_uses_classic_copy_and_four_card_rows(self):
+        # Fidelity target: WinnerMenu.draw().
+        #
+        # Classic winner rendering keeps only winner cards, uses the final/tie
+        # copy, and lays out winners in rows of at most four before centering
+        # the next row.
+        from src.winnermenu import WinnerMenu
+
+        class RecordingUi:
+            def __init__(self):
+                self.centered_text = []
+                self.text = []
+
+            def style(self, *_args, **kwargs):
+                return kwargs
+
+            def draw_centered_text(self, x, y, text, *, style):
+                self.centered_text.append((x, y, text, style))
+
+            def draw_text(self, x, y, text, *, style):
+                self.text.append((x, y, text, style))
+
+        class MockWinnerMenu(WinnerMenu):
+            def __init__(self, game):
+                self.polygons = []
+                super().__init__(game)
+
+            def draw_background(self):
+                pass
+
+            def draw_game_polygon(self, points, color):
+                self.polygons.append((points, color))
+
+        ui = RecordingUi()
+        self.game.get_ui = lambda: ui
+        for index in range(5):
+            self.game.players[index] = self.MockPlayer(
+                f"P{index + 1}",
+                200,
+                (index * 10, index * 20, index * 30),
+            )
+
+        menu = MockWinnerMenu(self.game)
+        menu.draw()
+
+        centered_text = [(round(x, 1), round(y, 1), text) for x, y, text, _style in ui.centered_text]
+        self.assertIn((0.0, 6.5, "Final Result"), centered_text)
+        self.assertIn((0.0, 5.5, "It's a tie!"), centered_text)
+        for expected in [
+            (-6.0, 0.8, "P1"),
+            (-2.0, 0.8, "P2"),
+            (2.0, 0.8, "P3"),
+            (6.0, 0.8, "P4"),
+            (0.0, -3.2, "P5"),
+        ]:
+            self.assertIn(expected, centered_text)
+
+        self.assertEqual(len(menu.polygons), 5)
+        self.assertEqual(menu.polygons[0][0], [(-7.5, 1.25), (-6.75, 2.75), (-5.25, 2.75), (-4.5, 1.25)])
+        self.assertEqual(menu.polygons[4][0], [(-1.5, -2.75), (-0.75, -1.25), (0.75, -1.25), (1.5, -2.75)])
+        self.assertEqual(len(ui.text), 35)
+        self.assertEqual(ui.text[0][2], "W")
+        self.assertAlmostEqual(ui.text[0][0], -4.2)
+        self.assertAlmostEqual(ui.text[0][1], 1.6)
+        self.assertEqual(ui.text[0][3]["orientation"], -90.0)
 
     def test_winner_menu_activation_delay_is_2_seconds_for_humans_and_4_for_computers(self):
         from src.winnermenu import WinnerMenu
@@ -1902,14 +3202,27 @@ class ScoreMenuFidelityTests(unittest.TestCase):
         self.game = FakeGame()
         
         class MockPlayer:
-            def __init__(self, name, score):
+            class MockTank:
+                def __init__(self, color):
+                    self._color = color
+
+                def get_colour(self):
+                    return self._color
+
+            def __init__(self, name, score, color=(255, 255, 255)):
                 self.name = name
                 self._score = score
                 self.commands = [False] * 11
                 self.is_leader = False
+                self._tank = self.MockTank(color)
+                self._defeated_players = []
+
             def get_score(self): return self._score
             def get_command(self, cmd, dummy=None): return self.commands[cmd]
             def set_leader(self, flag): self.is_leader = flag
+            def get_tank(self): return self._tank
+            def get_name(self): return self.name
+            def get_defeated_players(self): return self._defeated_players
             
         self.MockPlayer = MockPlayer
 
@@ -1984,6 +3297,23 @@ class ScoreMenuFidelityTests(unittest.TestCase):
         state3 = menu.update(0.1)
         self.assertEqual(state3, GameState.SHOP_MENU)
 
+    def test_score_menu_human_auto_advance_preserves_large_tick_timeout(self):
+        from src.scoremenu import ScoreMenu
+        from src.common import GameState
+
+        self.game.has_humans = True
+        self.game.players[0] = self.MockPlayer("P1", 100)
+
+        class MockScoreMenu(ScoreMenu):
+            def update_background(self, time): pass
+
+        menu = MockScoreMenu(self.game)
+
+        # A single slow frame can cross the 2s activation delay and the 10s
+        # safety timeout; Pygame advances immediately in that same update.
+        state = menu.update(12.1)
+        self.assertEqual(state, GameState.SHOP_MENU)
+
     def test_score_menu_assigns_leader_to_unique_highest_scorer(self):
         from src.scoremenu import ScoreMenu
         from src.player import Player
@@ -2042,6 +3372,62 @@ class ScoreMenuFidelityTests(unittest.TestCase):
         state = menu.update(2.0)
         
         self.assertEqual(state, GameState.WINNER_MENU)
+        self.assertFalse(self.game.players[0].is_leader)
+
+    def test_score_menu_draw_uses_classic_headings_rank_ties_and_order(self):
+        # Fidelity target: ScoreMenu.draw() table copy and row ordering.
+        #
+        # The classic score screen inserts players in descending score order,
+        # keeps original player order for ties, and renders a repeated " = "
+        # rank marker for rows tied with the row above.
+        from src.scoremenu import ScoreMenu
+
+        class RecordingUi:
+            def __init__(self):
+                self.text_calls = []
+
+            def style(self, *_args, **kwargs):
+                return kwargs
+
+            def draw_centered_text(self, x, y, text, *, style):
+                self.text_calls.append((x, y, text, style))
+
+        class MockScoreMenu(ScoreMenu):
+            def draw_background(self):
+                pass
+
+            def draw_game_polygon(self, points, color):
+                pass
+
+        ui = RecordingUi()
+        self.game.get_ui = lambda: ui
+        self.game.players[0] = self.MockPlayer("Alpha", 300, (255, 0, 0))
+        self.game.players[1] = self.MockPlayer("Bravo", 200, (0, 255, 0))
+        self.game.players[2] = self.MockPlayer("Charlie", 200, (0, 0, 255))
+        self.game.players[3] = self.MockPlayer("Delta", 100, (255, 255, 0))
+
+        menu = MockScoreMenu(self.game)
+        menu.draw()
+
+        drawn_text = [(x, round(y, 2), text) for x, y, text, _style in ui.text_calls]
+        for expected in [
+            (-6.3, 6.5, "Player"),
+            (0.0, 6.5, "Scoring for Round"),
+            (6.9, 6.5, "Total Score"),
+            (-9.0, 5.1, "1st"),
+            (-9.0, 3.5, "2nd"),
+            (-9.0, 1.9, " = "),
+            (-9.0, 0.3, "4th"),
+            (-6.4, 4.85, "Alpha"),
+            (-6.4, 3.25, "Bravo"),
+            (-6.4, 1.65, "Charlie"),
+            (-6.4, 0.05, "Delta"),
+            (6.9, 5.1, "300"),
+            (6.9, 3.5, "200"),
+            (6.9, 1.9, "200"),
+            (6.9, 0.3, "100"),
+        ]:
+            self.assertIn(expected, drawn_text)
 
 class MainMenuFidelityTests(unittest.TestCase):
     def setUp(self):
@@ -2283,6 +3669,25 @@ class QuitMenuFidelityTests(unittest.TestCase):
         self.assertEqual(menu.update(0.1), GameState.MAIN_MENU)
 
 class QuakeFidelityTests(unittest.TestCase):
+    def test_quake_read_settings_uses_configured_timing(self):
+        # Fidelity target: conf/options.ini [Quake] loaded by
+        # quake.py:read_settings(). Local Match should use the configured
+        # 60-second first quake and 20-second between-quake cadence, not the
+        # Python class fallback defaults.
+        from src.quake import Quake
+
+        original_first = Quake.OPTION_TimeTillFirstQuake
+        original_between = Quake.OPTION_TimeBetweenQuakes
+        try:
+            Quake.OPTION_TimeTillFirstQuake = -1.0
+            Quake.OPTION_TimeBetweenQuakes = -1.0
+            Quake.read_settings(SETTINGS)
+            self.assertAlmostEqual(Quake.OPTION_TimeTillFirstQuake, 60.0)
+            self.assertAlmostEqual(Quake.OPTION_TimeBetweenQuakes, 20.0)
+        finally:
+            Quake.OPTION_TimeTillFirstQuake = original_first
+            Quake.OPTION_TimeBetweenQuakes = original_between
+
     def test_quake_drops_terrain_and_offsets_viewport(self):
         from src.quake import Quake
         class FakeInterface:
@@ -2321,8 +3726,8 @@ class QuakeFidelityTests(unittest.TestCase):
         # During earthquake, terrain drops
         quake.update(1.0)
         self.assertAlmostEqual(game.landscape.dropped, 1.0 * Quake.OPTION_QuakeDropRate)
-        # Viewport is offset
-        self.assertNotEqual(game.interface.offset[0], 0.0)
+        expected_offset = math.sin(1.0 * Quake.OPTION_ShakeFrequency) * Quake.OPTION_ShakeAmplitude
+        self.assertAlmostEqual(game.interface.offset[0], expected_offset)
         self.assertEqual(game.interface.offset[1], 0.0)
         
         # Fast forward past duration

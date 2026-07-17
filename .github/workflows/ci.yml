@@ -89,7 +89,7 @@ jobs:
           unzip -q /tmp/godot.zip -d tools/godot
           chmod +x "$GODOT_BIN"
       - name: Install Godot export templates
-        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.run-godot-browser-qa == 'true' || inputs.package-godot == 'true') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.run-godot-browser-qa == 'true' || inputs.package-godot == 'true' || inputs.sign-release == 'true') }}
         run: |
           set -euo pipefail
           godot_tag="${GODOT_VERSION}-stable"
@@ -105,24 +105,35 @@ jobs:
         env:
           RUN_GODOT_BROWSER_QA: ${{ github.event_name == 'workflow_dispatch' && inputs.run-godot-browser-qa == 'true' }}
           PACKAGE_GODOT: ${{ github.event_name == 'workflow_dispatch' && inputs.package-godot == 'true' }}
+          SIGN_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' }}
         run: |
           set -euo pipefail
           flags=()
           if [[ "$RUN_GODOT_BROWSER_QA" == "true" ]]; then
             flags+=(--browser-qa)
           fi
-          if [[ "$PACKAGE_GODOT" == "true" ]]; then
+          if [[ "$PACKAGE_GODOT" == "true" || "$SIGN_RELEASE" == "true" ]]; then
             flags+=(--package)
           fi
           scripts/validate_godot_release.sh "${flags[@]}"
 
+      - name: Validate GPG signing secrets
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' }}
+        env:
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          RELEASE_SIGN_KEY: ${{ secrets.RELEASE_SIGN_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_GPG_PRIVATE_KEY"
+          test -n "$RELEASE_SIGN_KEY"
+
       - name: Import GPG private key
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' && secrets.RELEASE_GPG_PRIVATE_KEY != '' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' }}
         run: |
           echo "${{ secrets.RELEASE_GPG_PRIVATE_KEY }}" | gpg --batch --import
 
       - name: Sign checksums file
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' && secrets.RELEASE_SIGN_KEY != '' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' }}
         env:
           GROUNDFIRE_SIGN_KEY: ${{ secrets.RELEASE_SIGN_KEY }}
         run: scripts/sign_godot_release.sh

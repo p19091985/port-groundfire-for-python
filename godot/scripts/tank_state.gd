@@ -60,7 +60,7 @@ var gun_angle := GUN_ANGLE_DEFAULT
 var gun_angle_change_speed := 0.0
 var gun_power := GUN_POWER_DEFAULT
 var gun_power_change_speed := 0.0
-var health := TANK_MAX_HEALTH
+var health: float = TANK_MAX_HEALTH
 var fuel := TANK_FULL_FUEL
 var fuel_capacity := TANK_FULL_FUEL
 var fuel_reserve := TANK_FULL_FUEL
@@ -71,12 +71,12 @@ var shield_active := false
 var hover_time := 0.0
 var corbomite_active := false
 var exhaust_time := 0.0
+var boost_detach_pending := false
 
 
 func reset_round(x: float, terrain: RefCounted, label: String, color: Color) -> void:
 	name = label
 	body_color = color
-	position = terrain.tank_position(x)
 	tank_angle = 0.0
 	gun_angle = GUN_ANGLE_DEFAULT
 	gun_angle_change_speed = 0.0
@@ -92,10 +92,33 @@ func reset_round(x: float, terrain: RefCounted, label: String, color: Color) -> 
 	hover_time = 0.0
 	corbomite_active = false
 	exhaust_time = 0.0
+	boost_detach_pending = false
+	set_position_on_ground(x, terrain)
+
+
+func set_position_on_ground(x: float, terrain: RefCounted) -> void:
+	if terrain.has_method("tank_position"):
+		position = Vector2(terrain.call("tank_position", x))
+	else:
+		position = _ground_position_for_query(terrain, x, position.y)
+	if terrain.has_method("move_to_ground"):
+		position.y = float(terrain.call("move_to_ground", position.x, position.y))
+	tank_angle = 0.0
+	on_ground = true
+	airborne_velocity = Vector2.ZERO
+	boost_detach_pending = false
 
 
 func settle_on_terrain(terrain: RefCounted, delta := 0.0) -> void:
 	var classic_track_aligned := false
+	if boost_detach_pending:
+		boost_detach_pending = false
+		if terrain.has_method("move_to_ground"):
+			_apply_classic_track_ground_alignment(terrain, true)
+		else:
+			on_ground = false
+		_constrain_to_terrain_bounds(terrain)
+		return
 	if hover_time > 0.0:
 		hover_time -= delta
 		if hover_time < 0.0:
@@ -153,6 +176,7 @@ func move_on_terrain(direction: float, delta: float, terrain: RefCounted) -> voi
 	var next_x: float = position.x + cos(deg_to_rad(tank_angle)) * track_delta
 	position = _ground_position_for_query(terrain, next_x, position.y)
 	tank_angle = terrain.slope_angle_at(position.x)
+	_constrain_to_terrain_bounds(terrain)
 
 
 func _apply_passive_slope_slide(delta: float, terrain: RefCounted, ground_angle: float) -> void:
@@ -253,11 +277,13 @@ func _constrain_to_terrain_bounds(terrain: RefCounted) -> void:
 func boost(delta: float, air_turn_direction := 0.0) -> void:
 	if state != STATE_ALIVE or fuel <= 0.0:
 		return
+	var was_on_ground := on_ground
 	var radians := deg_to_rad(tank_angle)
 	on_ground = false
+	boost_detach_pending = was_on_ground
 	airborne_velocity.x -= sin(radians) * TANK_BOOST_ACCELERATION * delta
 	airborne_velocity.y -= cos(radians) * TANK_BOOST_ACCELERATION * delta
-	_spend_fuel(BOOST_FUEL_USAGE_RATE * delta)
+	_spend_fuel(BOOST_FUEL_USAGE_RATE * delta, true)
 	_update_boost_turn(delta, air_turn_direction)
 
 
@@ -322,7 +348,7 @@ func tank_center() -> Vector2:
 	)
 
 
-func apply_damage(amount: int) -> bool:
+func apply_damage(amount: float) -> bool:
 	health -= amount
 	if health < 0 and state == STATE_ALIVE:
 		health = 0
@@ -333,11 +359,11 @@ func apply_damage(amount: int) -> bool:
 	return false
 
 
-func damage_after_shield(amount: int) -> int:
-	var raw_damage: int = max(0, amount)
+func damage_after_shield(amount: float) -> float:
+	var raw_damage: float = max(0.0, amount)
 	if not shield_active:
 		return raw_damage
-	return int(round(float(raw_damage) * SHIELD_DAMAGE_MULTIPLIER))
+	return raw_damage * SHIELD_DAMAGE_MULTIPLIER
 
 
 func launch_origin() -> Vector2:
@@ -353,12 +379,17 @@ func add_fuel_capacity(amount := TANK_FUEL_PURCHASE_AMOUNT) -> float:
 
 
 func add_fuel_reserve(amount := TANK_FUEL_PURCHASE_AMOUNT) -> float:
-	fuel_reserve = max(0.0, fuel_reserve) + max(0.0, amount)
+	fuel_reserve += max(0.0, amount)
 	return fuel_reserve
 
 
-func _spend_fuel(amount: float) -> void:
-	var fuel_spent: float = min(fuel, max(0.0, amount))
+func _spend_fuel(amount: float, allow_overspend := false) -> void:
+	var requested_fuel: float = max(0.0, amount)
+	if allow_overspend:
+		fuel -= requested_fuel
+		fuel_reserve -= requested_fuel
+		return
+	var fuel_spent: float = min(fuel, requested_fuel)
 	fuel = max(0.0, fuel - fuel_spent)
 	fuel_reserve = max(0.0, fuel_reserve - fuel_spent)
 

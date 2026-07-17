@@ -33,6 +33,15 @@ if [[ -z "$BROWSER_BIN" || ! -x "$BROWSER_BIN" ]]; then
 fi
 
 if [[ ! -x "$PYTHON_BIN" ]]; then
+    PYTHON_BIN="${PYTHON_BIN_FALLBACK:-python}"
+fi
+
+if [[ "$PYTHON_BIN" == */* ]]; then
+    if [[ ! -x "$PYTHON_BIN" ]]; then
+        printf 'Python executable not found: %s\n' "$PYTHON_BIN" >&2
+        exit 1
+    fi
+elif ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
     printf 'Python executable not found: %s\n' "$PYTHON_BIN" >&2
     exit 1
 fi

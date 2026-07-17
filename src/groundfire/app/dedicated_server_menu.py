@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import os
 import re
 import shlex
@@ -15,13 +16,13 @@ import pygame
 
 pygame_gui: Any
 try:  # pygame_gui is the preferred widget layer when available.
-    import pygame_gui
+    pygame_gui = importlib.import_module("pygame_gui")
 except Exception:  # pragma: no cover - optional dependency fallback
     pygame_gui = None
 
 pygame_menu: Any
 try:  # pygame-menu remains useful for future desktop/web menu composition.
-    import pygame_menu
+    pygame_menu = importlib.import_module("pygame_menu")
 except Exception:  # pragma: no cover - optional dependency fallback
     pygame_menu = None
 

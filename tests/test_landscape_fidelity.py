@@ -47,6 +47,24 @@ class LandscapeFidelityTests(unittest.TestCase):
         self.assertEqual(first.min_height_1, -8.0)
         self.assertEqual(first.min_height_2, -8.0)
 
+    def test_drop_terrain_left_top_clamp_gates_both_bottom_edges(self):
+        # Fidelity target: Landscape.drop_terrain() lines 653-668 (Python).
+        #
+        # The classic code clamps both top edges independently, but the two
+        # bottom edges are both gated by max_height_1 after that clamp. If only
+        # the left top reaches MIN_LAND_HEIGHT, even a still-raised right side
+        # leaves both bottoms unchanged for that tick.
+        landscape = Landscape(TerrainSettings(slices=1, width=1.0), 0.0)
+        landscape._land_chunks = [[make_chunk(-6.9, -6.0, -8.0, -7.5)]]
+
+        landscape.drop_terrain(0.2)
+
+        result = landscape._land_chunks[0][0]
+        self.assertEqual(result.max_height_1, -7.0)
+        self.assertAlmostEqual(result.max_height_2, -6.2)
+        self.assertEqual(result.min_height_1, -8.0)
+        self.assertEqual(result.min_height_2, -7.5)
+
     def test_move_to_ground_at_angle_traces_across_slices(self):
         landscape = Landscape(TerrainSettings(slices=2, width=1.0), 0.0)
         landscape._land_chunks = [

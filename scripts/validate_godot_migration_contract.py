@@ -46,6 +46,7 @@ REQUIRED_RELEASE_FILES = (
     "scripts/sign_godot_release.sh",
     "scripts/validate_godot_release.sh",
     "scripts/package_godot_release.sh",
+    "scripts/verify_godot_hosted_deployment.py",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
 )

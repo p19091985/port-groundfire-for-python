@@ -80,6 +80,16 @@ jobs:
         run: scripts/package_godot_release.sh
 
       # ── Optional GPG signing ─────────────────────────────────────────────────
+      - name: Validate GPG signing secrets
+        if: ${{ secrets.RELEASE_GPG_PRIVATE_KEY != '' || secrets.RELEASE_SIGN_KEY != '' }}
+        env:
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          RELEASE_SIGN_KEY: ${{ secrets.RELEASE_SIGN_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_GPG_PRIVATE_KEY"
+          test -n "$RELEASE_SIGN_KEY"
+
       - name: Import GPG private key
         if: ${{ secrets.RELEASE_GPG_PRIVATE_KEY != '' }}
         run: |

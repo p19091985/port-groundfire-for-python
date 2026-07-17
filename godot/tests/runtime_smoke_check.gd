@@ -228,9 +228,9 @@ func _check_main_menu_and_options() -> void:
 	assert(str(Dictionary(roster[1]).get("kind", "")) == "computer")
 	assert(int(Dictionary(roster[0]).get("controller", -1)) == 0)
 	var setup_rows: Array = main.get("_local_match_setup_rows")
-	var first_active := Dictionary(setup_rows[0]).get("active") as CheckButton
-	var second_active := Dictionary(setup_rows[1]).get("active") as CheckButton
-	var third_active := Dictionary(setup_rows[2]).get("active") as CheckButton
+	var first_active := Dictionary(setup_rows[0]).get("active") as BaseButton
+	var second_active := Dictionary(setup_rows[1]).get("active") as BaseButton
+	var third_active := Dictionary(setup_rows[2]).get("active") as BaseButton
 	var first_slot := Dictionary(setup_rows[0]).get("slot") as OptionButton
 	var first_controller := Dictionary(setup_rows[0]).get("controller") as OptionButton
 	var second_controller := Dictionary(setup_rows[1]).get("controller") as OptionButton

@@ -23,6 +23,55 @@ MAX_PROTOCOL_VERSION = PROTOCOL_VERSION
 SUPPORTED_PROTOCOL_VERSIONS = tuple(range(MIN_PROTOCOL_VERSION, MAX_PROTOCOL_VERSION + 1))
 MATCH_SNAPSHOT_SCHEMA_VERSION = 1
 EVENT_SCHEMA_VERSION = 1
+MATCH_SNAPSHOT_SCHEMA_REQUIRED_FIELDS = frozenset(
+    {
+        "authority",
+        "game_phase",
+        "current_round",
+        "num_rounds",
+        "simulation_tick",
+        "players",
+        "entities",
+        "phase_ticks_remaining",
+        "round_winner_player_number",
+        "winner_player_number",
+        "seed",
+        "world_width",
+        "terrain_revision",
+        "terrain_profile",
+    }
+)
+REPLICATED_PLAYER_SCHEMA_REQUIRED_FIELDS = frozenset(
+    {
+        "player_number",
+        "name",
+        "score",
+        "money",
+        "connected",
+        "is_computer",
+        "tank_entity_id",
+        "acknowledged_command_sequence",
+        "acknowledged_snapshot_sequence",
+        "colour",
+        "is_leader",
+        "selected_weapon",
+        "weapon_stocks",
+        "round_defeated_player_numbers",
+    }
+)
+REPLICATED_ENTITY_SCHEMA_REQUIRED_FIELDS = frozenset(
+    {
+        "entity_id",
+        "entity_type",
+        "position",
+        "velocity",
+        "angle",
+        "owner_player",
+        "payload",
+    }
+)
+TERRAIN_PATCH_SCHEMA_REQUIRED_FIELDS = frozenset({"patch_id", "chunk_index", "operation", "payload"})
+EVENT_SCHEMA_REQUIRED_FIELDS = frozenset({"schema", "event_type", "payload"})
 SESSION_TOKEN_VERSION = "gf1"
 DEFAULT_SESSION_TOKEN_TTL_SECONDS = 3600
 INPUT_COMMAND_FIELDS = frozenset(
@@ -259,20 +308,7 @@ class WebSocketGateway:
                     continue
                 if isinstance(msg, ServerSnapshotEnvelope):
                     session.acknowledged_snapshot_sequence = msg.snapshot_sequence
-                    state = {
-                        "status": "joined",
-                        "player_name": session.player_name,
-                        "player_number": session._player_number,
-                        "joined": True,
-                        "last_input": session.last_input,
-                        "server_time_msec": int(time.time() * 1000),
-                        "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
-                        "event_schema": EVENT_SCHEMA_VERSION,
-                        "match_snapshot": to_plain(msg.snapshot),
-                        "terrain_patches": [to_plain(patch) for patch in msg.terrain_patches],
-                        "events": [_version_event(event) for event in msg.events],
-                    }
-                    state.update(session.join_registry.metadata())
+                    state = _snapshot_state_for_session(session, msg)
                     response = {
                         "type": "snapshot",
                         "protocol": PROTOCOL_VERSION,
@@ -660,10 +696,74 @@ def _base64url_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode((value + padding).encode("ascii"))
 
 
-def _version_event(event: dict[str, Any]) -> dict[str, Any]:
-    versioned = dict(event)
-    versioned.setdefault("schema", EVENT_SCHEMA_VERSION)
+def _snapshot_state_for_session(
+    session: WebSocketGatewaySession,
+    msg: Any,
+    *,
+    server_time_msec: int | None = None,
+) -> dict[str, Any]:
+    state = {
+        "status": "joined",
+        "player_name": session.player_name,
+        "player_number": session._player_number,
+        "joined": True,
+        "last_input": session.last_input,
+        "server_time_msec": int(time.time() * 1000) if server_time_msec is None else server_time_msec,
+        "match_snapshot_schema": MATCH_SNAPSHOT_SCHEMA_VERSION,
+        "event_schema": EVENT_SCHEMA_VERSION,
+        "match_snapshot": _version_match_snapshot(msg.snapshot),
+        "terrain_patches": [_version_terrain_patch(patch) for patch in msg.terrain_patches],
+        "events": [_version_event(event) for event in msg.events],
+    }
+    state.update(session.join_registry.metadata())
+    return state
+
+
+def _version_match_snapshot(snapshot: object) -> dict[str, Any]:
+    versioned = _plain_dict(snapshot, "match_snapshot")
+    _ensure_schema_fields("match_snapshot", versioned, MATCH_SNAPSHOT_SCHEMA_REQUIRED_FIELDS)
+    players = versioned.get("players", [])
+    if not isinstance(players, list):
+        raise ValueError("match_snapshot.players must be an array")
+    for player in players:
+        player_payload = _plain_dict(player, "match_snapshot.players[]")
+        _ensure_schema_fields("match_snapshot.players[]", player_payload, REPLICATED_PLAYER_SCHEMA_REQUIRED_FIELDS)
+    entities = versioned.get("entities", [])
+    if not isinstance(entities, list):
+        raise ValueError("match_snapshot.entities must be an array")
+    for entity in entities:
+        entity_payload = _plain_dict(entity, "match_snapshot.entities[]")
+        _ensure_schema_fields("match_snapshot.entities[]", entity_payload, REPLICATED_ENTITY_SCHEMA_REQUIRED_FIELDS)
     return versioned
+
+
+def _version_terrain_patch(patch: object) -> dict[str, Any]:
+    versioned = _plain_dict(patch, "terrain_patches[]")
+    _ensure_schema_fields("terrain_patches[]", versioned, TERRAIN_PATCH_SCHEMA_REQUIRED_FIELDS)
+    return versioned
+
+
+def _version_event(event: dict[str, Any]) -> dict[str, Any]:
+    versioned = _plain_dict(event, "events[]")
+    versioned.setdefault("schema", EVENT_SCHEMA_VERSION)
+    payload = versioned.get("payload", {})
+    versioned["payload"] = dict(payload) if isinstance(payload, dict) else {"value": payload}
+    versioned["event_type"] = str(versioned.get("event_type", "unknown"))
+    _ensure_schema_fields("events[]", versioned, EVENT_SCHEMA_REQUIRED_FIELDS)
+    return versioned
+
+
+def _plain_dict(value: object, label: str) -> dict[str, Any]:
+    plain = to_plain(value)
+    if not isinstance(plain, dict):
+        raise ValueError(f"{label} must be an object")
+    return dict(plain)
+
+
+def _ensure_schema_fields(label: str, payload: dict[str, Any], required_fields: frozenset[str]) -> None:
+    missing = sorted(required_fields.difference(payload))
+    if missing:
+        raise ValueError(f"{label} is missing required schema fields: {', '.join(missing)}")
 
 
 def build_parser() -> argparse.ArgumentParser:

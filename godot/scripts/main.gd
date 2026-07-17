@@ -11,8 +11,10 @@ const ControlSettings := preload("res://scripts/control_settings.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
 const BrowserStore := preload("res://scripts/browser_store.gd")
 const NetworkAdapter := preload("res://scripts/network_adapter.gd")
+const ADD_BUTTON_TEXTURE := preload("res://assets/addbutton.png")
 const LOGO_TEXTURE := preload("res://assets/logo.png")
 const MENU_TILE := preload("res://assets/menuback.png")
+const REMOVE_BUTTON_TEXTURE := preload("res://assets/removebutton.png")
 const OPTIONS_PATH := "user://groundfire_options.cfg"
 const BROWSER_QA_STORE_PATH := "user://qa_server_browser_store.json"
 const GAMEPAD_CAPTURE_CANCEL_BUTTON := JOY_BUTTON_BACK
@@ -869,12 +871,30 @@ func _setup_name_line_edit(text: String) -> LineEdit:
 	return line
 
 
+func _local_match_setup_active_button(index: int) -> TextureButton:
+	var button := TextureButton.new()
+	button.custom_minimum_size = Vector2(36.0, 36.0)
+	button.focus_mode = Control.FOCUS_ALL
+	button.toggle_mode = true
+	button.button_pressed = index < 2
+	button.texture_normal = ADD_BUTTON_TEXTURE
+	button.texture_hover = ADD_BUTTON_TEXTURE
+	button.texture_pressed = REMOVE_BUTTON_TEXTURE
+	button.texture_disabled = ADD_BUTTON_TEXTURE
+	button.ignore_texture_size = true
+	button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	_sync_local_match_setup_active_button(button)
+	return button
+
+
+func _sync_local_match_setup_active_button(button: TextureButton) -> void:
+	if button == null:
+		return
+	button.tooltip_text = "Remove player" if button.button_pressed else "Add player"
+
+
 func _add_local_match_setup_row(parent: GridContainer, index: int) -> void:
-	var active := CheckButton.new()
-	active.text = "P%d" % (index + 1)
-	active.button_pressed = index < 2
-	active.focus_mode = Control.FOCUS_ALL
-	GroundfireTheme.apply_button(active)
+	var active := _local_match_setup_active_button(index)
 	parent.add_child(active)
 
 	var swatch := ColorRect.new()
@@ -914,7 +934,10 @@ func _add_local_match_setup_row(parent: GridContainer, index: int) -> void:
 		"color": LOCAL_MATCH_PLAYER_COLORS[index],
 	}
 	_local_match_setup_rows.append(row)
-	active.toggled.connect(func(_value: bool) -> void: _on_local_match_setup_row_changed(index))
+	active.toggled.connect(func(_value: bool) -> void:
+		_sync_local_match_setup_active_button(active)
+		_on_local_match_setup_row_changed(index)
+	)
 	slot.item_selected.connect(func(_selected: int) -> void: _on_local_match_setup_row_changed(index))
 	controller.item_selected.connect(func(selected: int) -> void: _on_local_match_controller_selected(index, selected))
 
@@ -955,7 +978,7 @@ func _sync_local_match_setup_state(start_button: Button = null) -> void:
 	var computer_count := 0
 	for row_data in _local_match_setup_rows:
 		var row: Dictionary = row_data
-		var active := row.get("active") as CheckButton
+		var active := row.get("active") as BaseButton
 		var name := row.get("name") as LineEdit
 		var slot := row.get("slot") as OptionButton
 		var controller := row.get("controller") as OptionButton
@@ -1003,7 +1026,7 @@ func _next_available_local_match_controller(row_index: int, start_index: int) ->
 			if other_index == row_index:
 				continue
 			var other: Dictionary = _local_match_setup_rows[other_index]
-			var active := other.get("active") as CheckButton
+			var active := other.get("active") as BaseButton
 			var controller := other.get("controller") as OptionButton
 			if active != null and active.button_pressed and _local_match_row_is_human(other) and controller != null and controller.selected == candidate:
 				conflict = true
@@ -1018,7 +1041,7 @@ func _local_match_roster_snapshot() -> Array[Dictionary]:
 	var roster: Array[Dictionary] = []
 	for row_data in _local_match_setup_rows:
 		var row: Dictionary = row_data
-		var active := row.get("active") as CheckButton
+		var active := row.get("active") as BaseButton
 		if active == null or not active.button_pressed:
 			continue
 		var index := int(row.get("index", roster.size()))

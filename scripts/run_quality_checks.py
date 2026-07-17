@@ -24,6 +24,7 @@ LINT_TARGETS = tuple(
         "src/sounds.py",
         "src/font.py",
         "scripts/run_quality_checks.py",
+        "scripts/verify_godot_hosted_deployment.py",
     )
     if (PROJECT_ROOT / path).exists()
 )

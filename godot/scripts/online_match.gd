@@ -169,7 +169,6 @@ func _on_websocket_status_changed(status: String) -> void:
 	if (_protocol_failure or _fatal_server_failure) and (status == "websocket_closed" or status == "websocket_disconnected"):
 		return
 	if status == "websocket_connected":
-		_reconnect_attempt = 0
 		_reconnect_timer = 0.0
 		_snapshot_age = 0.0
 		_handshake_age = 0.0
@@ -202,6 +201,7 @@ func _on_websocket_message_received(message: Dictionary) -> void:
 		_last_snapshot_tick = int(_match_snapshot.get("simulation_tick", _last_snapshot_tick))
 		_last_terrain_revision = int(_match_snapshot.get("terrain_revision", _last_terrain_revision))
 		_snapshot_age = 0.0
+		_mark_session_healthy()
 		_ingest_acknowledgements()
 		_ingest_replicated_entities()
 		_ingest_events()
@@ -398,6 +398,11 @@ func _schedule_reconnect(reason: String) -> void:
 		_reconnect_attempt,
 		RECONNECT_MAX_ATTEMPTS,
 	]
+
+
+func _mark_session_healthy() -> void:
+	_reconnect_attempt = 0
+	_reconnect_timer = 0.0
 
 
 func _update_reconnect(delta: float) -> void:

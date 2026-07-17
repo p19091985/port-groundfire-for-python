@@ -294,6 +294,8 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "LOCAL_MATCH_NAME_MAX_LENGTH" in script
     assert "LOCAL_MATCH_MAX_PLAYERS := 8" in script
     assert "LOCAL_MATCH_CONTROLLER_LABELS" in script
+    assert 'preload("res://assets/addbutton.png")' in script
+    assert 'preload("res://assets/removebutton.png")' in script
     assert "var _local_match_setup_rows: Array[Dictionary]" in script
     assert "var _local_match_setup_back_button: Button" in script
     assert "var _local_match_setup_rounds: OptionButton" in script
@@ -309,6 +311,10 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert '"Computer"' in script
     assert "func _setup_name_line_edit" in script
     assert "line.max_length = LOCAL_MATCH_NAME_MAX_LENGTH" in script
+    assert "func _local_match_setup_active_button" in script
+    assert "TextureButton.new()" in script
+    assert "button.texture_normal = ADD_BUTTON_TEXTURE" in script
+    assert "button.texture_pressed = REMOVE_BUTTON_TEXTURE" in script
     assert "func _add_local_match_setup_row" in script
     assert "func _local_match_roster_snapshot" in script
     assert "func _next_available_local_match_controller" in script
@@ -716,6 +722,9 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'preload("res://scripts/terrain_model.gd")' in local_match
     assert "TURN_PLAYER" in local_match
     assert "func _cycle_weapon" in local_match
+    assert "const WEAPON_SWITCH_DELAY := 0.2" in local_match
+    assert "var _weapon_switch_delay_remaining := 0.0" in local_match
+    assert "func _update_weapon_switch_delay" in local_match
     assert "func _splash_damage" in local_match
     assert "func _rebuild_terrain_if_needed" in local_match
     assert 'preload("res://scripts/tank_state.gd")' in local_match
@@ -770,6 +779,10 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "SCORE_SURVIVAL_REWARD := 100" in local_match
     assert "CREDITS_ROUND_STIPEND := 10" in local_match
     assert "MATCH_TOTAL_ROUNDS := 5" in local_match
+    assert 'PHASE_ROUND_STARTING := "round_starting"' in local_match
+    assert "ROUND_STARTING_DELAY := 2.0" in local_match
+    assert "var _round_start_delay := 0.0" in local_match
+    assert "func _update_round_starting" in local_match
     assert "func setup(config: Dictionary)" in local_match
     assert "_requested_total_rounds" in local_match
     assert "var _player_name := TURN_PLAYER" in local_match
@@ -812,27 +825,47 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "MACHINE_GUN_TRACER_TRAIL_TIME := 0.01" in local_match
     assert "AI_SELF_DAMAGE_WEIGHT_HARD := 3.0" in local_match
     assert "AI_SELF_KILL_PENALTY := 1000.0" in local_match
-    assert 'AI_SHOP_PRIORITY_EASY := ["Machine Gun", "Missile", "Jump Jet"]' in local_match
-    assert 'AI_SHOP_PRIORITY_NORMAL := ["Missile", "MIRV", "Machine Gun", "Jump Jet"]' in local_match
-    assert 'AI_SHOP_PRIORITY_HARD := ["Nuke", "MIRV", "Missile", "Machine Gun", "Jump Jet"]' in local_match
+    assert "AI_SHOP_PRIORITY" not in local_match
     assert "SCORE_HUMAN_ACTIVATION_DELAY := 2.0" in local_match
     assert "SCORE_COMPUTER_ACTIVATION_DELAY := 4.0" in local_match
+    assert "SCORE_AUTO_ADVANCE_TIME := 10.0" in local_match
     assert "WINNER_HUMAN_ACTIVATION_DELAY := 2.0" in local_match
     assert "WINNER_COMPUTER_ACTIVATION_DELAY := 4.0" in local_match
     assert "SHOP_INITIAL_INPUT_DELAY := 0.4" in local_match
     assert "SHOP_ACTION_INPUT_DELAY := 0.2" in local_match
+    assert "var _shop_finish_pending := false" in local_match
     assert "velocity.y += PROJECTILE_GRAVITY * step" in local_match
     assert "velocity.y += PROJECTILE_GRAVITY * delta" in local_match
     assert "split_age = max(MIRV_MIN_SPLIT_AGE, -velocity.y / PROJECTILE_GRAVITY)" in local_match
     assert '"split_age": split_age' in local_match
     assert "func _mirv_split_velocity" in local_match
     assert "var projectiles_this_step := _projectiles.duplicate()" in local_match
+    assert 'var split_age: float = float(projectile.get("split_age", 0.8))' in local_match
+    assert "var split_delta: float = clamp(split_age - previous_age, 0.0, delta)" in local_match
+    assert "var split_position := previous_position + Vector2(split_velocity.x * split_delta, 0.0)" in local_match
+    assert "split_position.y = _ballistic_projectile_y_at(projectile, split_age, previous_position, velocity)" in local_match
+    assert "func _ballistic_projectile_y_at" in local_match
+    assert 'projectile["expired"] = true' in local_match
     assert (
-        'var split_delta: float = clamp(float(projectile.get("split_age", 0.8)) - previous_age, 0.0, delta)'
+        "if position.x < 0.0 or position.x > _world_size.x:\n"
+        '\t\t\t_lay_projectile_trail(projectile, position)\n'
+        '\t\t\t_expire_projectile_without_explosion(projectile)\n'
+        "\t\t\tcontinue\n"
+        "\t\tvar terrain_collision := _terrain_collision(previous_position, position)"
         in local_match
     )
-    assert "var split_position := previous_position + split_velocity * split_delta" in local_match
-    assert 'projectile["expired"] = true' in local_match
+    assert 'TRAIL_TEXTURE := preload("res://assets/trail.png")' in local_match
+    assert "func _lay_projectile_trail" in local_match
+    assert "func _update_trail_segments" in local_match
+    assert (
+        "var terrain_collision := _terrain_collision(previous_position, position)\n"
+        '\tif bool(terrain_collision["hit"]):\n'
+        '\t\tprojectile["position"] = Vector2(terrain_collision["position"])\n'
+        '\t\tprojectile["kill_next_frame"] = true\n'
+        "\t\treturn\n"
+        "\tvar target_owner := _segment_tank_hit_owner"
+        in local_match
+    )
     assert 'weapon.get("fragments", WeaponInventory.MIRV_FRAGMENTS)' in local_match
     assert 'weapon.get("spread", WeaponInventory.MIRV_SPREAD)' in local_match
     assert "var spread_step: float" in local_match
@@ -893,7 +926,9 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"delay"' in local_match
     assert "WeaponInventory.MACHINE_GUN_CLASSIC_POWER" in local_match
     assert 'draw_line(back_position, projectile_position, Color.WHITE, 2.0)' in local_match
-    assert "_add_score_for_owner(owner, damage)" in local_match
+    assert "_add_score_for_owner(owner, damage)" not in local_match
+    assert "_add_credits_for_owner(owner, damage)" not in local_match
+    assert "_record_round_defeat(owner, target_owner)" in local_match
     assert "machine_gun" in local_match
     assert "missile" in local_match
     assert "_credits" in local_match
@@ -922,8 +957,10 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _roll_round_wind" in local_match
     assert "QUAKE_DURATION" in local_match
     assert "QUAKE_DROP_RATE" in local_match
-    assert "QUAKE_TIME_TILL_FIRST := 90.0" in local_match
-    assert "QUAKE_TIME_BETWEEN := 30.0" in local_match
+    assert "QUAKE_TIME_TILL_FIRST := 60.0" in local_match
+    assert "QUAKE_TIME_BETWEEN := 20.0" in local_match
+    assert "QUAKE_SHAKE_AMPLITUDE := 0.05 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE" in local_match
+    assert "QUAKE_SHAKE_FREQUENCY := 50.0" in local_match
     assert 'preload("res://assets/quake.wav")' in local_match
     assert 'preload("res://assets/jumpjets.wav")' in local_match
     assert 'preload("res://assets/fireshell.wav")' in local_match
@@ -1019,6 +1056,9 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "_play_nuke_audio()" in local_match
     assert "func _update_quake" in local_match
     assert "_terrain.drop_terrain(delta * QUAKE_DROP_RATE)" in local_match
+    assert "func _update_quake_viewport_offset" in local_match
+    assert "func _reset_quake_viewport_offset" in local_match
+    assert "_camera_offset + _camera_shake_offset + _quake_viewport_offset" in local_match
     assert '"quake_active": _quake_active' in local_match
     assert '"wind_effect": _wind_acceleration(0.0)' in local_match
     assert '"ai_difficulty"' in local_match
@@ -1037,7 +1077,9 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _apply_explosion" in local_match
     assert "direct_hit_owner" in local_match
     assert "func _explosion_damage_for_target" in local_match
-    assert "_add_score_for_owner(owner, target_damage)" in local_match
+    assert "_add_score_for_owner(owner, target_damage)" not in local_match
+    assert "_add_credits_for_owner(owner, target_damage)" not in local_match
+    assert "_record_round_defeat(owner, target_owner)" in local_match
     assert "func _weapon_white_out" in local_match
     assert "func _draw_whiteout_overlay" in local_match
     assert "func _whiteout_alpha" in local_match
@@ -1073,14 +1115,18 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _score_activation_delay" in local_match
     assert "func _winner_activation_delay" in local_match
     assert "func _update_modal_activation" in local_match
+    assert "if _phase == PHASE_SHOP and _shop_finish_pending:" in local_match
     assert "func _refresh_score_continue_button" in local_match
     assert "_score_continue_button.disabled = _score_continue_delay > 0.0" in local_match
+    assert "_score_continue_delay <= -SCORE_AUTO_ADVANCE_TIME" in local_match
     assert "_shop_input_delay = SHOP_INITIAL_INPUT_DELAY" in local_match
     assert "_shop_input_delay = SHOP_ACTION_INPUT_DELAY" in local_match
-    assert '"input_locked": _shop_input_delay > 0.0' in local_match
+    assert "_shop_finish_pending = true" in local_match
+    assert '"input_locked": _shop_input_delay >= 0.0' in local_match
     assert "func _continue_from_score" in local_match
     assert "if _score_continue_delay > 0.0:" in local_match
     assert "_update_leader_flags()" in local_match
+    assert "if _is_final_round():\n\t\t_hide_score_overlay()\n\t\t_open_winner_overlay()\n\t\treturn\n\t_update_leader_flags()" in local_match
     assert "func _hide_score_overlay" in local_match
     assert "func _build_winner_overlay" in local_match
     assert "func _wire_single_button_focus" in local_match
@@ -1096,6 +1142,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "TextureRect.STRETCH_TILE" in local_match
     assert "GroundfireTheme.COLOR_MENU_TILE_TINT" in local_match
     assert "WINNER_BACKGROUND_SCROLL_SPEED := 0.1" in local_match
+    assert "var _winner_exit_pending := false" in local_match
     assert "func _update_winner_background" in local_match
     assert "_winner_background_scroll += delta * WINNER_BACKGROUND_SCROLL_SPEED" in local_match
     assert "_winner_background.offset_left = -offset.x" in local_match
@@ -1103,6 +1150,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _winner_rows_snapshot" in local_match
     assert "func _refresh_winner_continue_button" in local_match
     assert "_winner_main_menu_button.disabled = _winner_continue_delay > 0.0" in local_match
+    assert "if _winner_exit_pending or (not _has_human_participants() and _winner_continue_delay <= 0.0):" in local_match
+    assert "_winner_exit_pending = true" in local_match
     assert "_winner_main_menu_button.visible = false" in local_match
     assert "_winner_main_menu_button.focus_mode = Control.FOCUS_NONE" in local_match
     assert "_winner_main_menu_button.grab_focus.call_deferred()" not in local_match
@@ -1140,9 +1189,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _finish_shop_and_start_next_round" in local_match
     assert "func _complete_computer_shop_passes" in local_match
     assert "func _run_computer_shop_for_participant" in local_match
-    assert "func _computer_shop_priority" in local_match
     assert "_run_computer_shop_for_participant(shopper_index)" in local_match
-    assert '"%s bought %s."' in local_match
+    assert '"%s is done shopping."' in local_match
     assert "continue_requested.connect" in local_match
     assert "buy_requested.connect" in local_match
     assert '"reward": _shop_reward' in local_match
@@ -1297,6 +1345,12 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _target_world_size" in local_match
     assert "func _draw_map_bounds" in local_match
     assert "func _draw_mouse_reticle" in local_match
+    assert 'preload("res://assets/arrow.png")' in local_match
+    assert "func _mouse_cursor_draw_points" in local_match
+    assert "func _mouse_cursor_draw_uvs" in local_match
+    assert "func _sync_classic_mouse_cursor_mode" in local_match
+    assert "func _restore_classic_mouse_cursor_mode" in local_match
+    assert "Input.MOUSE_MODE_HIDDEN" in local_match
     assert "func _load_gameplay_options" in local_match
     assert "_screen_shake_enabled" in local_match
     assert "_camera_smoothing" in local_match
@@ -1415,10 +1469,15 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "const MACHINE_GUN" in weapons
     assert "const NUKE" in weapons
     assert '"kind": "mirv"' in weapons
-    assert "MIRV_ROUND_AMMO := 3" in weapons
+    assert "LIMITED_WEAPON_INITIAL_STOCK := 0" in weapons
+    assert "ROUND_STARTING_COOLDOWN_ADVANCE := 2.0" in weapons
+    assert "SHELL_COOLDOWN := 4.0" in weapons
+    assert "MIRV_ROUND_AMMO := 1" in weapons
+    assert "MIRV_DAMAGE := 30" in weapons
     assert "MIRV_FRAGMENTS := 5" in weapons
     assert "MIRV_SPREAD := 0.2" in weapons
-    assert '"ammo": MIRV_ROUND_AMMO' in weapons
+    assert '"ammo": LIMITED_WEAPON_INITIAL_STOCK, "shop_pack": MIRV_SHOP_PACK' in weapons
+    assert '"damage": MIRV_DAMAGE' in weapons
     assert '"fragments": MIRV_FRAGMENTS' in weapons
     assert '"spread": MIRV_SPREAD' in weapons
     assert '"fuel": 3.0' in weapons
@@ -1436,12 +1495,19 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "MACHINE_GUN_CLASSIC_POWER := 25.0" in weapons
     assert "MIRV_MIN_FRAGMENT_SPREAD_SPEED := 0.0" in weapons
     assert "MIRV_SHOP_PACK := 1" in weapons
+    assert "MIRV_COOLDOWN := 7.5" in weapons
     assert "MISSILE_SHOP_PACK := 5" in weapons
     assert "MISSILE_CLASSIC_SPEED := 9.0" in weapons
+    assert "MISSILE_COOLDOWN := 5.0" in weapons
     assert "NUKE_SHOP_PACK := 1" in weapons
-    assert '"ammo": MACHINE_GUN_ROUND_AMMO' in weapons
+    assert "NUKE_COOLDOWN := 10.0" in weapons
+    assert '"ammo": LIMITED_WEAPON_INITIAL_STOCK, "shop_pack": MACHINE_GUN_SHOP_PACK' in weapons
     assert '"shop_pack": MACHINE_GUN_SHOP_PACK' in weapons
     assert '"cooldown": MACHINE_GUN_COOLDOWN' in weapons
+    assert '"cooldown": SHELL_COOLDOWN' in weapons
+    assert '"cooldown": MIRV_COOLDOWN' in weapons
+    assert '"cooldown": MISSILE_COOLDOWN' in weapons
+    assert '"cooldown": NUKE_COOLDOWN' in weapons
     assert '"tracer_gravity": MACHINE_GUN_TRACER_GRAVITY' in weapons
     assert '"launch_power": MACHINE_GUN_CLASSIC_POWER' in weapons
     assert '"min_fragment_spread_speed": MIRV_MIN_FRAGMENT_SPREAD_SPEED' in weapons
@@ -1449,11 +1515,15 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func consume_current" in weapons
     assert "func consume_current_amount" in weapons
     assert "func consume_ammo" in weapons
+    assert "func update_current_cooldown" in weapons
+    assert "func is_current_ready" in weapons
+    assert "func current_cooldown" in weapons
     assert "func select_shell" in weapons
     assert "select_shell()" in weapons
     assert '"volley": MACHINE_GUN_VOLLEY' in weapons
     assert 'current().get("volley", DEFAULT_AMMO_SPEND)' in weapons
     assert "func ammo_for" in weapons
+    assert "func stock_for" in weapons
     assert "func weapon_by_name" in weapons
     assert "func select_by_name" in weapons
     assert "func has_ammo" in weapons
@@ -1462,8 +1532,16 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'weapon.get("shop_pack", weapon.get("ammo", 0))' in weapons
     assert "func add_ammo" in weapons
     assert "func inventory_snapshot" in weapons
+    assert '"stock"' in weapons
     assert '"selected"' in weapons
+    assert '"ammo": 0, "shop_pack": ROLLING_MINES_SHOP_PACK' in weapons
+    assert '"ammo": 0, "shop_pack": AIRSTRIKE_SHOP_PACK' in weapons
+    assert '"ammo": 0, "shop_pack": DEATHS_HEAD_SHOP_PACK' in weapons
+    assert '"ammo": 0, "shop_pack": HOVER_COIL_SHOP_PACK' in weapons
+    assert '"ammo": 0, "shop_pack": CORBOMITE_SHOP_PACK' in weapons
     assert '"inventory": _shop_inventory(shopper_index).inventory_snapshot()' in local_match
+    assert "CLASSIC_DISABLED_SHOP_WEAPONS" in local_match
+    assert "is not available in the classic shop" in local_match
     assert "signal continue_requested" in shop
     assert "signal buy_requested" in shop
     assert "func refresh" in shop
@@ -1516,6 +1594,15 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'MESSAGE_HELLO := "hello"' in network
     assert 'MESSAGE_PING := "ping"' in network
     assert "PROTOCOL_VERSION := 1" in network
+    assert "MIN_SUPPORTED_PROTOCOL := 1" in network
+    assert "MAX_SUPPORTED_PROTOCOL := PROTOCOL_VERSION" in network
+    assert "SERVER_ERROR_CATEGORY_CREDENTIALS" in network
+    assert "SERVER_ERROR_CATEGORY_CAPACITY" in network
+    assert "SERVER_ERROR_CATEGORY_SERVER_STATE" in network
+    assert "SERVER_ERROR_CATEGORY_ACCESS" in network
+    assert "SERVER_ERROR_CATEGORY_MATCH" in network
+    assert "SERVER_ERROR_CATEGORY_TRANSIENT" in network
+    assert "SERVER_ERROR_CATEGORY_PROTOCOL" in network
     assert "FATAL_SERVER_ERRORS" in network
     assert "static func command_from_local_match" in network
     assert "static func pong_message" in network
@@ -1526,14 +1613,21 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "auth_token" in network
     assert "static func input_message" in network
     assert "static func parse_message" in network
+    assert "static func client_supports_protocol" in network
+    assert "static func negotiated_protocol" in network
     assert "static func server_supports_client_protocol" in network
     assert "static func protocol_status_message" in network
     assert "static func is_fatal_server_error" in network
+    assert "static func server_error_category" in network
+    assert "static func server_error_recovery_hint" in network
     assert "static func server_error_status_message" in network
     assert '"invalid_password"' in network
     assert '"authentication_failed"' in network
     assert '"server_full"' in network
     assert '"Join failed: password rejected' in network
+    assert "Check credentials or request a fresh session token." in network
+    assert "Wait for a slot or choose another server." in network
+    assert "Update the client or choose a compatible server." in network
     assert "supported_protocols" in network
     assert "_protocol_support_label" in network
     assert "static func staged_connect_message" in network
@@ -1541,6 +1635,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"missing_protocol"' in network
     assert '"protocol_mismatch"' in network
     assert '"expected_protocol"' in network
+    assert "static func _server_supported_protocols" in network
     assert "Connect target staged" in network
     assert "allow_udp" in network
     assert "WebSocketPeer.new()" in websocket
@@ -1611,6 +1706,10 @@ def test_online_match_scene_consumes_websocket_snapshots_and_sends_input():
     assert "func _update_effects" in script
     assert "RECONNECT_BASE_DELAY" in script
     assert "RECONNECT_MAX_ATTEMPTS" in script
+    assert "func _mark_session_healthy" in script
+    assert "_mark_session_healthy()" in script
+    assert '"websocket_connected":\n\t\t_reconnect_timer = 0.0' in script
+    assert '"websocket_connected":\n\t\t_reconnect_attempt = 0' not in script
     assert "PING_INTERVAL" in script
     assert "PREDICTION_MOVE_STEP" in script
     assert "INTERPOLATION_RATE" in script
@@ -1741,6 +1840,9 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     visual_script = (PROJECT_ROOT / "scripts" / "validate_godot_visuals.sh").read_text(encoding="utf-8")
     fidelity_script = (PROJECT_ROOT / "scripts" / "validate_godot_fidelity.sh").read_text(encoding="utf-8")
     qa_script = (PROJECT_ROOT / "scripts" / "qa_godot_web.sh").read_text(encoding="utf-8")
+    hosted_verify_script = (PROJECT_ROOT / "scripts" / "verify_godot_hosted_deployment.py").read_text(
+        encoding="utf-8"
+    )
     pygame_reference_script = (PROJECT_ROOT / "scripts" / "capture_pygame_references.py").read_text(encoding="utf-8")
     validate_script = (PROJECT_ROOT / "scripts" / "validate_godot.sh").read_text(encoding="utf-8")
     visual_check = (GODOT_ROOT / "tests" / "visual_golden_check.gd").read_text(encoding="utf-8")
@@ -1756,9 +1858,12 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert 'exclude_filter="tests/*"' in presets
     assert "scripts/validate_godot.sh" in export_script
     assert "scripts/validate_godot.sh" in fidelity_script
+    assert "res://tests/network_adapter_protocol_check.gd" in validate_script
+    assert "res://tests/test_weapon_inventory_ammo.gd" in validate_script
     assert "scripts/validate_godot_migration_contract.py" in fidelity_script
     assert "test_godot_migration_scaffold.py" in fidelity_script
     assert "test_groundfire_net_module.py" in fidelity_script
+    assert "test_hosted_deployment_verifier.py" in fidelity_script
     assert "test_replicated_scene.py" in fidelity_script
     assert "test_port_fidelity.py" in fidelity_script
     assert "test_landscape_fidelity.py" in fidelity_script
@@ -1804,6 +1909,8 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "tomllib" in package_script
     assert "release_notes" in package_script
     assert "sha256" in package_script
+    assert 'PYTHON_BIN="${PYTHON_BIN_FALLBACK:-python}"' in package_script
+    assert 'command -v "$PYTHON_BIN"' in package_script
     assert "GODOT_VISUAL_UPDATE=1" in visual_script
     assert "visual_golden_check.gd" in visual_script
     release_script = (PROJECT_ROOT / "scripts" / "validate_godot_release.sh").read_text(encoding="utf-8")
@@ -1816,6 +1923,7 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "_capture_server_browser" in pygame_reference_script
     assert "_capture_local_match" in pygame_reference_script
     assert "qa=browser_runtime" in qa_script
+    assert 'PYTHON_BIN="${PYTHON_BIN_FALLBACK:-python}"' in qa_script
     assert "store_phase=$phase" in qa_script
     assert "gateway_endpoint=ws://127.0.0.1:$gateway_port/qa-gateway" in qa_script
     assert "auth_gateway_endpoint=ws://127.0.0.1:$auth_gateway_port/qa-auth-gateway" in qa_script
@@ -1861,8 +1969,16 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "scripts/validate_godot_fidelity.sh" in migration_doc
     assert "scripts/validate_godot_release.sh" in migration_doc
     assert "scripts/qa_godot_web.sh --check" in migration_doc
+    assert "scripts/verify_godot_hosted_deployment.py" in migration_doc
     assert "scripts/capture_pygame_references.py" in migration_doc
     assert "groundfire-directory" in migration_doc
+    assert "DEFAULT_WEB_URL" in hosted_verify_script
+    assert "DEFAULT_DIRECTORY_URL" in hosted_verify_script
+    assert "If-None-Match" in hosted_verify_script
+    assert "application/wasm" in hosted_verify_script
+    assert "embeds static auth_token" in hosted_verify_script
+    assert "session_token_url must return Cache-Control: no-store" in hosted_verify_script
+    assert "directory ETag must be quoted" in hosted_verify_script
     directory_service = (PROJECT_ROOT / "groundfire_net" / "directory_service.py").read_text(encoding="utf-8")
     assert "def directory_diagnostics" in directory_service
     assert "def _etag_matches" in directory_service
@@ -1904,10 +2020,12 @@ def test_godot_export_presets_exist_for_desktop_and_web():
 
 def test_ci_has_godot_release_gate():
     workflow = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    release_workflow = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
     assert "workflow_dispatch" in workflow
     assert "run-godot-browser-qa" in workflow
     assert "package-godot" in workflow
+    assert "sign-release" in workflow
     assert "godot-release-gate" in workflow
     assert 'GODOT_VERSION: "4.6.2"' in workflow
     assert "Godot_v${godot_tag}_linux.x86_64.zip" in workflow
@@ -1917,3 +2035,10 @@ def test_ci_has_godot_release_gate():
     assert "scripts/validate_godot_release.sh" in workflow
     assert "--browser-qa" in workflow
     assert "--package" in workflow
+    assert "inputs.package-godot == 'true' || inputs.sign-release == 'true'" in workflow
+    assert 'if [[ "$PACKAGE_GODOT" == "true" || "$SIGN_RELEASE" == "true" ]]; then' in workflow
+    assert "Validate GPG signing secrets" in workflow
+    assert "test -n \"$RELEASE_GPG_PRIVATE_KEY\"" in workflow
+    assert "test -n \"$RELEASE_SIGN_KEY\"" in workflow
+    assert "secrets.RELEASE_GPG_PRIVATE_KEY != '' || secrets.RELEASE_SIGN_KEY != ''" in release_workflow
+    assert "Validate GPG signing secrets" in release_workflow
