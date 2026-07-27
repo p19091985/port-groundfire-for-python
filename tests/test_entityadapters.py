@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from tests.support import CommandPlayer, DummyGameForTank, PROJECT_ROOT
+from tests.support import CommandPlayer, DummyGameForTank, PYTHON_VERSION_DIR
 
 from src.entityadapters import EntityAdapterRegistry
 from src.entityvisual import EntityVisualRenderer
@@ -10,7 +10,7 @@ from src.renderprimitives import EntityRenderState, PolygonPrimitive
 from src.tank import Tank
 
 
-SETTINGS = ReadIniFile(os.path.join(PROJECT_ROOT, "conf", "options.ini"))
+SETTINGS = ReadIniFile(os.path.join(PYTHON_VERSION_DIR, "conf", "options.ini"))
 
 
 class EntityAdaptersTests(unittest.TestCase):

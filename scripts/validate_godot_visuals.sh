@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source "$ROOT_DIR/scripts/repo_paths.sh"
+repo_paths_init
 GODOT_BIN="${GODOT_BIN:-$ROOT_DIR/tools/godot/Godot_v4.6.2-stable_linux.x86_64}"
 MODE="${1:---check}"
 
@@ -25,7 +27,7 @@ if [[ ! -x "$GODOT_BIN" ]]; then
 fi
 
 if [[ "$UPDATE_GOLDENS" == "1" ]]; then
-    GODOT_VISUAL_UPDATE=1 "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/visual_golden_check.gd
+    GODOT_VISUAL_UPDATE=1 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/visual_golden_check.gd
 else
-    "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --script res://tests/visual_golden_check.gd
+    "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/visual_golden_check.gd
 fi

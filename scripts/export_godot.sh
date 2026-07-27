@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source "$ROOT_DIR/scripts/repo_paths.sh"
+repo_paths_init
 GODOT_BIN="${GODOT_BIN:-$ROOT_DIR/tools/godot/Godot_v4.6.2-stable_linux.x86_64}"
 TARGET="${1:-all}"
 GODOT_TEMPLATE_VERSION="4.6.2.stable"
@@ -42,12 +44,12 @@ if [[ "$TARGET" == "all" || "$TARGET" == "web" ]]; then
 fi
 
 "$ROOT_DIR/scripts/validate_godot.sh"
-mkdir -p "$ROOT_DIR/build/godot" "$ROOT_DIR/build/godot-web"
+mkdir -p "$BUILD_DIR/godot" "$BUILD_DIR/godot-web"
 
 if [[ "$TARGET" == "all" || "$TARGET" == "linux" ]]; then
-    "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --export-release "Linux Desktop"
+    "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --export-release "Linux Desktop"
 fi
 
 if [[ "$TARGET" == "all" || "$TARGET" == "web" ]]; then
-    "$GODOT_BIN" --headless --path "$ROOT_DIR/godot" --export-release "Web"
+    "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --export-release "Web"
 fi

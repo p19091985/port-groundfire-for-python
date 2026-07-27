@@ -2,8 +2,9 @@
 set -Eeuo pipefail
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source "$ROOT_DIR/scripts/repo_paths.sh"
+repo_paths_init
 PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv/bin/python}"
-DIST_DIR="$ROOT_DIR/dist"
 RELEASE_NOTES_PATH="${GROUNDFIRE_RELEASE_NOTES:-}"
 
 if [[ ! -x "$PYTHON_BIN" ]]; then
@@ -52,10 +53,10 @@ CHECKSUMS="$DIST_DIR/${PACKAGE_PREFIX}-SHA256SUMS"
 mkdir -p "$DIST_DIR"
 rm -f "$LINUX_ARCHIVE" "$WEB_ARCHIVE" "$MANIFEST" "$CHECKSUMS"
 
-tar -C "$ROOT_DIR/build/godot" -czf "$LINUX_ARCHIVE" Groundfire.x86_64
+tar -C "$BUILD_DIR/godot" -czf "$LINUX_ARCHIVE" Groundfire.x86_64
 
 "$PYTHON_BIN" - \
-    "$ROOT_DIR" \
+    "$BUILD_DIR" \
     "$WEB_ARCHIVE" \
     "$MANIFEST" \
     "$PROJECT_VERSION" \
@@ -69,14 +70,14 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-root = Path(sys.argv[1])
+build_dir = Path(sys.argv[1])
 web_archive = Path(sys.argv[2])
 manifest_path = Path(sys.argv[3])
 version = sys.argv[4]
 linux_archive_name = sys.argv[5]
 web_archive_name = sys.argv[6]
 release_notes_path = Path(sys.argv[7]) if sys.argv[7] else None
-web_dir = root / "build" / "godot-web"
+web_dir = build_dir / "godot-web"
 
 with zipfile.ZipFile(web_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
     for path in sorted(web_dir.rglob("*")):

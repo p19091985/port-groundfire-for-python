@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source "$ROOT_DIR/scripts/repo_paths.sh"
+repo_paths_init
 PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv/bin/python}"
 BROWSER_BIN="${CHROMIUM_BIN:-${BROWSER_BIN:-}}"
 UPDATE_GOLDENS=0
@@ -67,7 +69,7 @@ banned_gateway_log="$tmp_dir/banned-gateway.log"
 user_data_dir="$tmp_dir/chromium-user"
 actual_dir="$ROOT_DIR/.tmp/godot_browser_actual"
 golden_dir="$ROOT_DIR/docs/references/godot_browser_visual"
-qa_fixture_dir="$ROOT_DIR/build/godot-web/qa"
+qa_fixture_dir="$BUILD_DIR/godot-web/qa"
 mkdir -p "$actual_dir" "$golden_dir"
 mkdir -p "$qa_fixture_dir"
 
@@ -198,7 +200,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$PYTHON_BIN" - "$port" "$ROOT_DIR/build/godot-web" "$ROOT_DIR" >"$server_log" 2>&1 <<'PY' &
+"$PYTHON_BIN" - "$port" "$BUILD_DIR/godot-web" "$ROOT_DIR" "$PYTHON_VERSION_DIR" >"$server_log" 2>&1 <<'PY' &
 import functools
 import http.server
 import json
@@ -208,6 +210,8 @@ import urllib.parse
 port = int(sys.argv[1])
 directory = sys.argv[2]
 root_dir = sys.argv[3]
+python_version_dir = sys.argv[4]
+sys.path.insert(0, python_version_dir)
 sys.path.insert(0, root_dir)
 
 from groundfire_net.websocket_gateway import generate_join_token
@@ -276,43 +280,43 @@ server.serve_forever()
 PY
 server_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m src.groundfire.server \
     --host 127.0.0.1 \
     --port "$gateway_udp_port" \
     --no-discovery >"$gateway_server_log" 2>&1 &
 gateway_server_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m src.groundfire.server \
     --host 127.0.0.1 \
     --port "$auth_gateway_udp_port" \
     --no-discovery >"$auth_gateway_server_log" 2>&1 &
 auth_gateway_server_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m src.groundfire.server \
     --host 127.0.0.1 \
     --port "$session_gateway_udp_port" \
     --no-discovery >"$session_gateway_server_log" 2>&1 &
 session_gateway_server_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m src.groundfire.server \
     --host 127.0.0.1 \
     --port "$full_gateway_udp_port" \
     --no-discovery >"$full_gateway_server_log" 2>&1 &
 full_gateway_server_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m src.groundfire.server \
     --host 127.0.0.1 \
     --port "$closed_gateway_udp_port" \
     --no-discovery >"$closed_gateway_server_log" 2>&1 &
 closed_gateway_server_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m src.groundfire.server \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m src.groundfire.server \
     --host 127.0.0.1 \
     --port "$banned_gateway_udp_port" \
     --no-discovery >"$banned_gateway_server_log" 2>&1 &
 banned_gateway_server_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$gateway_port" \
     --udp-host 127.0.0.1 \
@@ -320,7 +324,7 @@ PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_ne
     --password qa-secret >"$gateway_log" 2>&1 &
 gateway_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$auth_gateway_port" \
     --udp-host 127.0.0.1 \
@@ -328,7 +332,7 @@ PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_ne
     --auth-token qa-token >"$auth_gateway_log" 2>&1 &
 auth_gateway_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$session_gateway_port" \
     --udp-host 127.0.0.1 \
@@ -336,7 +340,7 @@ PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_ne
     --session-secret qa-session-secret >"$session_gateway_log" 2>&1 &
 session_gateway_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$full_gateway_port" \
     --udp-host 127.0.0.1 \
@@ -344,7 +348,7 @@ PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_ne
     --max-players 1 >"$full_gateway_log" 2>&1 &
 full_gateway_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$closed_gateway_port" \
     --udp-host 127.0.0.1 \
@@ -352,7 +356,7 @@ PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_ne
     --closed >"$closed_gateway_log" 2>&1 &
 closed_gateway_pid=$!
 
-PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
+PYTHONPATH="$(repo_pythonpath)" "$PYTHON_BIN" -m groundfire_net.websocket_gateway \
     --host 127.0.0.1 \
     --port "$banned_gateway_port" \
     --udp-host 127.0.0.1 \

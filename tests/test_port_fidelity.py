@@ -16,13 +16,14 @@ from src.tank import Tank
 from src.weapons_impl import MachineGunWeapon
 from tests.support import (
     PROJECT_ROOT,
+    PYTHON_VERSION_DIR,
     CommandPlayer,
     DummyGameForTank,
     FlatLandscape,
     RecordingWeapon,
 )
 
-SETTINGS = ReadIniFile(os.path.join(PROJECT_ROOT, "conf", "options.ini"))
+SETTINGS = ReadIniFile(os.path.join(PYTHON_VERSION_DIR, "conf", "options.ini"))
 
 
 class TankFidelityTests(unittest.TestCase):
@@ -94,6 +95,59 @@ class TankFidelityTests(unittest.TestCase):
                 self.tank._tank_size * 0.4,
             )
         )
+
+    def test_gun_arrow_readiness_color_uses_selected_weapon_cooldown(self):
+        # Fidelity target: Tank._build_gun_primitives() uses
+        # Weapon.ready_to_fire(), which is cooldown-driven in weapon.py.
+        class ReadyWeapon(RecordingWeapon):
+            def __init__(self, ready):
+                super().__init__()
+                self.ready = ready
+
+            def ready_to_fire(self):
+                return self.ready
+
+        ready_weapon = ReadyWeapon(True)
+        cooling_weapon = ReadyWeapon(False)
+        self.tank._weapons = [ready_weapon] + [RecordingWeapon() for _ in range(Tank.MAX_WEAPONS - 1)]
+        self.tank._selected_weapon = Tank.SHELLS
+        self.tank._state = Tank.TANK_ALIVE
+
+        ready_primitives = self.tank._build_gun_primitives()
+        self.tank._weapons[Tank.SHELLS] = cooling_weapon
+        cooling_primitives = self.tank._build_gun_primitives()
+
+        self.assertEqual(ready_primitives[0].colour, (0, 255, 0, 128))
+        self.assertEqual(cooling_primitives[0].colour, (255, 0, 0, 128))
+
+    def test_tank_update_does_not_query_shield_command(self):
+        # Fidelity target: Tank.update()/move_tank()/update_gun().
+        #
+        # The classic controls menu exposes command index 4 as "Use Shield",
+        # but the runtime Tank code never consumes it. Holding the command does
+        # not activate a shield and does not spend jump-jet fuel.
+        class RecordingCommandPlayer(CommandPlayer):
+            def __init__(self):
+                super().__init__()
+                self.requested_commands = []
+
+            def get_command(self, command, start_time_ref=None):
+                self.requested_commands.append(command)
+                return super().get_command(command, start_time_ref)
+
+        player = RecordingCommandPlayer()
+        player.commands[4] = True
+        game = DummyGameForTank(SETTINGS)
+        tank = Tank(game, player, 0)
+        player._tank = tank
+        tank._fuel = 0.5
+        tank._total_fuel = 0.5
+
+        tank.update(0.25)
+
+        self.assertNotIn(4, player.requested_commands)
+        self.assertAlmostEqual(tank._fuel, 0.5)
+        self.assertAlmostEqual(tank._total_fuel, 0.5)
 
     def test_machine_gun_launch_velocity_uses_fixed_weapon_speed(self):
         # Fidelity target: MachineGunWeapon.update() uses
@@ -1641,6 +1695,36 @@ class ExplosionFidelityTests(unittest.TestCase):
         if results[1]:
             self.assertLess(results[1][0], 40)
 
+    def test_explosion_does_not_apply_shield_damage_reduction(self):
+        # Fidelity target: gamesession.py:95-105.
+        #
+        # Classic explosion damage calls tank.do_damage(...) directly. There is
+        # no shield hook, multiplier, or runtime shield state in the Python tank
+        # even though the controls screen still exposes "Use Shield".
+        from tests.support import ExplosionTank
+
+        class ShieldLikeTank(ExplosionTank):
+            shield_active = True
+
+            def damage_after_shield(self, _damage):
+                raise AssertionError("classic GameSession.explosion must not query shields")
+
+        direct = ShieldLikeTank(x=0.0, y=0.0)
+        splash = ShieldLikeTank(x=0.1, y=0.0)
+
+        direct_results = self._run_explosion(
+            blast_x=0.0, blast_y=0.0, blast_size=0.3, damage=40,
+            hit_tank_idx=0, tanks=[direct]
+        )
+        splash_results = self._run_explosion(
+            blast_x=0.0, blast_y=0.0, blast_size=0.3, damage=40,
+            hit_tank_idx=-1, tanks=[splash]
+        )
+
+        self.assertEqual(direct_results[0], [40])
+        self.assertEqual(len(splash_results[0]), 1)
+        self.assertGreater(splash_results[0][0], 20)
+
     def test_explosion_records_defeats_without_immediate_score_or_money(self):
         # Fidelity target: gamesession.py explosion() and player.py end_round().
         #
@@ -1790,6 +1874,106 @@ class PlayerAndSoundFidelityTests(unittest.TestCase):
         self.assertTrue(entity.update(0.1))
         entity.set_inactive()
         self.assertFalse(entity.update(0.1))
+
+
+class GameSessionFidelityTests(unittest.TestCase):
+    """
+    Fidelity tests for round start player/tank spawning placement in GameSessionController.
+    """
+
+    def test_gamesession_start_round_calculates_exact_spawn_positions(self):
+        from src.gamesession import GameSessionController
+        from src.player import Player
+
+        class MockTank:
+            def __init__(self):
+                self.x = None
+                self.y = None
+                self.ground_position = None
+
+            def alive(self):
+                return True
+
+            def new_round(self):
+                pass
+
+            def do_pre_round(self):
+                return True
+
+            def set_position_on_ground(self, x):
+                self.ground_position = x
+
+        class MockPlayer:
+            def __init__(self, idx):
+                self._tank = MockTank()
+
+            def get_tank(self):
+                return self._tank
+
+            def is_computer(self):
+                return False
+
+            def new_round(self):
+                pass
+
+        class MockClock:
+            def sample_now(self):
+                return 42
+            def reset(self, seed):
+                pass
+
+        class MockGame:
+            def __init__(self, num_players):
+                self._players = [MockPlayer(i) if i < num_players else None for i in range(8)]
+                self._number_of_players = num_players
+                self._current_round = 0
+                self._entity_list = []
+                self._landscape = None
+                self.events = []
+
+            def get_clock(self):
+                return MockClock()
+
+            def get_settings(self):
+                return SETTINGS
+
+            def ensure_registered_entities(self):
+                pass
+
+            def add_entity(self, e):
+                self._entity_list.append(e)
+
+            def remove_entity(self, e):
+                if e in self._entity_list:
+                    self._entity_list.remove(e)
+
+            def queue_network_event(self, *a, **k):
+                pass
+
+        # Stub random swaps during start_round by using a dummy rng
+        class MockRng:
+            def randint(self, a, b):
+                return 0
+
+        session = GameSessionController(
+            human_player_factory=lambda *a, **k: None,
+            ai_player_factory=lambda *a, **k: None,
+            landscape_factory=lambda *a, **k: None,
+            quake_factory=lambda *a, **k: None,
+            blast_factory=lambda *a, **k: None,
+            sound_entity_factory=lambda *a, **k: None,
+            rng=MockRng(),
+        )
+
+        for count in [2, 3, 4, 8]:
+            game = MockGame(count)
+            session.start_round(game)
+            placed_x = [game._players[i].get_tank().ground_position for i in range(count)]
+            placed_x.sort()
+
+            expected_x = [-10.0 + (10.0 / count) + (i * (20.0 / count)) for i in range(count)]
+            for val, exp in zip(placed_x, expected_x):
+                self.assertAlmostEqual(val, exp, places=5)
 
 
 class ScoreEconomyFidelityTests(unittest.TestCase):
@@ -2878,6 +3062,103 @@ class ShopMenuEconomyFidelityTests(unittest.TestCase):
             self.assertIn((7.0, y, name), drawn_text)
             self.assertIn((4.0, y, cost), drawn_text)
         self.assertIn((7.0, -4.0, "Done!"), drawn_text)
+        drawn_labels = [text for _x, _y, text in drawn_text]
+        self.assertNotIn("Locked", drawn_labels)
+        self.assertFalse(any("Not migrated yet" in text for text in drawn_labels))
+
+    def test_shop_draw_shows_selected_limited_weapon_stock_as_x_count(self):
+        # Fidelity target: ShopMenu.draw() selected-row stock text.
+        #
+        # For MIRV/Missile/Nuke rows, the classic shop keeps the item label
+        # unchanged and draws a separate xN indicator beside the active
+        # player's cursor for the selected row.
+        from src.shopmenu import ShopMenu
+        from src.tank import Tank
+
+        class RecordingUi:
+            def __init__(self):
+                self.text_calls = []
+
+            def style(self, *_args, **kwargs):
+                return kwargs
+
+            def draw_centered_text(self, x, y, text, *, style):
+                self.text_calls.append((x, y, text, style))
+
+        class MockShopMenu(ShopMenu):
+            def draw_background(self):
+                pass
+
+            def draw_game_polygon(self, points, color):
+                pass
+
+        missile = self.tank.get_weapon(Tank.MISSILES)
+        missile.add_amount(5)
+
+        ui = RecordingUi()
+        self.game.get_ui = lambda: ui
+        shop = MockShopMenu(self.game)
+        shop._player_select_pos[0] = 3
+        shop.draw()
+
+        drawn_labels = [text for _x, _y, text, _style in ui.text_calls]
+        self.assertIn("Missiles", drawn_labels)
+        self.assertIn("x5", drawn_labels)
+        self.assertNotIn("Missiles x5", drawn_labels)
+
+    def test_shop_draw_shows_selected_machine_gun_and_jump_jet_bars(self):
+        # Fidelity target: ShopMenu.draw() and _draw_bars().
+        #
+        # Machine Gun draws persistent ammo / 50.0 as bars, while Jump Jet
+        # draws the tank's total fuel reserve as bars. A partial final unit is
+        # rendered as a proportionally shorter last bar.
+        from src.shopmenu import ShopMenu
+        from src.tank import Tank
+
+        class RecordingUi:
+            def __init__(self):
+                self.text_calls = []
+
+            def style(self, *_args, **kwargs):
+                return kwargs
+
+            def draw_centered_text(self, x, y, text, *, style):
+                self.text_calls.append((x, y, text, style))
+
+        class MockShopMenu(ShopMenu):
+            def __init__(self, game):
+                super().__init__(game)
+                self.polygons = []
+
+            def draw_background(self):
+                pass
+
+            def draw_game_polygon(self, points, color):
+                self.polygons.append((points, color))
+
+        def white_bar_lengths(polygons):
+            return [
+                round(abs(points[2][0] - points[0][0]), 2)
+                for points, color in polygons
+                if color == (255, 255, 255)
+            ]
+
+        self.tank.set_colour((10, 20, 30))
+        self.tank.get_weapon(Tank.MACHINEGUN)._quantity = 125
+        self.tank.set_total_fuel(2.5)
+
+        ui = RecordingUi()
+        self.game.get_ui = lambda: ui
+        shop = MockShopMenu(self.game)
+
+        shop._player_select_pos[0] = 0
+        shop.draw()
+        self.assertEqual(white_bar_lengths(shop.polygons), [1.3, 1.3, 0.65])
+
+        shop.polygons.clear()
+        shop._player_select_pos[0] = 1
+        shop.draw()
+        self.assertEqual(white_bar_lengths(shop.polygons), [1.3, 1.3, 0.65])
 
     def test_shop_input_delay_prevents_duplicate_buy_actions(self):
         from src.shopmenu import ShopMenu
@@ -3175,6 +3456,32 @@ class WinnerMenuFidelityTests(unittest.TestCase):
         self.assertEqual(state2, GameState.MAIN_MENU)
         self.assertTrue(self.game.players_deleted)
 
+    def test_winner_menu_ignores_global_enter_without_player_fire(self):
+        # Fidelity target: WinnerMenu.update().
+        #
+        # Unlike ScoreMenu, the final winner screen only exits on the player's
+        # FIRE command after activation; a global Return/Enter key fallback is
+        # not checked in the Pygame source.
+        import pygame
+        from src.winnermenu import WinnerMenu
+        from src.common import GameState
+
+        self.game.players[0] = self.MockPlayer("P1", 100)
+        self.game.has_humans = True
+
+        class MockWinnerMenu(WinnerMenu):
+            def update_background(self, time): pass
+
+        original_get_pressed = pygame.key.get_pressed
+        pygame.key.get_pressed = lambda: {pygame.K_SPACE: False, pygame.K_RETURN: True}
+        try:
+            menu = MockWinnerMenu(self.game)
+            self.assertEqual(menu.update(2.0), GameState.CURRENT_STATE)
+            self.assertEqual(menu.update(0.0), GameState.CURRENT_STATE)
+            self.assertFalse(self.game.players_deleted)
+        finally:
+            pygame.key.get_pressed = original_get_pressed
+
 class ScoreMenuFidelityTests(unittest.TestCase):
     def setUp(self):
         import pygame
@@ -3256,6 +3563,24 @@ class ScoreMenuFidelityTests(unittest.TestCase):
         
         state = menu.update(1.0)
         self.assertEqual(state, GameState.CURRENT_STATE)
+
+    def test_score_menu_global_return_advances_after_activation(self):
+        # Fidelity target: ScoreMenu.update().
+        #
+        # The score screen has a Python-side global SPACE/RETURN fallback in
+        # addition to player FIRE input.
+        import pygame
+        from src.scoremenu import ScoreMenu
+        from src.common import GameState
+
+        self.game.players[0] = self.MockPlayer("P1", 100)
+        pygame.key.get_pressed = lambda: {pygame.K_SPACE: False, pygame.K_RETURN: True}
+
+        class MockScoreMenu(ScoreMenu):
+            def update_background(self, time): pass
+
+        menu = MockScoreMenu(self.game)
+        self.assertEqual(menu.update(2.0), GameState.SHOP_MENU)
 
     def test_score_menu_auto_advances_computer_only_match_after_delay(self):
         from src.scoremenu import ScoreMenu
@@ -3560,6 +3885,253 @@ class OptionMenuFidelityTests(unittest.TestCase):
         
         menu._back_button.update = lambda: True
         self.assertEqual(menu.update(0.1), GameState.MAIN_MENU)
+
+class KeyboardControlDefaultsFidelityTests(unittest.TestCase):
+    def test_set_controls_menu_uses_classic_action_labels(self):
+        # Fidelity target: setcontrolsmenu.py::SetControlsMenu.CONTROL_STRINGS.
+        #
+        # The Godot controls screen should reuse these action names instead of
+        # exposing engine/action-id wording such as "Weapon Next".
+        from src.setcontrolsmenu import SetControlsMenu
+
+        self.assertEqual(
+            SetControlsMenu.CONTROL_STRINGS,
+            [
+                "Fire Weapon",
+                "Change Weapon Up",
+                "Change Weapon Down",
+                "Use Jump Jets",
+                "Use Shield",
+                "Move Tank Left",
+                "Move Tank Right",
+                "Rotate Gun Left",
+                "Rotate Gun Right",
+                "Increase Gun Power",
+                "Decrease Gun Power",
+            ],
+        )
+        self.assertEqual(SetControlsMenu.NUM_OF_CONTROLS, 11)
+        self.assertNotIn("Pause", SetControlsMenu.CONTROL_STRINGS)
+
+    def test_set_controls_menu_uses_classic_joystick_value_labels(self):
+        # Fidelity target: setcontrolsmenu.py::SetControlsMenu.draw().
+        #
+        # Joystick button labels are one-based ("Joy Button 1") and axis names
+        # use the classic Joystick/Pad direction wording.
+        from src.setcontrolsmenu import SetControlsMenu
+
+        self.assertEqual(
+            SetControlsMenu.AXIS_NAMES,
+            [
+                "Joystick/Pad Right",
+                "Joystick/Pad Left",
+                "Joystick/Pad Up",
+                "Joystick/Pad Down",
+                "Axis 3 (-)",
+                "Axis 3 (+)",
+                "Axis 4 (-)",
+                "Axis 4 (+)",
+            ],
+        )
+        self.assertEqual("Joy Button %d" % (0 + 1), "Joy Button 1")
+
+    def test_set_controls_menu_joystick_axis_capture_links_opposite_controls(self):
+        # Fidelity target: setcontrolsmenu.py::SetControlsMenu.update().
+        #
+        # Capturing a joystick axis for a directional action also assigns the
+        # opposite direction to the classic linked control. Replacing an axis
+        # with a joystick button clears that linked opposite control.
+        import inspect
+        from src.setcontrolsmenu import SetControlsMenu
+
+        self.assertEqual(
+            SetControlsMenu.LINKED_CONTROLS,
+            [-1, 2, 1, -1, -1, 6, 5, 8, 7, 10, 9],
+        )
+        self.assertEqual(
+            {
+                "Change Weapon Up": "Change Weapon Down",
+                "Change Weapon Down": "Change Weapon Up",
+                "Move Tank Left": "Move Tank Right",
+                "Move Tank Right": "Move Tank Left",
+                "Rotate Gun Left": "Rotate Gun Right",
+                "Rotate Gun Right": "Rotate Gun Left",
+                "Increase Gun Power": "Decrease Gun Power",
+                "Decrease Gun Power": "Increase Gun Power",
+            },
+            {
+                SetControlsMenu.CONTROL_STRINGS[index]: SetControlsMenu.CONTROL_STRINGS[linked]
+                for index, linked in enumerate(SetControlsMenu.LINKED_CONTROLS)
+                if linked != -1
+            },
+        )
+        self.assertEqual(SetControlsMenu.AXIS_NAMES[(100 + (0 * 2)) - 100], "Joystick/Pad Right")
+        self.assertEqual(SetControlsMenu.AXIS_NAMES[(101 + (0 * 2)) - 100], "Joystick/Pad Left")
+
+        source = inspect.getsource(SetControlsMenu.update)
+        self.assertIn("self._control_key[linked] = 101 + (a * 2)", source)
+        self.assertIn("self._control_key[linked] = 100 + (a * 2)", source)
+        self.assertIn("self._control_key[self.LINKED_CONTROLS[self._waiting_for_key]] = -1", source)
+
+    def test_set_controls_menu_uses_classic_undefined_value_label(self):
+        # Fidelity target: setcontrolsmenu.py::SetControlsMenu.draw().
+        #
+        # Empty keyboard/joystick bindings are shown with the classic
+        # "<Undefined>" value text.
+        import inspect
+        from src.setcontrolsmenu import SetControlsMenu
+
+        source = inspect.getsource(SetControlsMenu.draw)
+
+        self.assertIn('txt = "<Undefined>"', source)
+        self.assertIn('if key == -1: txt = "<Undefined>"', source)
+
+    def test_set_controls_menu_waiting_prompt_uses_classic_copy(self):
+        # Fidelity target: setcontrolsmenu.py::SetControlsMenu.draw().
+        #
+        # While waiting for any keyboard/joystick binding, Pygame shows one
+        # classic prompt shape instead of separate keyboard/gamepad copy.
+        from src.setcontrolsmenu import SetControlsMenu
+
+        self.assertEqual(
+            ["Press Button for '%s'" % label for label in SetControlsMenu.CONTROL_STRINGS],
+            [
+                "Press Button for 'Fire Weapon'",
+                "Press Button for 'Change Weapon Up'",
+                "Press Button for 'Change Weapon Down'",
+                "Press Button for 'Use Jump Jets'",
+                "Press Button for 'Use Shield'",
+                "Press Button for 'Move Tank Left'",
+                "Press Button for 'Move Tank Right'",
+                "Press Button for 'Rotate Gun Left'",
+                "Press Button for 'Rotate Gun Right'",
+                "Press Button for 'Increase Gun Power'",
+                "Press Button for 'Decrease Gun Power'",
+            ],
+        )
+
+    def test_set_controls_menu_idle_state_has_no_prompt(self):
+        # Fidelity target: setcontrolsmenu.py::SetControlsMenu.draw().
+        #
+        # The classic controls editor only draws the waiting prompt while a
+        # specific control is actively waiting for a key/button.
+        import inspect
+        from src.setcontrolsmenu import SetControlsMenu
+
+        self.assertIn("if self._waiting_for_key != -1:", inspect.getsource(SetControlsMenu.draw))
+
+        class FakeControls:
+            def get_control(self, _layout, _index):
+                return 0
+
+        class FakeGame:
+            def get_font(self):
+                return object()
+
+            def get_interface(self):
+                return object()
+
+            def get_graphics(self):
+                return object()
+
+            def get_ui(self):
+                return object()
+
+            def get_controls(self):
+                return FakeControls()
+
+        menu = SetControlsMenu(FakeGame(), 0)
+
+        self.assertEqual(menu._waiting_for_key, -1)
+
+    def test_set_controls_menu_reset_button_uses_classic_copy(self):
+        # Fidelity target: setcontrolsmenu.py::SetControlsMenu.__init__().
+        #
+        # The reset action is labeled "Reset To Defaults" in the classic
+        # controls editor.
+        from src.setcontrolsmenu import SetControlsMenu
+
+        class FakeControls:
+            def get_control(self, _layout, _index):
+                return 0
+
+        class FakeGame:
+            def get_font(self):
+                return object()
+
+            def get_interface(self):
+                return object()
+
+            def get_graphics(self):
+                return object()
+
+            def get_ui(self):
+                return object()
+
+            def get_controls(self):
+                return FakeControls()
+
+        menu = SetControlsMenu(FakeGame(), 0)
+
+        self.assertEqual(menu._reset_button._text, "Reset To Defaults")
+        self.assertEqual(menu._done_button._text, "Done")
+
+    def test_keyboard1_default_bindings_match_classic_pygame_layout(self):
+        # Fidelity target: groundfire/input/controls.py::_default_commands()
+        # and the Keyboard1 command order used by setcontrolsmenu.py.
+        #
+        # Classic Keyboard1 uses letter keys for the full tank/weapon layout:
+        # A/D aim, W/S power, J/L tank movement, I jump jets, K shield, O/U
+        # weapon cycling, and Space fire.
+        from src.groundfire.core.pygame import load_pygame_module
+        from src.groundfire.input.controls import _default_commands
+        from src.groundfire.input.controlsfile import CMD_NAMES
+
+        pygame_module = load_pygame_module()
+        keyboard1 = dict(zip(CMD_NAMES, _default_commands(pygame_module)[0]))
+
+        self.assertEqual(keyboard1["Fire"], pygame_module.K_SPACE)
+        self.assertEqual(keyboard1["WeaponUp"], pygame_module.K_o)
+        self.assertEqual(keyboard1["WeaponDown"], pygame_module.K_u)
+        self.assertEqual(keyboard1["JumpJets"], pygame_module.K_i)
+        self.assertEqual(keyboard1["Shield"], pygame_module.K_k)
+        self.assertEqual(keyboard1["TankLeft"], pygame_module.K_j)
+        self.assertEqual(keyboard1["TankRight"], pygame_module.K_l)
+        self.assertEqual(keyboard1["GunLeft"], pygame_module.K_a)
+        self.assertEqual(keyboard1["GunRight"], pygame_module.K_d)
+        self.assertEqual(keyboard1["GunUp"], pygame_module.K_w)
+        self.assertEqual(keyboard1["GunDown"], pygame_module.K_s)
+
+    def test_joylayout_default_bindings_match_classic_pygame_layout(self):
+        # Fidelity target: groundfire/input/controls.py::_default_commands()
+        # and conf/controls.ini JoyLayout1.
+        #
+        # Classic joystick movement uses buttons 6/7 for tank movement and
+        # axis 0/1 only for gun aim and power.
+        from src.groundfire.core.pygame import load_pygame_module
+        from src.groundfire.input.controls import _default_commands
+        from src.groundfire.input.controlsfile import CMD_NAMES
+
+        pygame_module = load_pygame_module()
+        joy_layout = dict(zip(CMD_NAMES, _default_commands(pygame_module)[2]))
+
+        self.assertEqual(
+            joy_layout,
+            {
+                "Fire": 0,
+                "WeaponUp": 2,
+                "WeaponDown": 1,
+                "JumpJets": 3,
+                "Shield": 4,
+                "TankLeft": 6,
+                "TankRight": 7,
+                "GunLeft": 101,
+                "GunRight": 100,
+                "GunUp": 102,
+                "GunDown": 103,
+            },
+        )
+
 
 class ControllerMenuFidelityTests(unittest.TestCase):
     def setUp(self):

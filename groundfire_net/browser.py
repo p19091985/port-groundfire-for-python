@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+SQLITE_SUFFIXES = {".db", ".sqlite", ".sqlite3"}
+SERVER_BOOK_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -36,33 +41,89 @@ class ServerListEntry:
 
 class ServerBook:
     def __init__(self, path: str | Path | None = None):
-        self._path = Path(path) if path is not None else None
+        self._requested_path = Path(path) if path is not None else None
+        self._path = _sqlite_path(self._requested_path) if self._requested_path is not None else None
+        self._legacy_json_path = (
+            self._requested_path
+            if self._requested_path is not None and self._requested_path.suffix.lower() == ".json"
+            else None
+        )
         self._favorites: list[ServerListEntry] = []
         self._history: list[ServerListEntry] = []
         self._internet: list[ServerListEntry] = []
         self.load()
 
     def load(self):
-        if self._path is None or not self._path.exists():
+        self._favorites = []
+        self._history = []
+        self._internet = []
+        if self._path is None:
             return
-        try:
-            payload = json.loads(self._path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        if self._path.exists():
+            try:
+                self._load_sqlite()
+                return
+            except sqlite3.Error:
+                return
+        legacy_payload = self._load_legacy_json()
+        if not legacy_payload:
             return
-        self._favorites = self._decode_entries(payload.get("favorites", ()))
-        self._history = self._decode_entries(payload.get("history", ()))
-        self._internet = self._decode_entries(payload.get("internet", ()))
+        self._favorites = self._decode_entries(legacy_payload.get("favorites", ()))
+        self._history = self._decode_entries(legacy_payload.get("history", ()))
+        self._internet = self._decode_entries(legacy_payload.get("internet", ()))
+        self.save()
 
     def save(self):
         if self._path is None:
             return
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
+        connection = sqlite3.connect(self._path)
+        try:
+            self._ensure_schema(connection)
+            connection.execute("DELETE FROM server_entries")
+            for bucket, entries in (
+                ("favorites", self._favorites),
+                ("history", self._history),
+                ("internet", self._internet),
+            ):
+                for position, entry in enumerate(entries):
+                    payload = asdict(entry)
+                    connection.execute(
+                        """
+                        INSERT OR REPLACE INTO server_entries (
+                            bucket, endpoint, position, name, host, port, game, map_name,
+                            player_count, max_players, latency_ms, source, description,
+                            last_played, requires_password, region, secure, protocol_version
+                        )
+                        VALUES (
+                            :bucket, :endpoint, :position, :name, :host, :port, :game, :map_name,
+                            :player_count, :max_players, :latency_ms, :source, :description,
+                            :last_played, :requires_password, :region, :secure, :protocol_version
+                        )
+                        """,
+                        {
+                            **payload,
+                            "bucket": bucket,
+                            "endpoint": entry.endpoint,
+                            "position": position,
+                            "requires_password": int(entry.requires_password),
+                            "secure": int(entry.secure),
+                        },
+                    )
+            connection.commit()
+        finally:
+            connection.close()
+
+    @property
+    def storage_path(self) -> Path | None:
+        return self._path
+
+    def to_payload(self) -> dict[str, list[dict[str, Any]]]:
+        return {
             "favorites": [asdict(entry) for entry in self._favorites],
             "history": [asdict(entry) for entry in self._history],
             "internet": [asdict(entry) for entry in self._internet],
         }
-        self._path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
     def get_favorites(self) -> tuple[ServerListEntry, ...]:
         return tuple(self._favorites)
@@ -163,6 +224,106 @@ class ServerBook:
                 continue
         return entries
 
+    def _load_sqlite(self) -> None:
+        connection = sqlite3.connect(self._path)
+        try:
+            self._ensure_schema(connection)
+            rows = connection.execute(
+                """
+                SELECT bucket, name, host, port, game, map_name, player_count, max_players,
+                       latency_ms, source, description, last_played, requires_password,
+                       region, secure, protocol_version
+                FROM server_entries
+                ORDER BY bucket, position, rowid
+                """
+            ).fetchall()
+        finally:
+            connection.close()
+        entries_by_bucket: dict[str, list[ServerListEntry]] = {
+            "favorites": [],
+            "history": [],
+            "internet": [],
+        }
+        for row in rows:
+            bucket = str(row[0])
+            if bucket not in entries_by_bucket:
+                continue
+            try:
+                entries_by_bucket[bucket].append(
+                    ServerListEntry(
+                        name=str(row[1]),
+                        host=str(row[2]),
+                        port=int(row[3]),
+                        game=str(row[4]),
+                        map_name=str(row[5]),
+                        player_count=int(row[6]),
+                        max_players=int(row[7]),
+                        latency_ms=None if row[8] is None else int(row[8]),
+                        source=str(row[9]),
+                        description=str(row[10]),
+                        last_played=str(row[11]),
+                        requires_password=bool(row[12]),
+                        region=str(row[13]),
+                        secure=bool(row[14]),
+                        protocol_version=int(row[15]),
+                    )
+                )
+            except (TypeError, ValueError):
+                continue
+        self._favorites = entries_by_bucket["favorites"]
+        self._history = entries_by_bucket["history"]
+        self._internet = entries_by_bucket["internet"]
+
+    def _load_legacy_json(self) -> dict[str, Any]:
+        if self._legacy_json_path is None or not self._legacy_json_path.exists():
+            return {}
+        try:
+            payload = json.loads(self._legacy_json_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _ensure_schema(self, connection: sqlite3.Connection) -> None:
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS server_entries (
+                bucket TEXT NOT NULL,
+                endpoint TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                host TEXT NOT NULL,
+                port INTEGER NOT NULL,
+                game TEXT NOT NULL,
+                map_name TEXT NOT NULL,
+                player_count INTEGER NOT NULL,
+                max_players INTEGER NOT NULL,
+                latency_ms INTEGER,
+                source TEXT NOT NULL,
+                description TEXT NOT NULL,
+                last_played TEXT NOT NULL,
+                requires_password INTEGER NOT NULL,
+                region TEXT NOT NULL,
+                secure INTEGER NOT NULL,
+                protocol_version INTEGER NOT NULL,
+                PRIMARY KEY (bucket, endpoint)
+            )
+            """
+        )
+        connection.execute(
+            "INSERT OR REPLACE INTO metadata(key, value) VALUES('schema_version', ?)",
+            (str(SERVER_BOOK_SCHEMA_VERSION),),
+        )
+
     def _upsert(
         self,
         entries: list[ServerListEntry],
@@ -180,3 +341,11 @@ class ServerBook:
             seen.add(entry.endpoint)
             unique.append(entry)
         return tuple(unique)
+
+
+def _sqlite_path(path: Path | None) -> Path | None:
+    if path is None:
+        return None
+    if path.suffix.lower() in SQLITE_SUFFIXES:
+        return path
+    return path.with_suffix(".sqlite3")

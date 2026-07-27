@@ -1,9 +1,12 @@
 import json
+import os
 import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-GODOT_ROOT = PROJECT_ROOT / "godot"
+GODOT_ROOT = Path(os.environ.get("GODOT_PROJECT_DIR", PROJECT_ROOT / "versao-godot" / "godot"))
+if not (GODOT_ROOT / "project.godot").exists() and (PROJECT_ROOT / "godot" / "project.godot").exists():
+    GODOT_ROOT = PROJECT_ROOT / "godot"
 
 
 def test_godot_project_declares_main_scene_and_platform_autoload():
@@ -169,6 +172,12 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "ControlSettings.conflict_labels()" in script
     assert "func _begin_key_capture" in script
     assert "func _begin_gamepad_capture" in script
+    assert "func _classic_control_capture_prompt" in script
+    assert '"Press Button for \'%s\'"' in script
+    assert 'Select a control to rebind.' not in script
+    assert script.count('_capture_prompt.text = ""') >= 2
+    assert "Press a keyboard key" not in script
+    assert "Press a gamepad button" not in script
     assert "InputEventJoypadButton" in script
     assert "InputEventJoypadMotion" in script
     assert "InputEventKey" in script
@@ -190,7 +199,7 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "clamp(MENU_LOGO_BASE_SIZE.x * _menu_scale()" in script
     assert "clamp(scaled.x, MENU_BUTTON_MIN_SIZE.x, MENU_BUTTON_MAX_SIZE.x)" in script
     assert "event.button_index == GAMEPAD_CAPTURE_CANCEL_BUTTON" in script
-    assert "Back cancels." in script
+    assert "Back cancels." not in script
     assert "ControlSettings.reset_defaults()" in script
     assert "ControlSettings.reset_gamepad_defaults()" in script
     assert "ScrollContainer.new()" in script
@@ -301,8 +310,7 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "var _local_match_setup_rounds: OptionButton" in script
     assert "func _local_match_setup_status_text" in script
     assert "Enable at least 2 players to start." in script
-    assert "Add at least 1 human player to start." in script
-    assert "start_button.disabled = active_count < 2 or human_count < 1" in script
+    assert "start_button.disabled = active_count < 2" in script
     assert '"%d players ready  Human %d  Computer %d"' in script
     assert "func _show_local_match_setup" in script
     assert '"Local Match Setup"' in script
@@ -461,6 +469,8 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert '"Gamepad"' in script
     assert '"Gamepad Profile"' in script
     assert "func _add_gamepad_profile_selector" in script
+    assert '"Reset To Defaults"' in script
+    assert '"Reset Controls"' not in script
     assert '"Reset Gamepad Defaults"' in script
     assert 'preload("res://assets/logo.png")' in script
     assert 'preload("res://assets/menuback.png")' in script
@@ -843,7 +853,10 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'var split_age: float = float(projectile.get("split_age", 0.8))' in local_match
     assert "var split_delta: float = clamp(split_age - previous_age, 0.0, delta)" in local_match
     assert "var split_position := previous_position + Vector2(split_velocity.x * split_delta, 0.0)" in local_match
-    assert "split_position.y = _ballistic_projectile_y_at(projectile, split_age, previous_position, velocity)" in local_match
+    assert (
+        "split_position.y = _ballistic_projectile_y_at(projectile, split_age, previous_position, velocity)"
+        in local_match
+    )
     assert "func _ballistic_projectile_y_at" in local_match
     assert 'projectile["expired"] = true' in local_match
     assert (
@@ -1126,13 +1139,30 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _continue_from_score" in local_match
     assert "if _score_continue_delay > 0.0:" in local_match
     assert "_update_leader_flags()" in local_match
-    assert "if _is_final_round():\n\t\t_hide_score_overlay()\n\t\t_open_winner_overlay()\n\t\treturn\n\t_update_leader_flags()" in local_match
+    assert (
+        "if _is_final_round():\n"
+        "\t\t_hide_score_overlay()\n"
+        "\t\t_open_winner_overlay()\n"
+        "\t\treturn\n"
+        "\t_update_leader_flags()"
+        in local_match
+    )
     assert "func _hide_score_overlay" in local_match
     assert "func _build_winner_overlay" in local_match
     assert "func _wire_single_button_focus" in local_match
     assert "button.focus_neighbor_left = path" in local_match
     assert "button.focus_neighbor_right = path" in local_match
-    assert 'or event.is_action_pressed("ui_cancel")' in local_match
+    assert (
+        'if event.is_action_pressed("ui_accept") or event.is_action_pressed("gf_fire"):\n'
+        "\t\t\t_continue_from_score()"
+        in local_match
+    )
+    assert 'if event.is_action_pressed("gf_fire"):\n\t\t\t_return_to_main_menu()' in local_match
+    assert (
+        'if event.is_action_pressed("ui_accept") or event.is_action_pressed("gf_fire") '
+        'or event.is_action_pressed("ui_cancel")'
+        not in local_match
+    )
     assert "WinnerOverlay" in local_match
     assert "var _winner_heading_label: Label" in local_match
     assert '_winner_heading_label.text = "Final Result"' in local_match
@@ -1150,7 +1180,10 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _winner_rows_snapshot" in local_match
     assert "func _refresh_winner_continue_button" in local_match
     assert "_winner_main_menu_button.disabled = _winner_continue_delay > 0.0" in local_match
-    assert "if _winner_exit_pending or (not _has_human_participants() and _winner_continue_delay <= 0.0):" in local_match
+    assert (
+        "if _winner_exit_pending or (not _has_human_participants() and _winner_continue_delay <= 0.0):"
+        in local_match
+    )
     assert "_winner_exit_pending = true" in local_match
     assert "_winner_main_menu_button.visible = false" in local_match
     assert "_winner_main_menu_button.focus_mode = Control.FOCUS_NONE" in local_match
@@ -1220,6 +1253,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"head_polygon": PackedVector2Array' in local_match
     assert 'Color("#00ff0080")' in local_match
     assert "func _tank_weapon_ready" in local_match
+    assert 'int(inventory.call("current_ammo")) == 0' in local_match
+    assert 'inventory.call("is_current_ready")' in local_match
     assert "func set_snapshot" in hud
     assert '"player_wins"' in hud
     assert '"player_name"' in hud
@@ -1566,19 +1601,43 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'return "$%d" % value' in shop
     assert 'CLASSIC_BUY_ACTION_LABEL := "Buy"' in shop
     assert "_shop_button(CLASSIC_BUY_ACTION_LABEL)" in shop
-    assert "Pack %s" in shop
     assert "func _cost_cell" in shop
     assert "CLASSIC_SHOP_DISPLAY_NAMES" in shop
     assert '"MIRV": "Mirvs"' in shop
     assert '"Missile": "Missiles"' in shop
     assert '"Nuke": "Nukes"' in shop
     assert "func _catalog_display_name" in shop
+    assert 'label.text = _catalog_display_name(weapon_name)' in shop
+    assert 'label.text = _catalog_display_name(item_name)' in shop
+    assert '"classic_shop_stock"' in shop
+    assert '"classic_shop_pack"' in shop
+    assert "CLASSIC_LIMITED_STOCK_INDICATORS" in shop
+    assert "func _selected_limited_stock_text" in shop
+    assert 'return "x%d" % max(0, stock_amount)' in shop
+    assert "func _selected_weapon_bar_value" in shop
+    assert 'weapon_name != "Machine Gun"' in shop
+    assert "float(stock_amount) / 50.0" in shop
+    assert "func _selected_shop_item_bar_value" in shop
+    assert 'item_name != "Jump Jet"' in shop
+    assert 'float(_state.get("fuel_reserve", 100)) / 100.0' in shop
+    assert "func _classic_bar_indicator" in shop
+    assert '"classic_shop_indicator_kind"' in shop
+    assert '"classic_shop_bar_value"' in shop
+    assert '"classic_shop_bar_fraction"' in shop
+    assert '"classic_shop_effect"' in shop
+    assert '"classic_shop_current"' in shop
     assert "label.text = _format_money(cost)" in shop
-    assert "row.add_child(_cost_cell(cost))" in shop
-    assert "row.add_child(_cost_cell(item_cost))" in shop
-    assert "func _format_pack" in shop
+    assert (
+        "row.add_child(_cost_cell(cost, GroundfireTheme.COLOR_TEXT if selected else GroundfireTheme.COLOR_WARN))"
+        in shop
+    )
+    assert (
+        "row.add_child(_cost_cell(item_cost, GroundfireTheme.COLOR_TEXT if selected else GroundfireTheme.COLOR_WARN))"
+        in shop
+    )
+    assert '"selected_position"' in shop
+    assert '"classic_shop_selected"' in shop
     assert '"shop_items"' in shop
-    assert "Current %s" in shop
     assert "DISABLED_CLASSIC_ITEMS" in shop
     assert '"Rolling Mines"' in shop
     assert '"Airstrike"' in shop
@@ -1587,7 +1646,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"Corbomite"' in shop
     assert "func _add_disabled_catalog_rows" in shop
     assert "func _disabled_shop_items" in shop
-    assert '"Locked"' in shop
+    assert '"Locked"' not in shop
+    assert "Not migrated yet" not in shop
     assert "continue_requested.emit()" in shop
     assert "buy_requested.emit(captured_name)" in shop
     assert 'TRANSPORT_WEBSOCKET := "websocket"' in network
@@ -1742,15 +1802,21 @@ def test_online_match_scene_consumes_websocket_snapshots_and_sends_input():
 
 def test_control_settings_persist_input_bindings():
     script = (GODOT_ROOT / "scripts" / "control_settings.gd").read_text(encoding="utf-8")
+    local_match = (GODOT_ROOT / "scripts" / "local_match.gd").read_text(encoding="utf-8")
 
     assert 'SETTINGS_PATH := "user://groundfire_controls.cfg"' in script
     assert "DEFAULT_BINDINGS" in script
     assert "static func apply_saved_bindings" in script
     assert "ACTION_ORDER" in script
+    assert "CLASSIC_REBIND_ACTION_ORDER" in script
+    assert "CLASSIC_LINKED_ACTIONS" in script
+    assert "for action_name in CLASSIC_REBIND_ACTION_ORDER:" in script
     assert '"gf_fire"' in script
     assert '"gf_weapon_next"' in script
     assert '"gf_weapon_prev"' in script
     assert '"gf_shield"' in script
+    assert '"gf_pause": KEY_ESCAPE' in script
+    assert '"gf_pause": JOY_BUTTON_START' in script
     assert 'for action_name in ACTION_ORDER:' in script
     assert "static func save_key_binding" in script
     assert "static func save_gamepad_button_binding" in script
@@ -1763,6 +1829,7 @@ def test_control_settings_persist_input_bindings():
     assert "static func gamepad_profiles" in script
     assert "static func action_names" in script
     assert "static func display_name" in script
+    assert "CLASSIC_ACTION_DISPLAY_NAMES" in script
     assert "static func key_label" in script
     assert "DEFAULT_GAMEPAD_BUTTONS" in script
     assert "DEFAULT_GAMEPAD_AXES" in script
@@ -1776,11 +1843,95 @@ def test_control_settings_persist_input_bindings():
     assert '"gamepad"' in script
     assert "static func _apply_default_gamepad_binding" in script
     assert "static func _apply_saved_gamepad_binding" in script
+    assert "static func _set_saved_gamepad_none" in script
+    assert "static func _saved_or_default_gamepad_binding_is_axis" in script
     assert "static func _gamepad_section" in script
     assert "Input.get_connected_joypads()" in script
     assert '"gamepad_device_%d"' in script
     assert ".device = device_id" in script
     assert "InputMap.action_erase_events" in script
+    classic_keyboard_defaults = {
+        "gf_fire": "KEY_SPACE",
+        "gf_weapon_next": "KEY_O",
+        "gf_weapon_prev": "KEY_U",
+        "gf_jump": "KEY_I",
+        "gf_shield": "KEY_K",
+        "gf_move_left": "KEY_J",
+        "gf_move_right": "KEY_L",
+        "gf_aim_left": "KEY_A",
+        "gf_aim_right": "KEY_D",
+        "gf_power_up": "KEY_W",
+        "gf_power_down": "KEY_S",
+    }
+    for action_name, key_name in classic_keyboard_defaults.items():
+        assert f'"{action_name}": {key_name}' in script
+        assert f'_ensure_key_action("{action_name}", {key_name})' in local_match
+    classic_action_labels = [
+        "Fire Weapon",
+        "Change Weapon Up",
+        "Change Weapon Down",
+        "Use Jump Jets",
+        "Use Shield",
+        "Move Tank Left",
+        "Move Tank Right",
+        "Rotate Gun Left",
+        "Rotate Gun Right",
+        "Increase Gun Power",
+        "Decrease Gun Power",
+    ]
+    for label in classic_action_labels:
+        assert f'"{label}"' in script
+    classic_linked_actions = {
+        "gf_weapon_next": "gf_weapon_prev",
+        "gf_weapon_prev": "gf_weapon_next",
+        "gf_move_left": "gf_move_right",
+        "gf_move_right": "gf_move_left",
+        "gf_aim_left": "gf_aim_right",
+        "gf_aim_right": "gf_aim_left",
+        "gf_power_up": "gf_power_down",
+        "gf_power_down": "gf_power_up",
+    }
+    for action_name, linked_action in classic_linked_actions.items():
+        assert f'"{action_name}": "{linked_action}"' in script
+    rebind_order = script.split("const CLASSIC_REBIND_ACTION_ORDER := [", 1)[1].split("]", 1)[0]
+    assert '"gf_pause"' not in rebind_order
+    classic_gamepad_button_defaults = {
+        "gf_fire": 0,
+        "gf_weapon_next": 2,
+        "gf_weapon_prev": 1,
+        "gf_jump": 3,
+        "gf_shield": 4,
+        "gf_move_left": 6,
+        "gf_move_right": 7,
+    }
+    for action_name, button_index in classic_gamepad_button_defaults.items():
+        assert f'"{action_name}": {button_index}' in script
+    for axis_label in [
+        "Joystick/Pad Right",
+        "Joystick/Pad Left",
+        "Joystick/Pad Up",
+        "Joystick/Pad Down",
+        "Axis 3 (-)",
+        "Axis 3 (+)",
+        "Axis 4 (-)",
+        "Axis 4 (+)",
+    ]:
+        assert f'"{axis_label}"' in script
+    assert 'CLASSIC_UNDEFINED_LABEL := "<Undefined>"' in script
+    assert '"Unbound"' not in script
+    assert '"No gamepad"' not in script
+    assert '"Joy Button %d" % (button_index + 1)' in script
+    assert '"Pad %d"' not in script
+    assert '"Axis %d%s"' not in script
+    assert 'binding_type == "none"' in script
+    assert '"gf_power_up": {"axis": JOY_AXIS_LEFT_Y, "value": 1.0}' in script
+    assert '"gf_power_down": {"axis": JOY_AXIS_LEFT_Y, "value": -1.0}' in script
+    assert '"gf_move_left": {"axis": JOY_AXIS_RIGHT_X' not in script
+    assert '"gf_move_right": {"axis": JOY_AXIS_RIGHT_X' not in script
+    assert "Weapon Next" not in script
+    assert "Weapon Prev" not in script
+    assert 'KEY_TAB' not in script
+    assert 'KEY_SHIFT' not in script
 
 
 def test_migration_strategy_documents_web_feature_rule():
@@ -1792,20 +1943,23 @@ def test_migration_strategy_documents_web_feature_rule():
     assert "WebSocket/WebRTC" in doc
 
 
-def test_migration_strategy_declares_pygame_fidelity_contract():
+def test_migration_strategy_declares_compatibility_contract():
     doc = (PROJECT_ROOT / "docs" / "godot_migration_strategy.md").read_text(encoding="utf-8")
     contract_script = (PROJECT_ROOT / "scripts" / "validate_godot_migration_contract.py").read_text(encoding="utf-8")
     fidelity_script = (PROJECT_ROOT / "scripts" / "validate_godot_fidelity.sh").read_text(encoding="utf-8")
 
-    assert "## Migration Fidelity Contract" in doc
-    assert "User experience cannot be changed by the migration." in doc
-    assert "The Python/Pygame client is the behavioral, visual, input, audio, timing, and flow source of truth" in doc
-    assert "Godot browser goldens are regression captures, not fidelity targets." in doc
-    assert "Every migration implementation batch must name its Pygame reference" in doc
-    assert "### Fidelity Annotation Template" in doc
+    assert "## Migration Compatibility Contract" in doc
+    assert "This is now an evolution-first migration." in doc
+    assert "`versao-python/` and `versao-godot/godot/` are the canonical editions" in doc
+    assert "historical fidelity is comparison material rather than a hard product rule" in doc
+    assert "Prefer modern, testable architecture over exact historical coupling" in doc
+    assert "use SQLite for mutable runtime state where practical" in doc
+    assert "Every migration implementation batch must name its reference material" in doc
+    assert "### Compatibility Annotation Template" in doc
     assert "scripts/validate_godot_migration_contract.py" in doc
     assert "validate_godot_migration_contract.py" in fidelity_script
     assert "REQUIRED_GLOBAL_PHRASES" in contract_script
+    assert "`versao-python/` and `versao-godot/godot/` are the canonical editions" in contract_script
     assert "PENDING_SECTION_HEADERS" in contract_script
 
     section_headers = (
@@ -1817,7 +1971,13 @@ def test_migration_strategy_declares_pygame_fidelity_contract():
         "### 6. Networked Gameplay Adapter",
         "### 7. Export And Runtime Validation",
     )
-    labels = (
+    compatibility_labels = (
+        "`Reference material:`",
+        "`User-visible contract:`",
+        "`Allowed adaptation:`",
+        "`Required validation:`",
+    )
+    legacy_labels = (
         "`Fidelity target:`",
         "`User-visible invariants:`",
         "`Allowed Godot adaptation:`",
@@ -1828,7 +1988,8 @@ def test_migration_strategy_declares_pygame_fidelity_contract():
         match = re.search(rf"^{re.escape(header)}\n(?P<body>.*?)(?=^### |^## |\Z)", doc, re.MULTILINE | re.DOTALL)
         assert match is not None
         body = match.group("body")
-        assert "Fidelity annotations:" in body
+        labels = compatibility_labels if "Compatibility references:" in body else legacy_labels
+        assert "Compatibility references:" in body or "Fidelity annotations:" in body
         for label in labels:
             assert label in body
 

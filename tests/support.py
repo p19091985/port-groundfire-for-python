@@ -181,6 +181,9 @@ install_fake_pygame()
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PYTHON_VERSION_DIR = os.path.join(PROJECT_ROOT, "versao-python")
+if not os.path.isdir(os.path.join(PYTHON_VERSION_DIR, "src")):
+    PYTHON_VERSION_DIR = PROJECT_ROOT
 
 
 class FlatLandscape:

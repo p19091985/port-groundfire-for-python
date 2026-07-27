@@ -7,7 +7,7 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
-      - ./build/web_export:/srv/web_export
+      - ./build/godot-web:/srv/web_export:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

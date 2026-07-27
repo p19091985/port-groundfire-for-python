@@ -8,38 +8,58 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+try:
+    from scripts.repo_paths import PROJECT_ROOT, python_version_dir, relative_to_root
+except ModuleNotFoundError:
+    from repo_paths import PROJECT_ROOT, python_version_dir, relative_to_root
+
+
+PYTHON_VERSION_DIR = python_version_dir()
+
+
+def _rel(path: Path) -> str:
+    return relative_to_root(path)
+
+
 SOURCE_DIRS = tuple(
-    path for path in ("src", "tests", "scripts", "groundfire", "groundfire_net") if (PROJECT_ROOT / path).exists()
+    _rel(path)
+    for path in (
+        PYTHON_VERSION_DIR / "src",
+        PROJECT_ROOT / "tests",
+        PROJECT_ROOT / "scripts",
+        PYTHON_VERSION_DIR / "groundfire",
+        PROJECT_ROOT / "groundfire_net",
+    )
+    if path.exists()
 )
 LINT_TARGETS = tuple(
-    path
+    _rel(path)
     for path in (
-        "src/groundfire",
-        "groundfire",
-        "groundfire_net",
-        "src/main.py",
-        "src/pygamebackend.py",
-        "src/interface.py",
-        "src/sounds.py",
-        "src/font.py",
-        "scripts/run_quality_checks.py",
-        "scripts/verify_godot_hosted_deployment.py",
+        PYTHON_VERSION_DIR / "src" / "groundfire",
+        PYTHON_VERSION_DIR / "groundfire",
+        PROJECT_ROOT / "groundfire_net",
+        PYTHON_VERSION_DIR / "src" / "main.py",
+        PYTHON_VERSION_DIR / "src" / "pygamebackend.py",
+        PYTHON_VERSION_DIR / "src" / "interface.py",
+        PYTHON_VERSION_DIR / "src" / "sounds.py",
+        PYTHON_VERSION_DIR / "src" / "font.py",
+        PROJECT_ROOT / "scripts" / "run_quality_checks.py",
+        PROJECT_ROOT / "scripts" / "verify_godot_hosted_deployment.py",
     )
-    if (PROJECT_ROOT / path).exists()
+    if path.exists()
 )
 TYPECHECK_TARGETS = tuple(
-    path
+    _rel(path)
     for path in (
-        "src/groundfire",
-        "groundfire_net",
-        "src/main.py",
-        "src/pygamebackend.py",
-        "src/interface.py",
-        "src/sounds.py",
-        "src/font.py",
+        PYTHON_VERSION_DIR / "src" / "groundfire",
+        PROJECT_ROOT / "groundfire_net",
+        PYTHON_VERSION_DIR / "src" / "main.py",
+        PYTHON_VERSION_DIR / "src" / "pygamebackend.py",
+        PYTHON_VERSION_DIR / "src" / "interface.py",
+        PYTHON_VERSION_DIR / "src" / "sounds.py",
+        PYTHON_VERSION_DIR / "src" / "font.py",
     )
-    if (PROJECT_ROOT / path).exists()
+    if path.exists()
 )
 
 
@@ -106,9 +126,16 @@ def run_check(check: QualityCheck, *, cwd: Path = PROJECT_ROOT) -> QualityResult
     if not check.available:
         return QualityResult(check=check, returncode=0, stdout="", stderr="tool unavailable", skipped=True)
 
+    env = os.environ.copy()
+    pythonpath = os.pathsep.join((str(PYTHON_VERSION_DIR), str(PROJECT_ROOT)))
+    if env.get("PYTHONPATH"):
+        pythonpath = os.pathsep.join((pythonpath, env["PYTHONPATH"]))
+    env["PYTHONPATH"] = pythonpath
+
     completed = subprocess.run(
         check.command,
         cwd=cwd,
+        env=env,
         capture_output=True,
         text=True,
         check=False,

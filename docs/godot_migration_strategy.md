@@ -1,13 +1,15 @@
 # Groundfire Godot Migration Strategy
 
 This migration keeps the current Python/Pygame version alive while a Godot client is built in parallel.
+The repository now keeps both implementations side by side: the Godot client lives under `versao-godot/godot/`, the Python/Pygame version lives under `versao-python/`, and root-level files are shared tooling, docs, CI, network services, and release artifacts.
 
 This is the single Markdown source of truth for the Godot migration. Keep strategy, current status, validation, build/runtime notes, release walkthroughs, WebSocket protocol details, and server-directory schema updates here instead of creating new migration Markdown files under `docs/`. The image folders under `docs/references/` are fidelity assets used by tests and review, not separate narrative migration documents.
 
 ## Document Map
 
 - `Decision` and `Web Feature Rule`: platform direction and browser safety boundaries.
-- `Migration Fidelity Contract`: non-negotiable Pygame parity rule for agents implementing Godot work.
+- `Repository Coexistence Strategy`: monorepo layout, shared-root policy, path helpers, validation, and the completed Godot/Python split.
+- `Migration Compatibility Contract`: evolution-first rule for agents implementing Godot work.
 - `Agent Migration Loop`: mandatory repeatable workflow for agents continuing the migration.
 - `First Migration Slice`: chronological migration log for implemented Godot work.
 - `Current Status`: implemented/started behavior and remaining migration work by area.
@@ -21,41 +23,189 @@ This is the single Markdown source of truth for the Godot migration. Keep strate
 - Keep browser QA screenshot goldens under `docs/references/godot_browser_visual/`; these are regression captures of the current Godot web build, not proof of classic fidelity by themselves.
 - Keep authoritative Python/Pygame visual references under `docs/references/pygame_visual/`, generated from the GitHub-tracked Pygame client with `scripts/capture_pygame_references.py`.
 - Do not add new standalone migration Markdown files unless the migration strategy is intentionally split again. Release walkthroughs, agent handoffs, protocol notes, runtime notes, QA notes, and remaining-work notes all belong in this file.
+- Keep Godot/Python coexistence and repository-layout notes in `Repository Coexistence Strategy`; do not recreate a separate `docs/plano_coexistencia_godot_python.md` unless the strategy is intentionally split again.
 - If an agent creates temporary migration notes while working, fold the durable content back into this file and remove the temporary note before handoff.
 - When code changes add or remove migration behavior, update `First Migration Slice`, `Current Status`, and the relevant reference section in the same change.
 
-## Migration Fidelity Contract
+## Repository Coexistence Strategy
 
-This is a preservation migration. User experience cannot be changed by the migration. The Python/Pygame client is the behavioral, visual, input, audio, timing, and flow source of truth for every Godot implementation item unless this file explicitly calls out a browser/platform limitation from the `Web Feature Rule`.
+This section folds in the former `docs/plano_coexistencia_godot_python.md` plan. It records both the analysis and the applied repository reorganization that lets the Godot client and the Python/Pygame version coexist as first-class project surfaces.
+
+### Coexistence Decision
+
+- Godot does not replace the Python/Pygame version in this repository.
+- `versao-godot/godot/` is the Godot desktop/web client and migration surface.
+- `versao-python/` is the classic Python/Pygame client/server implementation and remains the historical behavior source of truth.
+- The repository root is the monorepo orchestration layer for shared services, automation, docs, CI, generated artifacts, release packaging, and compatibility launchers.
+- Production deploy is outside this layout reorganization. Deployment readiness is tracked as manual release/operations evidence, not as a local migration blocker.
+
+### Current Layout Contract
+
+```text
+.
+├── .github/
+├── docs/
+├── scripts/
+│   └── dev/
+├── tests/
+├── tools/
+│   └── godot/
+├── build/
+├── dist/
+├── media/
+├── groundfire_net/
+├── versao-godot/
+│   └── godot/
+│       ├── project.godot
+│       ├── export_presets.cfg
+│       ├── assets/
+│       ├── data/
+│       ├── scenes/
+│       ├── scripts/
+│       └── tests/
+├── versao-python/
+│   ├── src/
+│   ├── groundfire/
+│   ├── conf/
+│   ├── data/
+│   ├── run_game.sh
+│   ├── run_game.bat
+│   ├── run_game.ps1
+│   ├── iniciar-all.sh
+│   ├── iniciar-clientes.sh
+│   └── iniciar-server.sh
+├── run_game.sh
+├── run_game.bat
+├── run_game.ps1
+├── iniciar-all.sh
+├── iniciar-clientes.sh
+├── iniciar-server.sh
+├── README.md
+├── LICENSE
+├── pyproject.toml
+└── requirements.txt
+```
+
+Root launchers are compatibility wrappers. Their implementation lives under `versao-python/`, while root wrappers keep the historical user commands stable.
+
+### Shared Root Policy
+
+`groundfire_net/` stays at the repository root even though it is Python code because it is a shared network service layer, not just part of the classic Pygame client. It provides the WebSocket gateway, directory service, protocol contracts, and QA fixtures consumed by both the Python server runtime and the Godot browser/online client.
+
+`scripts/` also stays at the repository root because it coordinates both versions: Python quality checks, Godot validation, export, packaging, browser QA, release signing, reference capture, and hosted deployment verification. Manual one-off analysis or scratch utilities belong in `scripts/dev/` so the root remains reserved for shared files, launchers, and project configuration.
+
+`tests/`, `docs/`, `.github/`, `tools/`, `build/`, `dist/`, `media/`, `Dockerfile`, `docker-compose.yml`, `README.md`, `pyproject.toml`, and `requirements.txt` are shared monorepo surfaces unless a future change explicitly narrows them.
+
+### Path Policy
+
+Scripts and tests must not hardcode the old top-level `godot/`, `src/`, `conf/`, or `data/` paths. Use the repository path helpers and environment overrides:
+
+```bash
+ROOT_DIR=/path/to/repo
+GODOT_PROJECT_DIR=$ROOT_DIR/versao-godot/godot
+PYTHON_VERSION_DIR=$ROOT_DIR/versao-python
+PYTHON_SRC_DIR=$ROOT_DIR/versao-python/src
+PYTHON_CONF_DIR=$ROOT_DIR/versao-python/conf
+PYTHON_DATA_DIR=$ROOT_DIR/versao-python/data
+BUILD_DIR=$ROOT_DIR/build
+DIST_DIR=$ROOT_DIR/dist
+GROUNDFIRE_NET_DIR=$ROOT_DIR/groundfire_net
+```
+
+Python commands that import the classic code should include both the Python version directory and the shared root:
+
+```bash
+PYTHONPATH="$ROOT_DIR/versao-python:$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+```
+
+The `src`, `groundfire`, and `groundfire_net` package names are compatibility contracts. Do not rename them as part of repository-layout work.
+
+### Execution Status
+
+Applied in the local tree on 2026-07-17:
+
+- Godot project moved to `versao-godot/godot/`.
+- Python/Pygame project moved to `versao-python/`.
+- Root `run_game.*` and `iniciar-*.sh` launchers kept as wrappers for compatibility.
+- Shared scripts and tests updated to use path helpers in `scripts/repo_paths.*`.
+- Shared package discovery updated so `groundfire`, `groundfire_net`, and `src` remain importable from the new layout.
+- Manual root-level analysis/scratch scripts moved under `scripts/dev/`.
+- README, Docker, CI/release scripts, Godot export/package/QA scripts, and migration docs updated for the split.
+- No production deployment was performed as part of the coexistence restructure.
+
+The original execution plan was:
+
+1. Prepare the tree and validate the pre-move state.
+2. Make paths configurable without moving files.
+3. Move the Godot project to `versao-godot/godot/`.
+4. Move the Python/Pygame project to `versao-python/` while preserving package names and root wrappers.
+5. Update CI, release, Docker, docs, tests, and packaging for the new layout.
+6. Keep or remove legacy-path fallbacks only after an explicit release-policy decision.
+
+### Validation Matrix
+
+Before treating future coexistence/layout work as complete, run the relevant gates from this baseline:
+
+```bash
+.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py
+CI=1 .tmp/codex-py314-venv/bin/python scripts/run_quality_checks.py
+.tmp/codex-py314-venv/bin/python -m pytest -q tests
+GROUNDFIRE_LAUNCHER_PYTHON=.tmp/codex-py314-venv/bin/python bash tests/shell/test_lan_launchers.sh
+PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_release.sh
+PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/qa_godot_web.sh --check
+git diff --check
+```
+
+If `bats` is installed, also run:
+
+```bash
+GROUNDFIRE_LAUNCHER_PYTHON=.tmp/codex-py314-venv/bin/python bats tests/shell/test_lan_launchers.bats
+```
+
+### Guardrails
+
+- Do not remove the Python/Pygame version.
+- Do not change gameplay, protocol, goldens, or production deployment behavior as a side effect of repository layout work.
+- Do not move `groundfire_net/` into `versao-python/` unless the shared Godot/Python gateway responsibility is replaced by another shared-service location.
+- Do not remove root launcher wrappers without an explicit compatibility decision.
+- Do not refresh visual goldens merely because paths changed.
+- Keep generated build and release outputs at the shared root unless a release-policy change says otherwise.
+
+## Migration Compatibility Contract
+
+This is now an evolution-first migration. `versao-python/` and `versao-godot/godot/` are the canonical editions of this repository, and historical fidelity is comparison material rather than a hard product rule. User experience can improve when quality, maintainability, desktop/web delivery, accessibility, observability, or gameplay clarity justify the change.
+
+The Python/Pygame client remains the most useful behavioral reference for classic systems, but it is not the sole source of truth. Godot may adapt or improve behavior for browser/platform constraints and modern UX, provided the change is intentional, documented, tested, and does not surprise players or admins.
 
 When an agent consults this file to implement Godot work, every task inherits this contract:
 
-- Match the player-facing Pygame behavior first; architecture, engine APIs, and internal data shapes may change only behind the same user experience.
-- Start from the Pygame source, original assets, and captured references before writing Godot code.
-- Treat `docs/references/pygame_visual/` and the Python/Pygame code under `src/` as the fidelity target. Godot browser goldens are regression captures, not fidelity targets.
-- Preserve menu flow, copy, layout proportions, controls, timing, physics feel, audio cues, scoring/economy semantics, multiplayer-visible states, and error/recovery behavior for supported platforms.
-- If web or Godot runtime constraints require a platform adaptation, document it under `Allowed Godot adaptation:` before implementing and keep the player-facing outcome as close as possible to Pygame.
-- Every migration implementation batch must name its Pygame reference, user-visible invariants, allowed Godot adaptation, and required validation before code is treated as complete.
-- Run `scripts/validate_godot_migration_contract.py` and the relevant fidelity/visual checks before marking migration work done.
+- Keep both canonical folders: `versao-python/` and `versao-godot/godot/`.
+- Start from the existing Python/Godot behavior, original assets, and captured references before changing player-facing behavior.
+- Treat `docs/references/pygame_visual/` and the Python/Pygame code under `versao-python/src/` as compatibility references. Godot browser goldens are regression captures, not proof of classic fidelity by themselves.
+- Prefer modern, testable architecture over exact historical coupling when those goals conflict.
+- Use `.ini` and `.json` for configuration, manifests, and public contracts; use SQLite for mutable runtime state where practical.
+- Document intentional platform or UX adaptations under `Allowed Godot adaptation:` or `Allowed adaptation:` and back them with validation.
+- Every migration implementation batch must name its reference material, user-visible contract, allowed adaptation, and required validation before code is treated as complete.
+- Run `scripts/validate_godot_migration_contract.py` and the relevant compatibility/visual checks before marking migration work done.
 
-### Fidelity Annotation Template
+### Compatibility Annotation Template
 
 Use these labels in every pending migration area and in new migration notes:
 
-- `Fidelity target:` Pygame code, original asset, captured reference, protocol, or behavior being copied.
-- `User-visible invariants:` What the player/admin must experience the same way after migration.
-- `Allowed Godot adaptation:` Browser/platform/engine constraint that may change internals while preserving the user-facing outcome.
+- `Reference material:` Pygame/Godot code, original asset, captured reference, protocol, or behavior being considered.
+- `User-visible contract:` What the player/admin must still understand, rely on, or experience consistently after migration.
+- `Allowed adaptation:` Browser/platform/engine/product constraint or improvement that may change behavior intentionally.
 - `Required validation:` Automated test, screenshot comparison, manual reference pass, or command that proves the invariant.
 
 ## Agent Migration Loop
 
 Any agent continuing the Godot migration must work in this loop until the user stops the work, the current task is genuinely blocked, or every named remaining migration item has been closed with validation:
 
-1. Re-read this file, especially `Migration Fidelity Contract`, `What Still Needs To Be Done`, `Recommended Next Large Batch`, and `Next Agent Handoff`.
+1. Re-read this file, especially `Migration Compatibility Contract`, `What Still Needs To Be Done`, `Recommended Next Large Batch`, and `Next Agent Handoff`.
 2. Inspect `git status --short` before editing and preserve unrelated user/agent changes.
-3. Pick one narrow fidelity target from this document. Name the Pygame reference, user-visible invariants, allowed Godot adaptation, and required validation before treating the patch as complete.
+3. Pick one narrow compatibility target from this document. Name the reference material, user-visible contract, allowed adaptation, and required validation before treating the patch as complete.
 4. Inspect the Python/Pygame source, original assets, and `docs/references/pygame_visual/` before changing Godot behavior.
-5. Implement only that narrow migration step in the Godot/Python bridge needed for parity.
+5. Implement only that narrow migration step in the Godot/Python bridge needed for compatibility or an intentional improvement.
 6. Add or extend the closest regression test. Prefer executable fidelity coverage over prose; use manual visual review only when automation cannot yet observe the behavior.
 7. Run the required validation for the touched surface: always include `scripts/validate_godot_migration_contract.py`; use `scripts/validate_godot_fidelity.sh` for gameplay/client parity; use `CI=1 .venv/bin/python scripts/run_quality_checks.py` when shared Python, gateway, launcher, release, or CI code changes; use browser visual QA when pixels, browser runtime, or web export behavior change.
 8. If validation fails, fix the implementation or document a precise blocker in this file before stopping. Do not hand off a vague "needs testing" state.
@@ -92,16 +242,16 @@ Allowed on web:
 
 ## First Migration Slice
 
-The `godot/` project is a standalone Godot client scaffold. It starts with:
+The `versao-godot/godot/` project is a standalone Godot client scaffold. It starts with:
 
 - `PlatformCapabilities` autoload.
 - Main menu.
 - Server browser placeholder.
 - Platform-aware feature visibility.
-- Groundfire menu, weapon icon, quake, fire-shell, shell-death, missile-launch, missile-flight, missile-death, Machine Gun, metal-hit, and Nuke audio assets ported into `godot/assets/`.
+- Groundfire menu, weapon icon, quake, fire-shell, shell-death, missile-launch, missile-flight, missile-death, Machine Gun, metal-hit, and Nuke audio assets ported into `versao-godot/godot/assets/`.
 - Shared `GroundfireTheme` script for colors, panels, buttons, and field styling.
 - `ServerDirectory` read-only browser model with browser-safe online entries and desktop-only LAN entries.
-- `godot/data/server_directory.json` as the temporary data source until HTTP/WebSocket is connected.
+- `versao-godot/godot/data/server_directory.json` as the temporary data source until HTTP/WebSocket is connected.
 - Godot runtime validation script for server directory filtering.
 - Server browser row selection and staged connect target status.
 - Server browser filters, favorites/history, password dialog, and functional refresh/connect actions.
@@ -118,12 +268,13 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Options now has a classic preset block before the modern scrollable settings: Pygame-style `Resolution:` and `Screen Mode:` brown selector rows, a `Set Controls` jump into bindings, and classic-width `Apply`/`Back` actions while preserving the richer Godot settings below.
 - Classic Main Menu and Options text now has a shared Pygame-style shadow/outline pass on title/copy labels, classic preset labels, and classic buttons, with classic button hover/pressed text switching to yellow like `TextButton`/`Selector` highlights.
 - Options `Resolution:` and `Screen Mode:` now use a custom `ClassicSelector` control with Pygame-style left/right triangle arrows, centered selected text, yellow hover/focus arrows, wraparound keyboard input, and browser-safe disabled resolution state instead of Godot dropdown chrome.
-- Main Menu and Options classic-facing text now uses the original `data/fonts.png` atlas ported to `godot/assets/fonts.png`, with a GDScript renderer preserving the Python `Font` proportional width table, proportional atlas row, shadow offset, classic button hover color, and selector text rendering instead of relying on Godot's fallback vector font.
+- Main Menu and Options classic-facing text now uses the original `versao-python/data/fonts.png` atlas ported to `versao-godot/godot/assets/fonts.png`, with a GDScript renderer preserving the Python `Font` proportional width table, proportional atlas row, shadow offset, classic button hover color, and selector text rendering instead of relying on Godot's fallback vector font.
 - Local Match setup now has first-pass roster fields for up to eight slots: active toggles, editable names, Human/Computer assignment, unique human controller selection, sanitized empty-name fallbacks, and configured names carried into the HUD, score table, and final result overlay.
-- Local Match setup active toggles now use the classic `PlayerMenu` add/remove icon assets: `data/addbutton.png` and `data/removebutton.png` are ported to `godot/assets/` and shown through a `TextureButton` toggle that preserves the existing roster enable/disable behavior.
+- Local Match setup active toggles now use the classic `PlayerMenu` add/remove icon assets: `versao-python/data/addbutton.png` and `versao-python/data/removebutton.png` are ported to `versao-godot/godot/assets/` and shown through a `TextureButton` toggle that preserves the existing roster enable/disable behavior.
 - Local Match setup focus now recalculates when roster rows change, skipping inactive names/slots and computer-only controller fields while keeping active toggles reachable.
 - Local Match now materializes the configured roster as participant state so combat, score/final-result tables, and the shop all operate on the same configured participants instead of only the first duel pair.
 - Local Match HUD now receives active-target and roster summary fields, so multi-combatant matches show the current target and alive/leader context instead of only hardcoded duel labels.
+- Godot default keyboard bindings were audited against Python `versao-python/src/groundfire/input/controls.py::_default_commands()` Keyboard1 layout, default gamepad bindings were audited against the same Python `JoyLayout1` default plus `versao-python/conf/controls.ini`, and visible action/control-value labels, undefined binding copy, reset button copy, capture prompt copy, and linked joystick-axis capture were audited against `versao-python/src/setcontrolsmenu.py::SetControlsMenu.CONTROL_STRINGS`, `AXIS_NAMES`, `LINKED_CONTROLS`, `SetControlsMenu.__init__()`, `SetControlsMenu.update()`, and `SetControlsMenu.draw()`. `ControlSettings.DEFAULT_BINDINGS` and the Local Match fallback now use the classic Pygame keys: Space fire, O/U weapon cycle, I jump jets, K shield, J/L tank movement, A/D gun aim, and W/S gun power. Godot's default gamepad mapping now mirrors the classic layout: buttons `0/2/1/3/4/6/7` for fire, weapon up/down, jump jets, shield, and tank left/right, with left stick axis 0/1 reserved for gun aim and power. The controls screen now exposes only the 11 classic editable actions, keeping Godot's `gf_pause` binding as an internal runtime adaptation instead of a visible Set Controls row. It labels actions with the classic copy such as "Fire Weapon", "Change Weapon Up", "Use Jump Jets", "Move Tank Left", and "Increase Gun Power" instead of Godot action-id wording, formats joystick values as one-based "Joy Button N" plus classic "Joystick/Pad Left/Right/Up/Down" axis names, shows empty keyboard/gamepad bindings as `<Undefined>`, uses the classic `Reset To Defaults` reset label, and shows the classic rebinding prompt `Press Button for '<action>'` only during active keyboard/gamepad capture while retaining the existing cancel behavior. Joystick-axis capture now also mirrors Pygame's linked opposite-control behavior for weapon cycle, tank movement, gun aim, and gun power pairs; replacing an axis with a joystick button clears the linked opposite gamepad binding instead of silently restoring a default axis.
 - Project input actions for aim, power, and fire, with runtime key defaults.
 - HTTP server directory configuration via `application/config/server_directory_url` with local JSON fallback.
 - Local match round state, player/enemy HP, simple AI shot, explosion, damage, and round reset.
@@ -161,6 +312,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Local Match final-result overlay now uses the classic winner-only card layout over the scrolling tiled `menuback.png` menu background, matching `Menu.update_background()` at speed `0.1`, showing each top-score winner with name, a tank-shaped color chip, and white rotating `Winner!` letters paced like the classic `WinnerMenu`; winner rows are centered and grouped in classic batches of up to four, with no added modal panel, ranking table, summary line, or visible exit button.
 - Local Match now advances from the final-round score overlay into a first winner/final-result overlay instead of opening another shop, with winner-only cards, winner/tie copy, no final-round leader-flag recalculation before the winner screen, and a direct main-menu exit.
 - Local Match score and final-result overlays now honor the classic activation delay: human matches wait 2 seconds before accepting Continue/Main Menu input, computer-only flows use the 4-second automatic advance path, computer-only final-result exits happen on the update after the 4-second delay reaches zero like `WinnerMenu.update()`, and human score screens preserve the Pygame 10-second post-activation safety auto-advance into shop/final flow.
+- Local Match score/final-result modal input now mirrors the classic menu-specific shortcuts: the score overlay advances only through FIRE/SPACE/ENTER after activation, while the final winner overlay exits only through the player's FIRE command after activation; Godot's generic cancel/Enter shortcuts no longer skip those screens.
 - Local Match shop now honors the classic shop input cadence with a short first-action delay and repeat delay after buy/Done attempts, keeping input locked until the delay becomes strictly negative like Pygame `ShopMenu.update()`, preventing held confirm/navigation input from immediately double-purchasing or skipping the shop.
 - Local Match shop now preserves the classic `ShopMenu.update()` end timing: a final `Done!`/computer pass marks the shop as finished, leaves the scene in `shop` for that update, and only starts the next round on the following modal update.
 - Local Match shop purchases now use classic-style bundle sizes separate from round-start ammo: Machine Gun +50, MIRV +1, Missile +5, and Nuke +1, with the shop UI showing the pack size per item.
@@ -169,6 +321,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Local Match shop rows now restore a separate classic-style `$cost` column for both purchasable weapons/items and disabled legacy catalog rows instead of burying cost only in the buy action text.
 - Local Match shop display names now match the classic catalog copy for plural weapon rows (`Mirvs`, `Missiles`, `Nukes`) while preserving internal weapon identifiers for inventory and buy actions.
 - Local Match shop purchase buttons now use a plain `Buy` action label while the price lives in the separate `$cost` column, reducing duplicated cost copy and matching the classic catalog layout more closely.
+- Local Match shop active row labels now show only the classic catalog item names, matching `ShopMenu.draw()` instead of exposing Godot-only `Stock`, `Pack`, `Damage`, `Blast`, effect, or current-value details in the row text; the selected Mirvs/Missiles/Nukes rows now show the classic separate `xN` stock indicator, while Machine Gun and Jump Jet selected-row bars remain a later visual parity item.
 - Local Match shop now presents shopper money in the classic `$N` format and uses `$` in insufficient-funds messages, while leaving the internal credits/economy model unchanged.
 - Local Match shop now has a closer Jump Jet purchase path: buying Jump Jet spends 50 credits, increases the player's persistent fuel reserve by one classic fuel unit, starts later rounds with active fuel clamped to 100%, and spends reserve alongside active fuel.
 - Local Match HUD/shop economy presentation now surfaces fuel reserve explicitly, with the HUD score/economy chip row and shop credit line both showing the persistent reserve percent.
@@ -199,7 +352,8 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Local Match now uses the configured classic first/between quake timing from `conf/options.ini` (`60s` until the first quake, `20s` between quakes) and plays the classic quake rumble as a looped Godot `AudioStreamPlayer`, pausing with the match and stopping cleanly when the quake ends or the round flow changes.
 - Local Match quake camera movement now uses Python `Quake.update()`'s horizontal sine viewport offset (`ShakeAmplitude = 0.05`, `ShakeFrequency = 50.0`) converted through the classic world pixel scale, and resets the offset when the quake settles or the match enters a modal phase.
 - Local Match tank damage now follows the classic exact-zero-health rule and round-over detection uses tank state instead of raw `health <= 0`.
-- Local Match dead tanks now arm the classic `Tank.burn()` exhaust timer on death and emit smoke particles using the Python ground/air release, offset, velocity, rotation, growth, and fade constants, rendered through the classic `data/smoke.png` texture ported to `godot/assets/smoke.png`.
+- Local Match Shield input now mirrors the Python runtime: the binding remains visible/configurable as `Use Shield`, but holding it does not spend fuel, activate a shield bubble, or reduce explosion damage because Python `Tank.update()` never queries command index 4 and `GameSessionController.explosion()` calls `do_damage()` directly.
+- Local Match dead tanks now arm the classic `Tank.burn()` exhaust timer on death and emit smoke particles using the Python ground/air release, offset, velocity, rotation, growth, and fade constants, rendered through the classic `versao-python/data/smoke.png` texture ported to `versao-godot/godot/assets/smoke.png`.
 - Local Match smoke particle lifetime is now covered against Python `Smoke.update()`: rotation, growth, velocity, and fade advance per frame, smoke remains alive on the exact `fade == 0.0` frame, and only negative fade removes it.
 - Options now includes video/audio/gameplay settings beyond FPS/audio: fullscreen, VSync, master volume, screen shake, camera smoothing, and mouse aiming.
 - Options now groups the scrollable settings into first-pass classic-style panels for Video, Audio, Gameplay, Online, and Controls, improving scanability while preserving existing keyboard/controller focus traversal.
@@ -227,7 +381,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Machine Gun direct-hit resolution now uses the owner-inclusive classic tank-body hit selection and has a full-roster regression covering third-participant hits, score, credits, and display names.
 - Machine Gun tracer launch velocity now uses a fixed classic weapon power (`MachineGunWeapon.OPTION_Speed = 25`) instead of the tank's current gun power, with paired Python/Godot regressions covering power-independent velocity.
 - Machine Gun tracer stepping now uses the same Godot projectile gravity scale as shells, matching the Python `MachineGunRound.update()`/`Shell.update()` parabolic `5.0 * t^2` source formula instead of zero-gravity straight traces.
-- Local Match now has first-pass classic projectile trails for Shell/MIRV/Missile/Nuke-style shots using the original `data/trail.png` ported to `godot/assets/trail.png`, Python `Trail.lay_trail()` spacing/angle/fade constants, and Missile trail cutoff after the fuel-exhaustion frame.
+- Local Match now has first-pass classic projectile trails for Shell/MIRV/Missile/Nuke-style shots using the original `versao-python/data/trail.png` ported to `versao-godot/godot/assets/trail.png`, Python `Trail.lay_trail()` spacing/angle/fade constants, and Missile trail cutoff after the fuel-exhaustion frame.
 - Shell/MIRV/Nuke-style ballistic projectiles now draw the classic small white triangle from Python `Shell.draw()` / `Mirv.draw()` instead of the earlier Godot warning-colored circle.
 - Missile projectiles now draw the classic rotated five-point white rocket polygon from Python `Missile.draw()` instead of the earlier Godot warning-colored circle.
 - Machine Gun tracer line tails now use the classic `0.01s` back-time window from Python `MachineGunRound.update()` instead of stretching to the previous rendered frame.
@@ -247,6 +401,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - MIRV configured cooldown, catalog cost, fragment count, and spread are now covered against `conf/options.ini` / `MirvWeapon.read_settings()` / `Mirv.read_settings()` and mirrored by Godot `WeaponInventory` metadata.
 - Shell, MIRV, Missile, Nuke, and Machine Gun selection cooldowns now live in `WeaponInventory`, with the classic two-second `ROUND_STARTING` countdown accounted for on round reset; human Local Match firing blocks non-Machine-Gun shots until the selected weapon cooldown reaches zero, Local Match now preserves the classic `0.2s` weapon-switch delay between cycle inputs, and final limited-weapon shots launch the selected weapon before falling back to Shell.
 - Local Match now has an explicit classic `round_starting` phase: the first two seconds of a new round block human firing/input and defer computer firing while still advancing selected-weapon cooldowns, terrain, and tank settling like Python `GameState.ROUND_STARTING`.
+- Local Match gun-arrow readiness now mirrors Python `Tank._build_gun_primitives()` / `Weapon.ready_to_fire()`: the translucent per-tank arrow is red while the selected weapon cooldown is positive and green only after the selected weapon is ready, instead of using ammo presence alone.
 - Local Match round resets now mirror the Python `GameSession.start_round()` placement sequence: after the `Tank.do_pre_round()` state reset, Godot finishes with `set_position_on_ground()`, so tanks enter the countdown already grounded with airborne velocity and boost-detach state cleared.
 - Missile now has a first-pass classic steering model with launch angle, fuel, steer acceleration, player aim-input steering, simple enemy steering, and ballistic fall after fuel is spent instead of direct homing.
 - Missile configured fuel, steer sensitivity, and powered speed are now covered against `conf/options.ini` / `Missile.read_settings()` and mirrored by the Godot `WeaponInventory` metadata consumed by fuel-limited steering.
@@ -259,6 +414,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Nuke configured damage, cooldown, and shop cost are now covered against `conf/options.ini` / `NukeWeapon.read_settings()` and mirrored by Godot `WeaponInventory` metadata; raw blast-size parity remains separate because the Godot blast radius is pixel-adapted.
 - Nuke explosions now play the classic `nuke.wav` through a dedicated one-shot Godot `AudioStreamPlayer`, with pause/resume and reset stop handling.
 - Rolling Mines, Airstrike, Death's Head, Hover Coil, and Corbomite now have first-pass Local Match behavior coverage behind tests, but they start with zero ammo and the player-facing shop keeps them as disabled gray catalog rows to match Pygame. Their internal `add_ammo`/effect paths remain protected for future experimentation and regression safety, while public shop exposure is intentionally out of the current Pygame-faithful release slice; Python `ShopMenu` regression coverage now proves positions 5-9 do not purchase, and Godot rejects those catalog names through `_buy_shop_weapon`.
+- Local Match shop legacy-row copy was audited against `versao-python/src/shopmenu.py::ShopMenu.draw()`: Godot no longer adds the non-Pygame "Not migrated yet" text or a disabled "Locked" button to Rolling Mines, Airstrike, Death's Head, Hover Coil, and Corbomite rows. The rows now expose only the classic disabled name and `$cost` cells, with Python and Godot regressions guarding the copy.
 - Tank gun angle/power controls now use named classic default acceleration/max-speed constants, stop changing immediately when aim/power input is released, and preserve the classic conflicting-input quirk where aim left+right cancels but Gun Up wins over Gun Down.
 - Jump jets now apply classic-style slope-aware thrust using the tank angle, with a separate horizontal component on inclined terrain and the Python default fuel usage rate.
 - Boosting tanks now rotate in air with the classic left/right 90 degrees-per-second turn behavior, preserve the pre-step +/-15 degree turn-limit gate that can overshoot on a large frame, and recover toward level when no turn input is held.
@@ -319,7 +475,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Dedicated Server gateway action focus now skips disabled Stop Gateway and rewires when the launched process state changes.
 - Main Menu logo, panel, button, margin, and stack spacing now use named 1024x768 reference metrics with bounded viewport scaling, giving 16:9, 4:3, ultrawide, and smaller browser windows a more intentional classic-menu baseline.
 - GroundfireTheme now names the shared button font size plus normal, hover, disabled, and border colors, so button parity can be tuned centrally instead of hunting literal state colors.
-- Local Match setup now gives clearer roster readiness copy with active, human, and computer counts, and explains when Start Match is blocked because fewer than two players are enabled or because no human player is active.
+- Local Match setup now gives clearer roster readiness copy with active, human, and computer counts, blocks Start Match only when fewer than two players are enabled, and allows computer-only AI-vs-AI local matches for unattended setup/testing.
 - Server Browser table scroll dimensions and horizontal/vertical scrollbar modes now use named constants, keeping future reference tuning for table width, height, and scrollbar behavior in one place.
 - Online Match now exposes manual reconnect/back controls in addition to automatic reconnect/backoff diagnostics.
 - Online Match reconnect/back controls now have explicit keyboard/controller focus wrapping, including vertical self-loops so focus stays in the header action row.
@@ -359,7 +515,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - `groundfire-web-gateway` now has an optional first-pass player-name ban list through `--ban-player` or `GROUNDFIRE_WEB_GATEWAY_BANNED_PLAYERS`, advertises `ban_enforced`, and emits `banned` for rejected Godot joins.
 - Gateway compatibility tests now exercise a real local TCP/WebSocket handshake, masked client frames, and a fake UDP backend through the actual gateway handler, covering `hello`, invalid password rejection, successful join, input forwarding, `acknowledged_snapshot_sequence`, ping, disconnect, and UDP `DisconnectNotice` cleanup.
 - Exported web browser QA now starts real local `groundfire-web-gateway` instances backed by local `src.groundfire.server` UDP runtimes for `invalid_password`, `authentication_failed`, signed session-token join, `server_full`, `server_closed`, and `banned`, reserves a `--max-players 1` slot for the full-server case, passes their WebSocket/session-token endpoints into `?qa=browser_runtime`, and verifies that Online Match surfaces failures as fatal, non-retrying join failures while proving the signed-token path reaches `joined` across seed and verify browser sessions.
-- A mandatory `Migration Fidelity Contract`, per-area fidelity annotation structure, and `scripts/validate_godot_migration_contract.py` now make explicit that Godot migration work must preserve the Python/Pygame user experience.
+- A mandatory `Migration Compatibility Contract`, per-area reference annotation structure, and `scripts/validate_godot_migration_contract.py` now make explicit that Godot migration work must preserve predictable user experience while allowing intentional improvement.
 - `groundfire-directory` now provides a first real read-only HTTP server-directory service for schema `1`, including CORS, quoted `ETag`, conditional `If-None-Match` / `304 Not Modified` responses, `Cache-Control`, `X-Groundfire-Directory-Refresh`, ServerBook-to-Godot conversion, LAN filtering for public web directories, default public rejection of embedded static `auth_token` entries, HTTP(S) validation for `session_token_url`, and optional injected WebSocket gateway entries for local hosted testing.
 - Server Browser now surfaces HTTP directory cache/ETag/refresh diagnostics and has a first classic table-header chrome pass instead of bare labels.
 - `groundfire-directory` now exposes `/healthz` and `/diagnostics.json` with served/filtered/invalid server counts, making production-style directory QA easier before public hosting exists.
@@ -367,7 +523,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Local Match projectile out-of-world explosions now clamp the terrain-height lookup to the playable map edge, avoiding edge shots sampling terrain beyond the world bounds.
 - Runtime smoke validation now exercises Main Menu classic metrics across 640x480, 1024x768, 1280x720, 1600x900, and 1920x720 viewports so scaling regressions are caught before browser visual QA.
 - `scripts/validate_godot_release.sh` now defines an explicit local release gate around migration contract validation, Godot fidelity validation, optional visual/browser QA, optional packaging, and checksum verification.
-- The classic `Shield` command is now present in Godot input settings and the browser-safe WebSocket input contract as `gf_shield` / `shield`, and Local Match now has first-pass shield gameplay that drains tank fuel, draws a visible tank shield, and reduces incoming explosion damage before defeat recording and later end-round rewards.
+- The classic `Shield` command is present in Godot input settings and the browser-safe WebSocket input contract as `gf_shield` / `shield`, but Local Match now mirrors the Python runtime by treating it as a bindable no-op: `Tank.update()` never consumes command index 4, and `GameSessionController.explosion()` applies damage directly through `do_damage()` without a shield multiplier.
 - WebSocket snapshots now carry `player_number`, `max_players`, and `players_connected`, so online-visible state includes the same capacity/session metadata advertised by `hello`.
 - Web query routing now supports `?screen=local_match_setup` / `?screen=local_setup` for direct browser capture of the Local Match setup route.
 - Server Browser table sizing now responds to viewport width/height with proportional column widths and bounded scroll height, and runtime smoke validation covers 640x480, 1024x768, and 1600x900 browser layout constraints.
@@ -412,6 +568,7 @@ The `godot/` project is a standalone Godot client scaffold. It starts with:
 - Release CI/signing policy is now implemented: `scripts/sign_godot_release.sh` produces detached GPG signatures for the SHA256SUMS file; `scripts/validate_godot_release.sh` gains a `--sign` flag that invokes it after packaging; `.github/workflows/release.yml` publishes Linux/Web artifacts and an optional signature to GitHub Releases when a `v*` tag is pushed; `scripts/validate_godot_migration_contract.py` now asserts that all release/CI scripts and workflow files exist.
 - Production-deployment scaffolding now exists: `Dockerfile` packages the Python gateway/directory runtime, `docker-compose.yml` runs local directory and WebSocket gateway services with a shared `SESSION_SECRET`, and `scripts/setup_github_release_secrets.sh` generates a release GPG key and prints the `RELEASE_GPG_PRIVATE_KEY` / `RELEASE_SIGN_KEY` values that must be copied into GitHub Actions.
 - Hosted deployment verification now has an executable smoke gate: `scripts/verify_godot_hosted_deployment.py` checks the public Godot web export, `.wasm`/`.pck` artifact headers, schema `1` server directory headers, quoted ETag conditional `304`, static `auth_token` rejection, and no-store `session_token_url` issuance before a hosted deployment can be treated as release-ready.
+- Main Menu quit path now implements the classic `QuitMenu` confirmation flow in Godot: clicking "Quit" on the main menu no longer exits immediately but displays an "Are you sure?" confirmation screen with "Yes" and "No" buttons using the classic font atlas and styling, matching the Python `QuitMenu` transitions, with automatic test coverage in `runtime_smoke_check.gd` verifying transition and cancellation.
 
 ## Current Status
 
@@ -421,7 +578,7 @@ The Python/Pygame client remains the source of truth for any future audit. Remai
 
 Implemented or started:
 
-- Main menu with Groundfire logo/background and basic navigation.
+- Main menu with Groundfire logo/background, basic navigation, and a Python-faithful Quit confirmation menu asking "Are you sure?" with Yes/No choices.
 - Main menu now has a first Local Match setup screen between Start and gameplay, carrying the selected round count plus an eight-slot roster snapshot into the match scene; the battle runtime now instantiates the full roster, rotates turns across surviving participants, and keeps score/shop rows plus final winner selection tied to that same participant state.
 - The Local Match setup screen now carries editable player/enemy names into the actual match state, so HUD bars, score rows, defeated-player detail, and final-result winner cards no longer depend only on hardcoded `Player`/`Enemy` labels.
 - Local Match setup keyboard/controller focus now updates with active slot/type changes so disabled roster controls are skipped without trapping inactive rows, and the active-slot control now uses the classic add/remove icon texture path instead of a text checkbox.
@@ -457,7 +614,7 @@ Implemented or started:
 - The score overlay now has first-pass classic table semantics: it orders player/enemy by score, shows rank/tie labels, displays who was defeated in the round, marks defeated leaders in the round detail, and tracks enemy score for local ranking.
 - End-of-round score/economy now applies the classic `Player.end_round` shape in Godot: defeated normal players give +100 score/+50 credits, defeated leaders give +200 score/+50 credits, self-defeats penalize -50 score, surviving tanks get +100 score/+25 credits, and every participant receives the +10 credit round stipend.
 - The final configured round now routes from score into a first winner overlay with winner/tie messaging, winner-only cards, classic human/computer activation delays, the classic computer-only one-update exit handoff, no final-round score-screen leader reassignment, the classic human score-screen safety timeout, and a main-menu exit instead of another shop pass.
-- Shop purchases now distinguish classic purchase bundle sizes from the current ammo stock, so MIRV/Missile/Nuke buying no longer inherits the round-start ammo value; rows expose the pack amount in the shop overlay.
+- Shop purchases now distinguish classic purchase bundle sizes from the current ammo stock, so MIRV/Missile/Nuke buying no longer inherits the round-start ammo value; the shop rows keep pack/stock/current metadata while their visible labels stay on the classic item names.
 - Shop actions now include the classic input-delay cadence and end timing: the first buy/Done action is locked briefly when the shop opens, delay `0.0` is still locked and only a negative delay accepts input, each buy/Done attempt applies a short repeat delay, and the final `Done!`/computer pass starts the next round on the following modal update instead of the same handler.
 - Shop buy actions now use the classic-style table split: prices stay in the `$cost` column and the action control reads `Buy`.
 - The shop money line and blocked-purchase messages now use the classic `$N` money copy instead of exposing the prototype `Credits N` wording.
@@ -498,7 +655,7 @@ Implemented or started:
 - Options now exposes the classic-facing top preset shape from `src/optionmenu.py`: `Resolution:` and `Screen Mode:` selector rows in the brown band style, `Set Controls`, `Apply`, and `Back` actions, with the richer Video/Audio/Gameplay/Online/Controls settings retained below for Godot-specific configuration.
 - Main Menu and Options now share a classic text rendering path: title/copy labels, top preset labels, classic buttons, and classic selectors draw through the original Pygame `fonts.png` atlas with the Python proportional width table, black shadow offset, and yellow hover/pressed selector/button highlight, while the native Godot text rendering is hidden behind the same accessible `Label`/`Button` controls.
 - Local Match applies persisted camera shake, camera smoothing, and mouse aiming settings.
-- Optional mouse aiming now draws the classic cursor texture path: `conf/assets.json` texture id `8` / `data/arrow.png` is ported to `godot/assets/arrow.png` and rendered as a top-left anchored textured quad at the mouse world position instead of the temporary cyan crosshair; Local Match also hides the system pointer while that cursor is active and restores the previous mode on pause, menu return, and shutdown.
+- Optional mouse aiming now draws the classic cursor texture path: `versao-python/conf/assets.json` texture id `8` / `versao-python/data/arrow.png` is ported to `versao-godot/godot/assets/arrow.png` and rendered as a top-left anchored textured quad at the mouse world position instead of the temporary cyan crosshair; Local Match also hides the system pointer while that cursor is active and restores the previous mode on pause, menu return, and shutdown.
 - Server Browser filters now include passwordless-only, open-slot-only, and latency/name/player-count sorting.
 - Server Browser filter text, passwordless/open-slot toggles, and sort mode now persist through the browser-safe `BrowserStore`.
 - Server Browser Favorites/History now supports removing favorites, clearing history, undoing those destructive actions, disabling history cleanup when empty, tab-specific empty messages, and showing saved favorite endpoints from known History details or fallback rows when the current directory omits them.
@@ -538,7 +695,7 @@ Implemented or started:
 - MIRV catalog damage now uses the classic configured `MirvWeapon.OPTION_Damage = 30.0` value through a named inventory constant, with Python/Godot regressions covering the value.
 - MIRV launcher cooldown/cost and entity fragment/spread settings are now explicitly anchored to the configured Python `[Mirv]`/`[Price]` values (`CooldownTime = 7.5`, `Mirvs = 50`, `Fragments = 5`, `Spread = 0.2`) with paired Python/Godot coverage.
 - Shell damage and cooldown are now explicitly anchored to the configured Python `[Shell]` values (`Damage = 40.0`, `CooldownTime = 4.0`) with paired Python/Godot coverage.
-- Shell/MIRV/Missile/Nuke selection cooldowns now mirror the configured Python weapon cooldowns; Godot tracks selected-weapon readiness in `WeaponInventory`, advances the current cooldown each frame, preserves the classic two-second round-start countdown adjustment, and blocks human shell-style firing until ready instead of launching immediately after a weapon switch.
+- Shell/MIRV/Missile/Nuke selection cooldowns now mirror the configured Python weapon cooldowns; Godot tracks selected-weapon readiness in `WeaponInventory`, advances the current cooldown each frame, preserves the classic two-second round-start countdown adjustment, blocks human shell-style firing until ready instead of launching immediately after a weapon switch, and uses the same selected-weapon readiness for the classic red/green gun-arrow color.
 - Round starts now use an explicit `round_starting` phase for the classic two-second countdown; human commands and AI shots are deferred until the countdown ends, while weapon cooldowns continue to drain just like Python `Tank.update()` during `GameState.ROUND_STARTING`.
 - Missile behavior now uses fuel-limited steering and angle-change acceleration rather than direct target homing, and now loops the classic powered-flight sound while fuel remains, moving it closer to the original controllable missile entity.
 - Missile fuel, steer sensitivity, and powered speed are now explicitly anchored to the configured Python `[Missile]` values (`Fuel = 3.0`, `SteerSensitivity = 300.0`, `Speed = 9.0`) with paired Python/Godot coverage.
@@ -575,7 +732,7 @@ Implemented or started:
 - Optional mouse aim updates a world reticle and supports left-click firing, while staying disabled by default for classic gameplay parity.
 - Optional mouse aim now uses the original `arrow.png` cursor texture at the classic top-left hotspot, hides/restores the system pointer only while the optional cursor is active, and stays disabled by default for keyboard/controller parity.
 - Local Match HUD now uses the classic `weaponicons.png` atlas in Pygame-style tank status cards, with the same top-screen world-coordinate placement and health/fuel bar color formulas as the Python renderer; those classic panel/bar/icon coordinates are now exposed through a testable helper and protected by GDScript fidelity assertions.
-- Local Match aiming now uses the classic translucent per-tank gun arrow, with the arrow geometry anchored on the same tank center as the launch origin and scaled from the classic `tank_size`/`gun_power` proportions, leaving the modern line/gauge HUD as removed prototype scaffolding rather than the target experience.
+- Local Match aiming now uses the classic translucent per-tank gun arrow, with the arrow geometry anchored on the same tank center as the launch origin, scaled from the classic `tank_size`/`gun_power` proportions, and colored from selected-weapon cooldown readiness (`Weapon.ready_to_fire()` parity) rather than ammo-only state; the modern line/gauge HUD remains removed prototype scaffolding rather than the target experience.
 - WebSocket transport exposes connection state and sequence tracking.
 - Online Match now reconnects with exponential backoff, displays latency/ack/pending/tick/terrain diagnostics, prunes acknowledged commands, and applies local prediction to the player's replicated tank.
 - Online Match now has explicit Reconnect and Back controls for production failure-flow polish.
@@ -612,7 +769,7 @@ Implemented or started:
 - The first WebSocket protocol document exists and gateway-side shape validation covers hello, join, input command names/booleans, ping, disconnect, error, and snapshot envelopes; gateway hello/errors now advertise supported protocol versions, snapshots include `match_snapshot_schema` and `event_schema` metadata, and schema `1` snapshot/player/entity/terrain-patch/event required fields are now codified by the Python gateway before WebSocket emission.
 - Protocol compatibility policy is now explicit: the Python gateway advertises a contiguous supported window, the Godot client has named min/max supported protocol constants, negotiates the highest mutually supported protocol before join/input, rejects incompatible envelopes with min/max diagnostics, and the local headless Godot gate runs `network_adapter_protocol_check.gd`.
 - The browser-safe input envelope now includes the classic Shield command as `shield`, with Godot exposing `gf_shield` in project settings, Options rebinding, Local Match input registration, and Online Match input snapshots.
-- Local Match now consumes the classic Shield input for the active human tank, spends fuel while held, renders a shield bubble, and applies shield-reduced explosion damage before classic defeat recording and end-round reward accounting.
+- Local Match preserves the classic Shield input path for controls/protocol parity, but does not consume fuel, draw a shield bubble, or reduce explosion damage from that input because the Python/Pygame tank runtime exposes the binding without implementing shield gameplay.
 - Online Match now performs first-pass client-side protocol compatibility negotiation before sending join/input messages, handles protocol handshake errors without reconnect loops, and surfaces protocol/schema status in the network diagnostics panel.
 - Online Match now treats a WebSocket open as insufficient proof of recovery: reconnect attempts are only reset after a server snapshot marks the session healthy, so repeated hello/snapshot timeouts consume the configured retry budget instead of looping forever.
 - Online Match and Server Browser now share fatal server error taxonomy and recovery copy through `NetworkAdapter`, so password/auth/full-server failures do not enter automatic reconnect loops and status messages include the next player/admin action.
@@ -654,24 +811,34 @@ Implemented or started:
 > [!IMPORTANT]
 > **Resumo de Pendências e Estado de Fidelidade**
 > 
-> O marco de release Godot atual está aprovado pelos gates locais e não deve mais ser descrito como bloqueado por pendências genéricas de gameplay, HUD/input ou fluxos clássicos. Vários itens que antes eram lacunas amplas agora têm regressões Godot/Python ou QA de navegador. O que ainda fica aberto deve ser tratado como auditoria específica, implantação pública futura, ou prova visual manual contra a referência Pygame:
+> O marco de release Godot atual está aprovado pelos gates locais e não deve mais ser descrito como bloqueado por pendências genéricas de gameplay, HUD/input ou fluxos clássicos. Vários itens que antes eram lacunas amplas agora têm regressões Godot/Python ou QA de navegador. Sem contar deploy/hospedagem em produção, que será feito manualmente fora da migração local, o que ainda fica aberto deve ser tratado como auditoria específica ou prova visual manual contra a referência Pygame:
 > 
 > * **Coberto pelo gate atual**: terreno, colisões, vento/HUD, mira opcional por mouse, foco por teclado/controle, score/shop/winner, armas principais, áudio local, runtime de navegador, diretório HTTP schema `1`, cache `304`, persistência web, gateway WebSocket local conectado ao runtime UDP Python, empacotamento e SHA256.
 > * **Visual Parity**: `scripts/qa_godot_web.sh --check` compara capturas Godot contra goldens Godot aprovados em `docs/references/godot_browser_visual/`. As referências Pygame em `docs/references/pygame_visual/` continuam sendo o alvo autoritativo de revisão antes de atualizar goldens; o gate atual não é uma comparação pixel-a-pixel automática Godot-versus-Pygame.
-> * **Online/Produção**: URLs públicos padrão já estão configurados, a stack Docker inicial existe, e o gateway local já proxy para o runtime UDP Python. Ainda é preciso verificar/deployar os hosts reais, hospedar o issuer `/session-token.json` atrás da política final de conta/sessão, manter `auth_token` estático bloqueado nos diretórios públicos por padrão, e expandir QA contra diretórios/gateways hospedados.
+> * **Produção manual**: URLs públicos padrão, stack Docker, gateway, diretório HTTP schema `1`, issuer local de `/session-token.json` e verificador de hospedagem já existem como apoio operacional. Verificar/deployar hosts reais, configurar DNS/TLS/secrets, publicar endpoints e rodar QA contra serviços hospedados são tarefas manuais de operação/release, não bloqueios da migração Godot local.
 > * **Fidelidade futura**: abrir trabalho apenas para deltas nomeados contra fonte/captura Pygame, como uma tela específica, um timing path específico, um edge case multiplayer, economia/fuel-reserve, item futuro ou comportamento ainda sem regressão.
-> * **Release/CI**: workflow de tag, assinatura opcional e helper de secrets existem; o script de assinatura foi testado localmente com chave GPG temporária e `gpg --verify`. Ainda falta cadastrar secrets reais, provar uma publicação `v*` no GitHub Releases, verificar hospedagem pública e decidir quais gates pesados de navegador/rede devem bloquear CI regular versus execução manual.
+> * **Release/CI**: workflow de tag, assinatura opcional e helper de secrets existem; o script de assinatura foi testado localmente com chave GPG temporária e `gpg --verify`. Cadastrar secrets reais e provar uma publicação `v*` no GitHub Releases agora ficam classificados como operação manual de release.
 > 
-> **Resumo honesto**: o marco validado está pronto para distribuição local conforme os gates registrados. O que não deve ser afirmado é que há uma prova matemática ou automática de 100% de pixels contra Pygame para todo o cliente; essa afirmação exige revisão direta das referências Pygame ou um novo comparador dedicado.
+> **Resumo honesto**: o marco validado está pronto para distribuição local conforme os gates registrados. Tirando produção manual, a migração restante é polimento/auditoria nomeada de fidelidade, não uma pendência estrutural ampla. O que não deve ser afirmado é que há uma prova matemática ou automática de 100% de pixels contra Pygame para todo o cliente; essa afirmação exige revisão direta das referências Pygame ou um novo comparador dedicado.
+
+### Non-Production Remaining Work Summary
+
+Ignoring manual production deployment, the remaining migration work is:
+
+- **Visual parity decisions**: final reference review against `docs/references/pygame_visual/` for Main Menu, Options, Server Browser, Local Match HUD, score/shop, and winner overlays before accepting any new visual goldens.
+- **Named Local Match fidelity audits**: only concrete Pygame deltas, such as a specific terrain clipping branch, weapon/full-match edge case, AI/camera tuning issue, economy/fuel-reserve detail, or score/shop timing path.
+- **Input/HUD polish**: final focus-neighbor tuning, controller/mouse edge cases, HUD/status pixel polish, and remaining classic overlay feedback timing.
+- **Online code hardening when behavior changes**: extend protocol/schema/gateway tests when new payload families or player-visible online flows are added. Hosted public proof is manual post-deploy evidence.
+- **Validation policy**: decide which heavy browser/desktop smoke gates should be required in CI versus manual release QA. The local gates already prove the current release slice.
 
 ### Remaining Scope After Local Release Verification
 
 The latest local release milestone is complete: `scripts/validate_godot_release.sh --browser-qa --package` produced and verified the `0.25.0` Linux/Web release assets after the browser runtime/visual QA gate, and the generated `dist/groundfire-godot-0.25.0-SHA256SUMS` file verifies the Linux archive, Web archive, and manifest as `OK`. A local signing rehearsal also verified that `scripts/sign_godot_release.sh` can create a detached signature for the checksums file when a valid GPG key is available.
 
-The remaining post-local-release state is:
+The current post-local-release state is:
 
-- **Estimativa de conclusão em 2026-07-16**: Treat the migration as about **90% complete overall**, with about **10% still open**. Breakdown: local Godot technical migration is about **95% complete**, local release automation is about **95% complete**, and public production readiness is about **80-85% complete**. This is an operational estimate based on current local gates, not a mathematical proof of full Pygame pixel parity or hosted production readiness.
-- **Status de conclusão**: The local Godot migration/release slice is currently green across the strongest post-audit local gates run on 2026-07-17, including the combined browser/release package gate recorded below. Do not call the whole public migration `100% complete` until hosted production, GitHub release publishing, signing secrets, and account/session policy are proven against real infrastructure.
+- **Estimativa de conclusão sem produção manual**: Treat the local Godot migration/release slice as **functionally complete for local distribution and continued fidelity hardening**. Remaining non-production work is targeted polish/audit work: named visual parity decisions, specific Pygame behavior deltas, and new regressions when a concrete mismatch is found. This is not a mathematical proof of full Pygame pixel parity.
+- **Status de conclusão**: The local Godot migration/release slice is currently green across the strongest post-audit local gates run on 2026-07-17, including the combined browser/release package gate recorded below. Hosted production deployment, DNS/TLS/secrets, account/session policy, real GitHub release publishing, and hosted smoke evidence are manual release/operations tasks and are no longer counted as migration blockers in this document.
 - **Auditoria Codex em 2026-07-16 apos reparo/shop/protocol/MIRV timing/projectile bounds/weapon stock/collision-priority/weapon-switch delay/limited-final-shot/machine-gun-cost/missile-config/missile-weapon-config/mirv-config/nuke-config/shell-config/shop-catalog-order/score-rank-tie/post-round-cleanup/winner-card-layout/round-start-grounding audit**:
   - `CI=1 .tmp/codex-py314-venv/bin/python scripts/run_quality_checks.py` passed `compileall`, `unittest`, `ruff`, and `mypy`.
   - `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_groundfire_net_module.py` passed with `20 passed`, including active WebSocket frame tests through a fake UDP backend.
@@ -684,21 +851,21 @@ The remaining post-local-release state is:
   - `bash -n scripts/setup_github_release_secrets.sh scripts/sign_godot_release.sh scripts/validate_godot_release.sh scripts/package_godot_release.sh scripts/qa_godot_web.sh` passed.
   - `docker compose config` passed without the obsolete `version` warning, and the server command now uses accepted `src.groundfire.server` flags.
   - `python -m src.groundfire.server --host 0.0.0.0 --port 27015 --no-discovery --ticks 1` runs successfully.
-- **Hosting & Deployment**: The intended public Web target is documented as `https://play.groundfire.net/`, but the repository still does not prove that this host is live or serving the current package. A 2026-07-17 run of `.tmp/codex-py314-venv/bin/python scripts/verify_godot_hosted_deployment.py --web-url https://play.groundfire.net/ --directory-url https://play.groundfire.net/directory/servers.json --health-url https://play.groundfire.net/directory/healthz --diagnostics-url https://play.groundfire.net/directory/diagnostics.json` failed cleanly because `play.groundfire.net` does not resolve in DNS from this environment. `Dockerfile`, `Caddyfile`, and `docker-compose.yml` now provide deployment scaffolding for Caddy, `groundfire-directory`, the WebSocket gateway, and the Python UDP server runtime, and `scripts/verify_godot_hosted_deployment.py` now turns the hosted web/directory smoke test into an executable gate. Final public release still needs the real host to pass that gate with cache headers, TLS/reverse-proxy behavior, non-default production secrets, artifact upload/preservation policy, and hosted smoke evidence recorded here.
+- **Manual Hosting & Deployment**: The intended public Web target is documented as `https://play.groundfire.net/`. A 2026-07-17 run of `.tmp/codex-py314-venv/bin/python scripts/verify_godot_hosted_deployment.py --web-url https://play.groundfire.net/ --directory-url https://play.groundfire.net/directory/servers.json --health-url https://play.groundfire.net/directory/healthz --diagnostics-url https://play.groundfire.net/directory/diagnostics.json` failed cleanly because `play.groundfire.net` did not resolve in DNS from this environment. That is now tracked as manual deployment evidence, not as a local migration failure. `Dockerfile`, `Caddyfile`, and `docker-compose.yml` provide scaffolding for Caddy, `groundfire-directory`, the WebSocket gateway, and the Python UDP server runtime; `scripts/verify_godot_hosted_deployment.py` remains the manual post-deploy smoke gate for cache headers, TLS/reverse-proxy behavior, non-default production secrets, artifact upload/preservation policy, and hosted evidence.
 - **Environment & Directory Endpoints**: Default environment settings are defined in the project configuration:
   - `dev` environment queries the local directory server at `http://127.0.0.1:27880/servers.json`.
   - `staging` environment queries the directory server at `https://staging.groundfire.net/directory/servers.json`.
   - `production` environment queries the public directory server at `https://play.groundfire.net/directory/servers.json`.
-  - Current working tree note: `godot/project.godot` is set to `dev`, not `production`. Decide whether production selection belongs in committed config, export/deploy injection, or runtime settings before release.
-- **Online Production Gateway**: The intended production gateway route is `wss://play.groundfire.net/gateway`, and the signed `/session-token.json` flow is implemented for local/directory-service use. `groundfire_net.directory_service` now has an opt-in GitHub OAuth verification path that calls `https://api.github.com/user` and compares the returned login against `player_name`. The WebSocket gateway now proxies browser WebSocket clients to the Python UDP server runtime, forwards snapshots, records acknowledged snapshot sequence, and sends `DisconnectNotice` on WebSocket close. What remains is hosted deployment and account/session policy proof against the real public domain.
+  - Current working tree note: `versao-godot/godot/project.godot` is set to `dev`, not `production`. Production selection is a manual release/deploy decision and may be injected by the deployment environment instead of committed as the local default.
+- **Manual Online Production Gateway**: The intended production gateway route is `wss://play.groundfire.net/gateway`, and the signed `/session-token.json` flow is implemented for local/directory-service use. `groundfire_net.directory_service` now has an opt-in GitHub OAuth verification path that calls `https://api.github.com/user` and compares the returned login against `player_name`. The WebSocket gateway now proxies browser WebSocket clients to the Python UDP server runtime, forwards snapshots, records acknowledged snapshot sequence, and sends `DisconnectNotice` on WebSocket close. Hosted deployment and account/session policy proof against the real public domain are manual operational steps.
 - **CI / Release / Signing Policy**:
   - GitHub Actions has a Linux `godot-release-gate` job and manual `workflow_dispatch` options for browser QA, packaging, and GPG signing in `.github/workflows/ci.yml`.
   - Automatic tag publishing to GitHub Releases is implemented in `.github/workflows/release.yml`: pushing a `v*` tag runs the fidelity gate, packages artifacts, optionally signs the checksums, and publishes them to a GitHub Release.
   - `scripts/sign_godot_release.sh` produces detached GPG signatures for the SHA256SUMS file. `scripts/validate_godot_release.sh --sign` can invoke it after packaging. The signing script has been proven locally with a temporary GPG key and verified detached signature, but `scripts/setup_github_release_secrets.sh` still needs to be used or replaced with a real reviewed key, and the resulting values still must be registered as `RELEASE_GPG_PRIVATE_KEY` / `RELEASE_SIGN_KEY` before signatures are included in published releases.
   - `scripts/package_godot_release.sh` now mirrors the Python fallback used by the fidelity/browser QA scripts: if the default `.venv/bin/python` is missing, it falls back to `PYTHON_BIN_FALLBACK` or `python` and validates command availability. A 2026-07-17 run with `PYTHON_BIN=/definitely/missing/python PYTHON_BIN_FALLBACK=.tmp/codex-py314-venv/bin/python scripts/validate_godot_release.sh --package` passed the migration contract, the 248-test fidelity gate, release packaging, and checksum verification, proving the release-gate package path no longer depends on a repository `.venv`.
   - The manual CI signing path now treats `sign-release=true` as implying package/export-template setup, so it produces a fresh SHA256SUMS before calling `scripts/sign_godot_release.sh`. Both the manual CI workflow and the tag release workflow now fail early if only one of `RELEASE_GPG_PRIVATE_KEY` / `RELEASE_SIGN_KEY` is configured, avoiding silent unsigned releases or late GPG failures from partial secret setup.
-  - `scripts/verify_godot_hosted_deployment.py` now exists as the hosted smoke gate once a staging or production URL is live; it is proven against a local production-shaped HTTP fixture, and it now reports DNS/network failures as ordinary `[FAIL]` sections instead of tracebacks. The documented public domain still fails DNS resolution from this environment, so real public release completion remains unproven.
-  - A real `v*` tag publish has still not been proven from this repository state.
+  - `scripts/verify_godot_hosted_deployment.py` now exists as the manual hosted smoke gate once a staging or production URL is live; it is proven against a local production-shaped HTTP fixture, and it reports DNS/network failures as ordinary `[FAIL]` sections instead of tracebacks.
+  - A real `v*` tag publish is a manual release proof, not a migration blocker.
 - **Fidelity Work**: Continues exclusively for identified deltas against Pygame references. Headless visual tests run `scripts/qa_godot_web.sh --check` against approved Godot goldens, but this is not the same as automatic pixel-perfect Godot-versus-Pygame proof for every screen/gameplay state.
 
 ### 1. Main Menu Visual Parity
@@ -718,7 +885,7 @@ Fidelity annotations:
 - Continue matching button width, height, focus state, and disabled state; the main menu now uses the Pygame reference logo/version/copyright/button stack, classic brown/black surfaces, a closer flush button stack inside the classic panel, and the original `fonts.png` atlas for title/copy/button glyphs with Python-style proportional widths and yellow hover/pressed text, but final disabled/focus pixel parity and exact screenshot placement still need review.
 - Continue testing desktop and web scaling at 16:9, 4:3, ultrawide, and small browser windows; runtime Main Menu metric smoke coverage now exists for common small/classic/wide/ultrawide sizes, Options/setup/dedicated entry points now have small/classic/wide smoke coverage, and browser visual QA now captures the Local Match setup route through `?screen=local_match_setup`. The current approved Godot browser goldens include the source-backed Local Match setup add/remove icon states and the initial Local Match round-starting banner, but final screenshot review still needs approved parity decisions against the Pygame references.
 - Continue expanding Options into final classic parity; richer video/audio/gameplay settings, classic-facing Resolution/Screen Mode preset rows, Set Controls jump, Apply/Back actions, classic atlas text rendering, pause access, and grouped Video/Audio/Gameplay/Online/Controls panels now exist, but exact selector disabled/focus pixel polish and final layout placement remain.
-- Continue adding the remaining Python/Pygame menu routes; the desktop dedicated gateway route now includes first-pass join-policy administration with a live policy summary, launch/stop lifecycle controls, copyable WebSocket endpoint handling, non-secret setting persistence, masked command preview/copy support, and disabled-action focus skipping, and Local Match setup now has an eight-slot roster grid with active slots, player type, unique human controller assignment, editable names, round selection, dynamic focus wiring, and clearer readiness/blocking copy including the no-human case, but final roster UX polish and final server administration parity still need work.
+- Continue adding the remaining Python/Pygame menu routes; the desktop dedicated gateway route now includes first-pass join-policy administration with a live policy summary, launch/stop lifecycle controls, copyable WebSocket endpoint handling, non-secret setting persistence, masked command preview/copy support, and disabled-action focus skipping, and Local Match setup now has an eight-slot roster grid with active slots, player type, unique human controller assignment for human rows, editable names, round selection, dynamic focus wiring, and clearer readiness/blocking copy that permits computer-only AI-vs-AI matches, but final roster UX polish and final server administration parity still need work.
 
 ### 2. Server Browser Final Visual Parity
 
@@ -726,41 +893,41 @@ The Server Browser has real behavior now, but it still needs final visual and in
 
 Remaining work:
 
-Fidelity annotations:
+Compatibility references:
 
-- `Fidelity target:` `src/serverbrowsermenu.py`, `conf/servers.json`, server browser fixtures, and `docs/references/pygame_visual/server_browser.png`.
-- `User-visible invariants:` Table scanability, tabs, row states, connection feedback, favorites/history behavior, password prompt, and failure recovery must feel like the Pygame browser for supported platforms.
-- `Allowed Godot adaptation:` Browser-safe persistence, HTTP/WebSocket directory plumbing, and hidden LAN/native-only affordances on web builds.
+- `Reference material:` `versao-python/src/serverbrowsermenu.py`, SQLite-backed server browser state, server browser fixtures, and `docs/references/pygame_visual/server_browser.png`.
+- `User-visible contract:` Table scanability, tabs, row states, connection feedback, favorites/history behavior, password prompt, and failure recovery must stay understandable for supported platforms.
+- `Allowed adaptation:` Browser-safe persistence, HTTP/WebSocket directory plumbing, and hidden LAN/native-only affordances on web builds.
 - `Required validation:` Run server browser Python/Godot tests, compare against the Pygame browser capture, and run browser QA for exported web behavior.
 
 - Continue tuning table column widths, row heights, tab spacing, header styling, and scrollbar placement against the reference UI; first-pass named table dimensions, scroll modes, and table-header chrome now exist, but final visual parity still needs reference screenshot tuning.
 - Continue improving hover, selected, disabled, loading, error, and empty states; full-viewport browser layout, classic brown buttons, transparent row states, table selection/focus, row tooltips, selected-row detail copy, tab-specific empty messages, disabled connect/favorite/history actions, undo copy, visible table loading rows, defensive player/latency parsing, online-directory duplicate-refresh protection, and `304 Not Modified` cached refresh reuse now exist, but final Pygame table chrome and inline-filter removal/tuning still need work.
 - Continue refining richer filters; passwordless, open-slot, sort controls, and persistence now exist, but final visual/interaction parity is still pending.
-- Continue final Favorites and History polish; favorite removal, clear-history, empty-history disabled state, undo restore copy, history-backed favorite details, and missing-directory favorite fallback rows now exist, but final stale/deleted-server production semantics still need tuning.
-- Continue password/connect modal polish; shared fatal error copy plus real gateway `invalid_password`, `authentication_failed`, `server_full`, `server_closed`, and `banned` responses now exist, but the final modal flow still needs production server feedback and visual polish.
+- Continue final Favorites and History polish; favorite removal, clear-history, empty-history disabled state, undo restore copy, history-backed favorite details, and missing-directory favorite fallback rows now exist, but final stale/deleted-server behavior should be tuned only after a concrete hosted/manual test case exists.
+- Continue password/connect modal polish; shared fatal error copy plus real gateway `invalid_password`, `authentication_failed`, `server_full`, `server_closed`, and `banned` responses now exist, but final hosted-server feedback belongs to manual deployment/playtest follow-up.
 - Continue testing responsive behavior in the Godot web export size constraints; proportional table widths, bounded scroll height, and 640x480/1024x768/1600x900 runtime smoke coverage now exist, but final exported-browser screenshot review remains.
 
 ### 3. Real Online Server Directory
 
-The browser can load from HTTP and a local production-shaped service exists, but the public hosted service/endpoints are not chosen yet.
+The browser can load from HTTP and a local production-shaped service exists. Public hosting, DNS, TLS, secrets, and endpoint rollout are manual deployment tasks outside the local migration gate.
 
 Remaining work:
 
-Fidelity annotations:
+Compatibility references:
 
-- `Fidelity target:` Existing Pygame/LAN server browser expectations, `conf/servers.json`, `src/serverbrowsermenu.py`, and the documented `Server Directory Schema`.
-- `User-visible invariants:` Server list fields, password/auth expectations, visible availability, failure messages, and offline fallback behavior must not surprise players used to the Pygame flow.
-- `Allowed Godot adaptation:` A browser-safe read-only HTTP directory may replace native discovery for web while desktop keeps native-capable routes where supported.
-- `Required validation:` Validate schema `1`, fallback diagnostics, browser runtime QA, and production-like directory behavior before public server listings are trusted.
+- `Reference material:` Existing Pygame/LAN server browser expectations, SQLite-backed browser state, `versao-python/src/serverbrowsermenu.py`, and the documented `Server Directory Schema`.
+- `User-visible contract:` Server list fields, password/auth expectations, visible availability, failure messages, and offline fallback behavior should stay predictable for players.
+- `Allowed adaptation:` A browser-safe read-only HTTP directory may replace native discovery for web while desktop keeps native-capable routes where supported.
+- `Required validation:` Validate schema `1`, fallback diagnostics, browser runtime QA, and production-like local directory behavior before public server listings are trusted. Hosted verification is a manual post-deploy gate.
 
-- Promote the documented and client-validated server directory schema `1` into the real public service contract.
-- Verify and host the public read-only HTTP endpoint; a local stdlib `groundfire-directory` service now serves schema `1` with cache/quoted-ETag/refresh headers, conditional `304` handling, optional valid gateway injection, public-entry filtering for invalid/non-WebSocket online entries, default rejection of static directory-carried `auth_token`, HTTP(S) validation for `session_token_url`, `/healthz`/`/diagnostics.json`, and opt-in no-store `/session-token.json` signed-token issuance advertised through `session_token_url`, while the Godot client now exercises conditional `If-None-Match` refreshes and cached `304` reuse. Default dev/staging/production URL values are configured in `godot/project.godot`, but the public staging/production services still need hosted verification.
-- Keep the configured dev, staging, and production values for `application/config/server_directory_url_dev`, `application/config/server_directory_url_staging`, and `application/config/server_directory_url_production` aligned with the final hosted service; the client-side environment selection, Options controls, user persistence, and override path now exist.
-- Continue improving directory diagnostics; timeout, one retry, HTTP result diagnostics, schema diagnostics, cache/ETag/refresh diagnostics, invalid URL diagnostics, invalid-payload fallback, local service health/diagnostics endpoints, and fallback messaging are implemented, but final user-facing copy still needs polish once the public service behavior is known.
-- Keep public authenticated listings on the signed `/session-token.json` flow plus production account/session policy; the service now rejects static directory-carried `auth_token` by default, with explicit `--allow-static-auth-tokens` reserved for private/dev directories only.
+- Keep the documented and client-validated server directory schema `1` as the public service contract.
+- Use the existing local stdlib `groundfire-directory` service as the implementation reference for manual hosting; it serves schema `1` with cache/quoted-ETag/refresh headers, conditional `304` handling, optional valid gateway injection, public-entry filtering for invalid/non-WebSocket online entries, default rejection of static directory-carried `auth_token`, HTTP(S) validation for `session_token_url`, `/healthz`/`/diagnostics.json`, and opt-in no-store `/session-token.json` signed-token issuance advertised through `session_token_url`. The Godot client now exercises conditional `If-None-Match` refreshes and cached `304` reuse locally.
+- Keep the configured dev, staging, and production values for `application/config/server_directory_url_dev`, `application/config/server_directory_url_staging`, and `application/config/server_directory_url_production` ready for manual deploy injection; the client-side environment selection, Options controls, user persistence, and override path now exist.
+- Continue improving directory diagnostics when a concrete UX issue is found; timeout, one retry, HTTP result diagnostics, schema diagnostics, cache/ETag/refresh diagnostics, invalid URL diagnostics, invalid-payload fallback, local service health/diagnostics endpoints, and fallback messaging are implemented.
+- Keep authenticated listings on the signed `/session-token.json` flow plus the future manual account/session policy; the service now rejects static directory-carried `auth_token` by default, with explicit `--allow-static-auth-tokens` reserved for private/dev directories only.
 - Keep the local JSON fallback for offline development.
 - Later, add presence and latency updates through WebSocket or WebRTC-compatible infrastructure.
-- Expand the new browser runtime QA from the served schema `1` fixture, first-pass cache/refresh header checks, and local `304 Not Modified` conditional refresh checks to production-like public directory behavior under real hosting.
+- After manual deployment, expand browser runtime QA from the served schema `1` fixture, first-pass cache/refresh header checks, and local `304 Not Modified` conditional refresh checks to the hosted public directory behavior.
 
 ### 4. Local Match Gameplay Fidelity
 
@@ -776,13 +943,13 @@ Fidelity annotations:
 - `Required validation:` Run `scripts/validate_godot_fidelity.sh`, targeted Godot fidelity checks, Python reference tests, and manual/visual comparison against Pygame gameplay captures when behavior changes.
 
 - Continue improving the original-style terrain model until it fully matches Python `Landscape`; edge-colour interpolation for crater top/bottom cuts, near-exact uniform-colour merge checks, stacked-chunk `move_to_ground` selection, angled `move_to_ground_at_angle` top-edge tracing, linked superblock fall/merge, independent left/right falling-superblock landing gaps, current-frame fall speed with next-frame acceleration, falling wait speed preservation and whole-tick motion deferral, falling-support motion inheritance on landing, uniform falling-support merge motion preservation, first linked-support cut propagation, linked-removal top propagation, integrated removed-linked-cap crater-edge continuation, mirrored falling removed-linked-cap support-motion propagation, mirrored one-sided removed-linked-cap asymmetric top promotion, mirrored removed-linked-cap surviving-opposite-side top promotion, mirrored one-sided and two-sided top-edge clipping including explicit endpoint-code `top_code = 6`/`9`, mirrored linked top-only support preservation, mirrored non-linked bottom-edge fall starts including explicit `bottom_code = 3`/`12`, unlinked `bottom_code = 6`/`9`/`11`/`14`, and unlinked `bottom_code = 7`/`13`/`15`, one-sided and two-sided linked-bottom support detachment, mirrored one-sided linked-bottom uncut-side adjustment, asymmetric one-sided split remainder preservation, linked double-split lower support preservation, linked-support double-split leader fall-start propagation, falling linked-support double-split leader-motion handoff, falling-split motion handoff, falling linked double-split support-motion handoff, the mirrored multi-chunk classic linked-superblock edge-graze skip guard, minimum-land crater floor clamping, Python-faithful terrain dropping including the left-top-gated asymmetric bottom movement, first-pass quake wiring, classic first/between quake timing, looped quake rumble playback, and classic horizontal sine viewport offset now exist, but the remaining split clipping edge cases and tuning still need fidelity work.
-- Continue porting the full original tank state model; the Godot `TankState` now has movement, active fuel plus persistent reserve, health, slope angle, launch origin/velocity, classic-style tank-center launch geometry, named round-start defaults with an initially ungrounded `do_pre_round`-equivalent reset plus classic `set_position_on_ground` start placement, passive steep-slope sliding with the classic signed direction, grounded input combined with signed slope-slide movement, cos-projected along-slope `x`/`y` displacement coverage, no ground-movement fuel spend, airborne non-boost input ignored, airborne angle preservation until landing, `move_to_ground`-based stacked support landing, classic three-point track support alignment from `Tank.update()`, slope-aware jump jets with in-air boost rotation including the classic pre-step turn-limit overshoot, classic grounded-launch ordering that defers airborne integration until the frame after detachment, classic final-frame boost fuel overspend for both active fuel and persistent reserve, looped classic audio, classic boost exhaust smoke, and classic two-second round-start command gating, tuned airborne gravity, terrain-gap detachment, grounded/airborne playable-bound edge stopping, airborne launch velocity inheritance, first-pass fuel-draining shield damage reduction, classic `-75..75` gun angle semantics, classic `10` default power, immediate release stop, classic conflicting aim/power input priority, exact-zero death semantics, and classic textured dead-tank burn smoke.
+- Continue porting the full original tank state model; the Godot `TankState` now has movement, active fuel plus persistent reserve, health, slope angle, launch origin/velocity, classic-style tank-center launch geometry, named round-start defaults with an initially ungrounded `do_pre_round`-equivalent reset plus classic `set_position_on_ground` start placement, passive steep-slope sliding with the classic signed direction, grounded input combined with signed slope-slide movement, cos-projected along-slope `x`/`y` displacement coverage, no ground-movement fuel spend, airborne non-boost input ignored, airborne angle preservation until landing, `move_to_ground`-based stacked support landing, classic three-point track support alignment from `Tank.update()`, slope-aware jump jets with in-air boost rotation including the classic pre-step turn-limit overshoot, classic grounded-launch ordering that defers airborne integration until the frame after detachment, classic final-frame boost fuel overspend for both active fuel and persistent reserve, looped classic audio, classic boost exhaust smoke, and classic two-second round-start command gating, tuned airborne gravity, terrain-gap detachment, grounded/airborne playable-bound edge stopping, airborne launch velocity inheritance, classic no-op Shield command parity, classic `-75..75` gun angle semantics, classic `10` default power, immediate release stop, classic conflicting aim/power input priority, exact-zero death semantics, and classic textured dead-tank burn smoke.
 - Improve projectile physics, crater generation, and explosion damage fidelity; exact terrain segment collision, collinear/boundary chunk-edge collision, classic horizontal out-of-bounds projectile expiration without explosion, classic tank-body direct-hit selection with owner-inclusive shooter hits after the launch point, full direct-hit tank damage before splash falloff, named projectile gravity, classic projectile trail segment spacing/fade/texture, classic shell-style projectile triangle geometry, classic tank-center target/damage positioning, Pygame-faithful fractional distance-only splash damage with no terrain occlusion reduction or pre-damage rounding, defeat recording without immediate per-damage score/credits, and first-pass turn wind/gust effects are implemented, but remaining collision edge cases, wind tuning, gravity tuning, and damage tuning are not final.
 - Complete original weapon behavior; `WeaponInventory` now has Shell, Machine Gun, MIRV, Missile, and Nuke definitions, plus classic Shell fallback when limited ammo is depleted after launching the selected final shot, classic persistent stock separated from per-round available ammo, selected-weapon cooldown/readiness tracking for Shell/MIRV/Missile/Nuke/Machine Gun, zero initial limited-weapon stock, shop purchases that increase stock only until the next round reset, Machine Gun direct-hit tracer behavior with centralized stock-pack/volley/cooldown constants, player held-fire cadence, AI staged-burst cadence, named-ammo consumption, looping classic firing audio, direct-hit metal clang audio, classic `0.2s` weapon-cycle delay, weapon-cycle unselect handling, first-pass tactical AI hold budgets, classic cooldown-gated first-tracer timing including multi-tracer slow-frame catch-up, fixed classic tracer launch power, gravity-matched launch-age trajectory stepping, `0.01s` classic tracer tails, launch-time position updates, one-frame `_kill_next_frame` tracer lifetime on terrain/edge exits, classic side-exit/terrain-before-tank collision priority, pre-shot unselect cancellation, lethal-hit stop/queued-tracer expiry, and first full-roster direct-hit validation, a closer apex/five-fragment MIRV split with centralized ammo/fragment/spread/damage constants, Python-faithful vertical no-fan-out spread, parent expiry, intra-frame split positioning, and split-frame fragment stepping protection, named fuel-limited Missile steering with unclamped classic angle-speed powered velocity, next-frame free-fall transition, and Python-order free-fall position-before-gravity integration, classic fire-shell/missile-launch one-shot audio, Shell/Missile death audio, powered Missile flight loop audio, and first-pass Nuke blast/whiteout/audio tuning including `Blast.fade_away` thresholds and `size * 1.1` non-growing visible blast radius. Final classic weapon tuning and full-match edge cases still need work.
 - Continue full round flow fidelity; turn ownership, wins, reset, classic grounded start placement, an initial post-round score/shop flow, classic post-round held-fire/Jump Jet cleanup when the score screen opens, classic two-second round-start countdown, classic defeat/leader/survival/stipend score and money awards, previous-round leader flags, score-screen leader reassignment only for non-final shop transitions, self-defeat scoring, score-screen translucent column boxes, white total-score text, player tank icons, defeated-tank icons with leader flags, a first final-round winner overlay with separate `Final Result` heading, top-score/tie winner marking, classic centered winner-only tank-card rows with white rotating-letter emphasis, classic 2-second human and 4-second computer activation delays for score/final overlays, the Pygame 10-second human score-screen safety auto-advance, the Pygame one-update computer-only winner exit handoff, roster-backed combatants, classic line-of-sight/distance target scoring, surviving-participant turn rotation, roster-aware HUD target/leader context, roster-backed score ranking and winner selection, human-focused shop passes with no-purchase computer pass-through, defeated-player details, classic purchase bundle sizes separated from round-start ammo, shop stock display/copy based on persistent stock rather than previous-round available ammo, next-round inventory reset that copies purchased stock into available ammo, classic shop input delay cadence, classic one-update `Done!` handoff before round start, classic shop ordering/copy, fixed active/legacy catalog order and prices, separate `$cost` shop column, non-duplicated `Buy` actions, classic `$N` shop money copy, full classic catalog rows, disabled/no-purchase legacy gray rows for positions 5-9, Jump Jet fuel-reserve purchasing, visible reserve economy state, and next-round shop labels now exist; final classic score/winner art tuning, exact multi-player semantics/tuning, and exact economy/fuel-reserve tuning are not final.
 - Add better AI decision logic; the first trajectory-search shell aiming pass, classic target scoring, strategic weapon choice, risk/reward special-weapon scoring, self-damage avoidance, and easy/normal/hard difficulty tuning exist, but final personality tuning is still pending.
 - Continue camera behavior, zoom/framing, and map bounds; projectile lookahead and explosion shake now exist, but final original framing feel and tuning are not done.
-- Bring over the final score, economy, shop, and end-of-round screen fidelity; first playable score/shop/economy scaffolds, roster-backed score ranking/detail rows with classic translucent column boxes, white total-score text, player tank icons plus defeated-tank/leader-flag icons, a first winner overlay with centered winner-only tank cards and white rotating `Winner!` letters, visible reserve economy state, human-focused shop passes, Pygame-style no-purchase computer shop pass-through, and a classic-ordered full shop catalog with `Done!` completion now exist. The legacy catalog items (Rolling Mines, Airstrike, Death's Head, Hover Coil, Corbomite) now render as disabled classic rows, no longer start as selectable player weapons, and cannot be bought through the Local Match shop handler; their prototype effect helpers remain hidden and test-covered outside the Pygame-faithful public path. Final classic art tuning and simultaneous classic shop visual integration remain.
+- Bring over the final score, economy, shop, and end-of-round screen fidelity; first playable score/shop/economy scaffolds, roster-backed score ranking/detail rows with classic translucent column boxes, white total-score text, player tank icons plus defeated-tank/leader-flag icons, a first winner overlay with centered winner-only tank cards and white rotating `Winner!` letters, visible reserve economy state, human-focused shop passes, Pygame-style no-purchase computer shop pass-through, and a classic-ordered full shop catalog with `Done!` completion now exist. The legacy catalog items (Rolling Mines, Airstrike, Death's Head, Hover Coil, Corbomite) now render as disabled classic name/price rows with no Godot-only "Locked" or "Not migrated yet" copy, no longer start as selectable player weapons, and cannot be bought through the Local Match shop handler; their prototype effect helpers remain hidden and test-covered outside the Pygame-faithful public path. Final classic art tuning and simultaneous classic shop visual integration remain.
 
 ### 5. Input And HUD Completion
 
@@ -793,7 +960,7 @@ Remaining work:
 Fidelity annotations:
 
 - `Fidelity target:` `src/weaponhud.py`, `src/gamehudrenderer.py`, `src/controls.py`, `src/controlsfile.py`, `src/controllermenu.py`, `data/weaponicons.png`, and current Pygame HUD/menu captures.
-- `User-visible invariants:` Control defaults, rebinding expectations, controller navigation, HUD information density, weapon display, messages, pause/options access, and input timing must stay Pygame-faithful.
+- `User-visible invariants:` Control defaults, rebinding expectations, controller navigation, HUD information density, weapon display, messages, pause/options access, and input timing must stay Pygame-faithful. Keyboard1 defaults now match the Pygame reference layout: Space, O/U, I, K, J/L, A/D, and W/S. JoyLayout defaults now match classic button indices `0/2/1/3/4/6/7` and gun axis semantics. The visible controls list now has the same 11 editable actions as `SetControlsMenu`; the internal Godot pause action remains available to the runtime but is not shown as an extra rebinding row. The visible action names, joystick value labels, `<Undefined>` empty-binding text, `Reset To Defaults` reset button, active-only `Press Button for '<action>'` capture prompt, and linked joystick-axis rebinding behavior now match the classic `SetControlsMenu` labels/copy and `LINKED_CONTROLS` pairing.
 - `Allowed Godot adaptation:` Godot input event plumbing and per-device gamepad profiles may be used behind equivalent player-facing bindings.
 - `Required validation:` Run input/HUD Godot checks, controller/menu focus smoke coverage, and compare HUD/status presentation against Pygame captures.
 
@@ -806,7 +973,7 @@ Fidelity annotations:
 
 ### 6. Networked Gameplay Adapter
 
-The browser-safe online path now connects through WebSocket, proxies to the Python UDP server runtime, and is covered by local TCP/WebSocket/UDP and exported-browser QA. It is production-shaped locally, but it is not yet proven as a hosted public multiplayer service.
+The browser-safe online path now connects through WebSocket, proxies to the Python UDP server runtime, and is covered by local TCP/WebSocket/UDP and exported-browser QA. It is production-shaped locally; hosted public proof is a manual deployment/playtest step.
 
 Remaining work:
 
@@ -817,15 +984,15 @@ Fidelity annotations:
 - `Allowed Godot adaptation:` WebSocket/WebRTC-compatible transport may replace native-only network paths in web builds; desktop-only UDP/LAN affordances remain gated by platform capability.
 - `Required validation:` Run gateway contract tests, replicated-scene tests, browser runtime QA, and compatibility checks before changing online-visible behavior.
 
-- Continue freezing the live protocol shape for the Godot client and Python server; protocol metadata, gateway-side envelope/input-command validation, supported-version advertisement, client-side compatibility negotiation, snapshot/event schema metadata, explicit schema `1` required-field constants, first schema documentation, and explicit future compatibility policy now exist. Remaining work here is hosted-public verification and extending schema coverage when new payload families are introduced, not basic protocol-version or schema-1 policy.
-- Promote the WebSocket gameplay path beyond local proof; Server Browser routes to Online Match, the Python gateway forwards authoritative `ServerSnapshotEnvelope` payloads with player number/capacity metadata, and Godot renders terrain/entities/projectiles/effects/players with interpolation, projectile extrapolation, prediction diagnostics, and local tank reconciliation, but hosted multiplayer behavior and full reconciliation tuning still need real deployment/playtest evidence.
+- Continue freezing the live protocol shape for the Godot client and Python server; protocol metadata, gateway-side envelope/input-command validation, supported-version advertisement, client-side compatibility negotiation, snapshot/event schema metadata, explicit schema `1` required-field constants, first schema documentation, and explicit future compatibility policy now exist. Remaining code work here is extending schema coverage when new payload families are introduced, not basic protocol-version or schema-1 policy.
+- Treat hosted multiplayer behavior, public routing, and real-world reconciliation evidence as manual deployment/playtest proof. Locally, Server Browser routes to Online Match, the Python gateway forwards authoritative `ServerSnapshotEnvelope` payloads with player number/capacity metadata, and Godot renders terrain/entities/projectiles/effects/players with interpolation, projectile extrapolation, prediction diagnostics, and local tank reconciliation.
 - Optionally keep UDP transport for desktop-only builds.
-- Finish production-grade failure flows; reconnect/backoff with a bounded retry budget that only resets after healthy snapshots, manual reconnect/back controls, latency display, ack pruning, stale pending-input diagnostics, closed-connection reporting, fatal error taxonomy/recovery hints, optional gateway password rejection, optional static auth-token rejection, signed expiring gateway join tokens, reusable player-slot capacity assignment, optional closed-join mode, optional player-name ban rejection, and desktop launcher controls for those first-pass gateway policies exist, but hosted account/session token issuance, production ban persistence/administration, and final hosted user recovery paths still need polish.
-- Keep expanding compatibility tests between the Python gateway/server and Godot message contract; gateway tests now cover hello, join, input, ping, errors, replicated tank movement, terrain revision, events, WebSocket masking/framing, UDP proxy forwarding, acknowledged snapshot sequence, disconnect cleanup, and exported-browser runtime behavior. Hosted public end-to-end gameplay tests are still missing.
+- Finish failure-flow polish only when a named UX issue is found; reconnect/backoff with a bounded retry budget that only resets after healthy snapshots, manual reconnect/back controls, latency display, ack pruning, stale pending-input diagnostics, closed-connection reporting, fatal error taxonomy/recovery hints, optional gateway password rejection, optional static auth-token rejection, signed expiring gateway join tokens, reusable player-slot capacity assignment, optional closed-join mode, optional player-name ban rejection, and desktop launcher controls for those first-pass gateway policies exist. Hosted account/session token issuance, production ban persistence/administration, and final hosted user recovery paths belong to manual operations.
+- Keep expanding compatibility tests between the Python gateway/server and Godot message contract when new messages are added; gateway tests now cover hello, join, input, ping, errors, replicated tank movement, terrain revision, events, WebSocket masking/framing, UDP proxy forwarding, acknowledged snapshot sequence, disconnect cleanup, and exported-browser runtime behavior. Hosted public end-to-end gameplay tests are manual post-deploy evidence.
 
 ### 7. Export And Runtime Validation
 
-The project validates in editor/headless mode, runs runtime scene smoke checks, documents the build/runtime path, produces local Linux/Web exports through `scripts/export_godot.sh`, packages release artifacts, verifies SHA256 checksums, and has exported-browser runtime plus screenshot QA. The local release gate has passed for version `0.25.0`; CI/tag publishing, a locally verified signing script path, and Docker-based gateway/directory/server scaffolding now exist. Remaining release work is operational: configure real signing secrets, exercise a real `v*` tag publish, deploy public hosting/gateway services, and run browser QA against hosted endpoints rather than local fixtures.
+The project validates in editor/headless mode, runs runtime scene smoke checks, documents the build/runtime path, produces local Linux/Web exports through `scripts/export_godot.sh`, packages release artifacts, verifies SHA256 checksums, and has exported-browser runtime plus screenshot QA. The local release gate has passed for version `0.25.0`; CI/tag publishing, a locally verified signing script path, and Docker-based gateway/directory/server scaffolding now exist. Remaining release work is manual/operational: configure real signing secrets, exercise a real `v*` tag publish, deploy public hosting/gateway services, and run browser QA against hosted endpoints rather than local fixtures.
 
 Follow-up work:
 
@@ -837,7 +1004,7 @@ Fidelity annotations:
 - `Required validation:` Run migration contract validation, Godot validation, fidelity tests, browser QA, release packaging checksums, and manual desktop smoke coverage before release.
 
 - `scripts/validate_godot_release.sh`, `scripts/package_godot_release.sh`, `scripts/sign_godot_release.sh`, `scripts/setup_github_release_secrets.sh`, and `.github/workflows/release.yml` now form the official release/tag/signing process; version sourcing, release notes metadata, checksums, versioned artifact names, a local release gate, a Linux GitHub Actions release-gate job, a tag-triggered publish workflow that uploads artifacts to GitHub Releases, optional GPG signing through `--sign` / `RELEASE_SIGN_KEY`, a helper that generates the required GitHub secret values, a locally verified detached-signature path, and a contract-level file-existence check now exist. The remaining open items are choosing/generating a real reviewed signing key, registering the real `RELEASE_GPG_PRIVATE_KEY` / `RELEASE_SIGN_KEY` secrets, and pushing a real `v*` tag to prove signing and publishing end to end.
-- Expand browser-driven QA beyond the current runtime fixture to exercise production directory cache behavior under real hosting and user-visible recovery flows; local browser QA now validates the exported client's `If-None-Match` request path and cached `304 Not Modified` handling against the QA server, and screenshot `--check` now requires an approved golden for every captured route.
+- After manual deployment, expand browser-driven QA beyond the current runtime fixture to exercise hosted directory cache behavior and user-visible recovery flows; local browser QA now validates the exported client's `If-None-Match` request path and cached `304 Not Modified` handling against the QA server, and screenshot `--check` now requires an approved golden for every captured route.
 - Add approved `docs/references/godot_visual/` goldens with a capture backend that can read viewport pixels; `scripts/validate_godot_visuals.sh` now fails cleanly under the current dummy headless renderer when viewport capture is unavailable. Then decide whether `--check` should join default validation or remain an optional pre-release visual gate.
 - Finish hardening CI/release-gate coverage for `scripts/qa_godot_web.sh` where Chromium/Chrome and export templates are available; a manual workflow-dispatch path now installs export templates and can run browser QA, but the project still needs final policy on when that heavier gate blocks every PR/tag.
 - Validate desktop build behavior manually or with a windowed smoke harness for LAN/server tools beyond the deterministic feature matrix; headless runtime smoke now reaches the Dedicated Server tool route and its focus wiring, but not a full launched desktop gateway session.
@@ -845,7 +1012,7 @@ Fidelity annotations:
 
 ## Recommended Next Large Batch
 
-Every recommended batch inherits the `Migration Fidelity Contract`. Do not use these batches as redesign opportunities; each implementation step should copy the Pygame-facing behavior, record the relevant `Fidelity target:`, and pass the required validation before being marked complete.
+Every recommended batch inherits the `Migration Compatibility Contract`. Do not use these batches as accidental redesign opportunities; each implementation step should name the relevant reference material, document any intentional adaptation, and pass the required validation before being marked complete.
 
 The next big but controlled batch should focus on `Local Match Fidelity 2`:
 
@@ -855,14 +1022,14 @@ The next big but controlled batch should focus on `Local Match Fidelity 2`:
 4. Continue tuning landing edge cases and final projectile scale against the original Python/C++ feel; classic gun angle/power defaults/bounds, acceleration/release-stop, conflicting aim/power input priority, passive steep-slope sliding, cos-projected grounded slope movement, `move_to_ground`-based stacked support landing, three-point track support alignment, slope-aware jump jet thrust, in-air boost rotation including the classic pre-step turn-limit overshoot, looped classic jump-jet audio, classic boost exhaust smoke, tuned airborne gravity, terrain-gap detachment, grounded/airborne playable-bound edge stopping, tank-owned projectile launch velocity inheritance, classic-style launch-origin geometry, center-anchored/size-scaled gun-arrow visual geometry, and textured dead-tank burn smoke now exist.
 5. Continue tuning Nuke beyond the first whiteout/audio pass, keep validating Machine Gun against full-match classic turn flow beyond the fixed-power/cooldown-gated tracer launch, launch-time trajectory, one-frame tracer expiry, looped audio, weapon-cycle unselect, pre-shot cancellation, lethal-hit stop handling, and first-pass AI tactical hold paths, and keep tuning MIRV/Missile details beyond the current launch-time shell/MIRV parabola, intra-frame apex/five-fragment split with protected split-frame fragment stepping, unclamped fuel-limited steering, steering clamp/conflicting-input recentering, and Python-order missile free-fall integration.
 6. Continue tuning AI personality after the new risk/reward weapon scoring pass; the AI now avoids self-damaging Nukes and ranks specials by expected value, while between-round shop behavior has been restored to the Pygame no-purchase pass-through. Final classic aggression/personality tuning still needs playtest calibration.
-7. Replace the first score/shop scaffold with faithful end-of-round, score, economy, winner, and shop screens; classic defeat/leader/survival/stipend awards, previous-round leader flags, score-screen leader reassignment, self-defeat penalty, score-screen translucent column boxes, white total-score text, player tank icons, defeated-tank icons and leader flags, classic weapon bundle sizes, persistent weapon stock copied into per-round available ammo at round start, classic shop ordering/copy with `Done!`, classic shop input delays, separate `$cost` shop column, non-duplicated `Buy` actions, classic `$N` shop money copy, legacy catalog behavior (Rolling Mines, Airstrike, Death's Head, Hover Coil, Corbomite mapped as disabled no-purchase classic rows with zero initial ammo), closer Jump Jet fuel-reserve purchasing, visible reserve economy state, a separate score overlay, roster-backed score rows and final-result winner selection, final `Final Result` heading, final top-score/tie winner marking, centered winner-only tank-card rows with white rotating-letter emphasis, human/computer activation delays, human-focused shop passes with no-purchase computer pass-through, next-round shop labels, and a first final-result overlay are now started. The current Python/Godot coverage protects Pygame score/economy constants, classic score draw headings and multi-combatant rank/tie ordering, classic post-round held-fire/Jump Jet cleanup entering score, classic winner draw copy and four-card row grouping for multi-winner ties, simultaneous roster money display, active and disabled classic shop catalog order/prices, no-purchase behavior for shop positions 5-9, AI-style Gun Up wrapping from Machine Gun to `Done!` without buying, classic one-update shop finish handoff, classic stock-vs-available-ammo behavior for shop purchases and round resets, and hidden inventory pack semantics; final classic art tuning and exact simultaneous shop layout parity still need manual visual integration.
+7. Replace the first score/shop scaffold with faithful end-of-round, score, economy, winner, and shop screens; classic defeat/leader/survival/stipend awards, previous-round leader flags, score-screen leader reassignment, self-defeat penalty, score-screen translucent column boxes, white total-score text, player tank icons, defeated-tank icons and leader flags, classic weapon bundle sizes, persistent weapon stock copied into per-round available ammo at round start, classic shop ordering/copy with `Done!`, classic shop input delays, separate `$cost` shop column, non-duplicated `Buy` actions, classic `$N` shop money copy, legacy catalog behavior (Rolling Mines, Airstrike, Death's Head, Hover Coil, Corbomite mapped as disabled no-purchase classic rows with zero initial ammo and no Godot-only locked/migration copy), closer Jump Jet fuel-reserve purchasing, visible reserve economy state, a separate score overlay, roster-backed score rows and final-result winner selection, final `Final Result` heading, final top-score/tie winner marking, centered winner-only tank-card rows with white rotating-letter emphasis, human/computer activation delays, human-focused shop passes with no-purchase computer pass-through, next-round shop labels, and a first final-result overlay are now started. The current Python/Godot coverage protects Pygame score/economy constants, classic score draw headings and multi-combatant rank/tie ordering, classic post-round held-fire/Jump Jet cleanup entering score, classic winner draw copy and four-card row grouping for multi-winner ties, simultaneous roster money display, active and disabled classic shop catalog order/prices/copy, no-purchase behavior for shop positions 5-9, AI-style Gun Up wrapping from Machine Gun to `Done!` without buying, classic one-update shop finish handoff, classic stock-vs-available-ammo behavior for shop purchases and round resets, and hidden inventory pack semantics; final classic art tuning and exact simultaneous shop layout parity still need manual visual integration.
 
 ### Local Match Fidelity 2 Execution Checklist
 
 Use this checklist to keep the next batch narrow and reviewable:
 
 1. Pick one Pygame reference surface per change: `Landscape.clip_slice`/`Landscape.update`, `Tank.move_tank`, a single weapon entity, one score/shop menu behavior, or one HUD/focus route. Do not mix terrain, weapon, AI, and release work in one patch unless a test proves they are coupled.
-2. Add or extend the closest regression first. Prefer Godot tests under `godot/tests/local_match_fidelity_check.gd` for scene-visible behavior, Python reference tests under `tests/test_landscape_fidelity.py` or `tests/test_port_fidelity.py` for source-of-truth behavior, and scaffold assertions only for wiring that cannot be executed headlessly yet.
+2. Add or extend the closest regression first. Prefer Godot tests under `versao-godot/godot/tests/local_match_fidelity_check.gd` for scene-visible behavior, Python reference tests under `tests/test_landscape_fidelity.py` or `tests/test_port_fidelity.py` for source-of-truth behavior, and scaffold assertions only for wiring that cannot be executed headlessly yet.
 3. Update the status bullets in this document in the same patch as the implementation. Each update should say what now exists and what remains non-final, so this file stays a migration map instead of a changelog that implies completion too early.
 4. Run `scripts/validate_godot_fidelity.sh` before treating any Local Match parity change as stable. If shared Python/gateway code changed, also run `CI=1 .venv/bin/python scripts/run_quality_checks.py`.
 5. When a visual change is intentional, compare against `docs/references/pygame_visual/` first, then refresh Godot browser/headless goldens only after deciding the change improves Pygame parity.
@@ -886,13 +1053,22 @@ This section is the practical handoff for the next agent that opens this reposit
 - Latest MIRV timing audit: Python `Mirv.update()` uses a strict `current_time > _apex_time` split guard; Godot now mirrors that by keeping exact-apex MIRVs alive and splitting only on a later update, with paired Python/Godot regressions.
 - Latest MIRV damage audit: Python `conf/options.ini` sets `[Mirv] Damage = 30.0` and `MirvWeapon.read_settings()` loads it into `OPTION_Damage`; Godot `WeaponInventory.MIRV_DAMAGE` now mirrors that configured classic value instead of the older `22` placeholder, and inventory/shop/MIRV split fixtures reference the named constant.
 - Latest weapon select cooldown audit: Python `Weapon.select()` arms configured cooldowns such as Shell `4.0` and MIRV `7.5`, and firing during a positive cooldown does not spawn a projectile or consume limited ammo. Godot `WeaponInventory` now tracks selected cooldowns/readiness, advances them each frame, accounts for the classic two-second round-start countdown on Shell reset, and Local Match blocks human shell-style firing until ready.
+- Latest gun-arrow readiness audit: Python `Tank._build_gun_primitives()` colors the aiming arrow from selected `Weapon.ready_to_fire()` / cooldown state. Godot `LocalMatch._tank_weapon_ready()` now checks current ammo and selected `WeaponInventory.is_current_ready()`, with Python and Godot regressions proving the arrow readiness stays red during the round-start Shell cooldown and turns green only after the selected weapon is ready.
 - Latest weapon switch delay audit: Python `Tank.update()` sets `_switch_weapon_time = 0.2` after a WeaponUp/WeaponDown cycle and ignores further cycle input while that timer is positive. Godot Local Match now mirrors that with `WEAPON_SWITCH_DELAY`, resets the delay on turn handoff, blocks repeated normal and Machine Gun unselect-cycle inputs during the delay, and has paired Python/Godot regressions for the timing path.
 - Latest limited-weapon final-shot audit: Python `Tank.update_gun()` lets a limited weapon such as MIRV launch its final projectile before `fire()` returns `False` and reselects Shell. Godot Local Match now captures the selected weapon name before ammo consumption, keeps the final-shot projectile weapon as MIRV/Missile/Nuke, reports the fired weapon name instead of the Shell fallback, and has paired Python/Godot regressions for that handoff.
 - Latest round-starting audit: Python `GameState.ROUND_STARTING` lasts two seconds; `Tank.update()` ignores weapon/fire/move/jump commands during that countdown while still calling the selected weapon's `update()`. Godot now mirrors this with `PHASE_ROUND_STARTING`, deferred human/AI firing, ignored weapon-cycle input, and regressions proving Shell cooldown drains during the countdown before `aim` while selectable alternate weapons do not cycle early.
 - Latest round-starting weapon-input validation run for this slice on 2026-07-16: `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path godot --script res://tests/local_match_fidelity_check.gd` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_port_fidelity.py -k 'round_starting_ignores_weapon_input_but_updates_selected_weapon or update_applies_classic_weapon_switch_delay or selected_weapons_wait_for_classic_configured_cooldown'` reported `3 passed, 106 deselected`; `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed; and `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_fidelity.sh` passed with `225 passed`.
 - Latest score timeout audit: Python `ScoreMenu.update()` keeps subtracting from `_time_till_active` after the 2-second human activation gate and auto-advances to shop/final flow when it reaches `-10.0`. Godot now lets `_score_continue_delay` go negative after enabling Continue and auto-calls `_continue_from_score()` at `-SCORE_AUTO_ADVANCE_TIME`, including a large-frame regression that crosses activation and timeout in the same update.
+- Latest score/winner modal input audit: Python `ScoreMenu.update()` accepts player `CMD_FIRE` plus global `pygame.K_SPACE`/`pygame.K_RETURN`, but not cancel; Python `WinnerMenu.update()` accepts only player `CMD_FIRE` after activation and does not use the score screen's global Return fallback. Godot `_unhandled_input()` now ignores `ui_cancel` on score screens, keeps `ui_accept`/`gf_fire` for score continuation, and exits the winner screen only on `gf_fire`. Targeted validation for this slice on 2026-07-17: `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_port_fidelity.py -k 'score_menu_global_return_advances_after_activation or winner_menu_ignores_global_enter_without_player_fire or score_menu_human_match_requires_input_but_auto_advances_after_timeout or winner_menu_human_match_requires_fire_input_to_exit'` reported `4 passed, 140 deselected`; `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path versao-godot/godot --script res://tests/local_match_fidelity_check.gd` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py -k local_match_and_network_adapter_scaffolds_exist` reported `1 passed, 15 deselected`; and `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_fidelity.sh` passed with `261 passed`.
 - Latest shop input-delay audit: Python `ShopMenu.update()` accepts buy/Done/navigation input only when `_player_select_delay < 0.0`; a delay of exactly `0.0` still takes the decrement path and remains locked for that update. Godot now mirrors that by letting `_shop_input_delay` go negative, keeping shop buttons and buy/Done handlers locked while the delay is `>= 0.0`, and only refreshing/unlocking once the timer crosses below zero.
 - Latest shop finish audit: Python `ShopMenu.update()` returns `CURRENT_STATE` on the frame where a player presses `Done!`, then returns `ROUND_STARTING` on the following update once no players remain in the shop. Godot now mirrors that through `_shop_finish_pending`, so human `Done!` plus computer no-purchase pass-through remains in `PHASE_SHOP` until the next modal update starts `round_starting`.
+- Latest shop classic-cursor input audit: Python `ShopMenu.update()` drives the shop with the same player commands used for gun power (`CMD_GUNUP`, `CMD_GUNDOWN`) and fire, keeps a per-player cursor across rows `0..10`, wraps `Gun Up` from Machine Gun to `Done!`, and does not buy anything on that navigation frame. Godot now keeps a per-participant shop cursor, routes `gf_power_up`, `gf_power_down`, and `gf_fire` through the classic row order while preserving the existing button UI, keeps legacy gray rows as no-purchase fire targets, and uses `Done!` to enter the existing one-update shop-finish path. Targeted validation for this slice on 2026-07-17: `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path versao-godot/godot --script res://tests/local_match_fidelity_check.gd` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_port_fidelity.py -k 'shop_ai_style_gunup_from_machine_gun_goes_to_done_without_purchase or shop_gray_catalog_positions_do_not_purchase or shop_input_delay_requires_negative_value_before_action'` reported `3 passed, 143 deselected`.
+- Latest shop selected-row visual audit: Python `ShopMenu.draw()` lights the currently selected shop row with `_line_lit[pos]` and draws the active player's tank-coloured marker at `_player_select_pos`, so cursor movement is visible even before a buy/Done action. Godot now passes the classic `selected_position` into `LocalMatchShop`, marks each catalog row and the `Done!` button with its classic row index, brightens the selected active or gray catalog row, and marks `Done!` selected at position `10`; the existing focus/button UI remains as the Godot interaction shell. The Local Match fidelity check now proves a gray row can be selected visibly and that the cursor state propagated from `gf_power_up` reaches the shop overlay.
+- Latest shop classic row-label audit: Python `ShopMenu.draw()` writes the active catalog rows as only `Machine Gun`, `Jump Jet`, `Mirvs`, `Missiles`, and `Nukes`, with prices in the separate `$cost` column; ammo bars/`xN` are drawn separately near the active player's cursor only for the selected row. Godot `LocalMatchShop` no longer renders Godot-only row text such as `Stock`, `Pack`, `Damage`, `Blast`, effect, or `Current` in the item label. The data needed for future selected-item stock/fuel indicators is preserved as row metadata, and `local_match_fidelity_check.gd` now asserts the visible labels stay classic-only.
+- Latest shop selected limited-stock audit: Python `ShopMenu.draw()` draws `x{ammo}` separately for selected MIRV, Missile, and Nuke rows using `tank.get_weapon(...).get_ammo()`, leaving the row label as `Mirvs`, `Missiles`, or `Nukes`. Godot `LocalMatchShop` now mirrors that visible behavior for selected limited-weapon rows by rendering a separate `xN` stock label from the persistent `classic_shop_stock` metadata while keeping the catalog item label clean. Machine Gun and Jump Jet bar indicators remain a future focused visual parity slice.
+- Latest shop selected limited-stock validation run for this slice on 2026-07-17: `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path versao-godot/godot --script res://tests/local_match_fidelity_check.gd` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_port_fidelity.py -k 'shop_draw_shows_selected_limited_weapon_stock_as_x_count or shop_draw_uses_classic_catalog_order_and_prices'` reported `2 passed, 145 deselected`; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py -k local_match_and_network_adapter_scaffolds_exist` reported `1 passed, 15 deselected`; `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed; and `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_fidelity.sh` passed with `264 passed`.
+- Latest shop classic row-label validation run for this slice on 2026-07-17: `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path versao-godot/godot --script res://tests/local_match_fidelity_check.gd` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py -k local_match_and_network_adapter_scaffolds_exist` reported `1 passed, 15 deselected`; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_port_fidelity.py -k 'shop_draw_uses_classic_catalog_order_and_prices or shop_purchase_machine_gun_adds_50_ammo or shop_purchase_missiles_adds_5_ammo_and_nukes_mirvs_add_1'` reported `3 passed, 143 deselected`; `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed; and `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_fidelity.sh` passed with `263 passed`.
+- Optional browser QA note for this slice: `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/qa_godot_web.sh --check` passed the browser runtime seed/verify checks, but failed the browser visual comparison on the base `local_match` golden with `average=1.171` and `changed_ratio=0.0103`. That browser case does not open the shop overlay touched by this row-label audit, and `docs/references/godot_browser_visual/local_match.png` was already modified in the pre-existing dirty tree, so treat this as a separate local-match browser-golden review item rather than acceptance evidence for the shop label slice.
 - Latest winner computer-only timing audit: Python `WinnerMenu.update()` subtracts the 4-second computer activation delay and returns `CURRENT_STATE` on that exact update; only the next update sees `_time_till_active <= 0.0`, deletes players, and returns `MAIN_MENU`. Godot now mirrors this through `_winner_exit_pending`, with a host-backed regression proving `_show_main_menu()` is called only on the following modal update.
 - Latest final-score leader audit: Python `ScoreMenu.update()` returns `WINNER_MENU` before assigning next-round leader flags when `current_round == num_rounds`, because there is no following shop/round. Godot now mirrors that by opening the final winner overlay before `_update_leader_flags()`, while still using scores rather than leader flags to choose/tie winners.
 - Latest projectile bounds audit: Python `Shell.update()`, `Mirv.update()`, and `Missile.update()` remove projectiles that leave the landscape horizontally without calling `Game.explosion()`. Godot now mirrors that side-exit path by erasing the projectile without explosion, damage, or death audio, while still ending the shot phase if it was the last active projectile.
@@ -911,7 +1087,8 @@ This section is the practical handoff for the next agent that opens this reposit
 - Latest release packaging Python fallback audit: `scripts/package_godot_release.sh` used to require the repository `.venv/bin/python`, which is fragile in GitHub Actions and in this workspace where `.venv` is known stale. It now falls back to `PYTHON_BIN_FALLBACK` or `python`, matching `scripts/validate_godot_fidelity.sh` and `scripts/qa_godot_web.sh`. Validation for this slice on 2026-07-17: `bash -n scripts/package_godot_release.sh scripts/validate_godot_release.sh scripts/qa_godot_web.sh scripts/validate_godot_fidelity.sh` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py` reported `16 passed`; forced-fallback packaging with `PYTHON_BIN=/definitely/missing/python PYTHON_BIN_FALLBACK=.tmp/codex-py314-venv/bin/python scripts/package_godot_release.sh` passed and produced checksum-verified artifacts; and forced-fallback release validation with `PYTHON_BIN=/definitely/missing/python PYTHON_BIN_FALLBACK=.tmp/codex-py314-venv/bin/python scripts/validate_godot_release.sh --package` passed the migration contract, the 248-test fidelity gate, release packaging, and `sha256sum --check`.
 - Latest GitHub release workflow audit: the GitHub connector now verifies access to `p19091985/port-groundfire-for-python` with admin/push permissions, and `git ls-remote` shows no published `v*` tags yet. The remote default branch is `port-groundfire-for-python-version-2026`, and the remote workflows currently publish the release/tag machinery but still need a real tag run. This slice hardens the local workflow definitions before that run: manual `sign-release=true` now installs export templates, runs the package path, and validates that both signing secrets are present; the tag workflow also fails early when only one signing secret is configured. Validation for this slice on 2026-07-17: `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py` reported `16 passed`, `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed, and `CI=1 .tmp/codex-py314-venv/bin/python scripts/run_quality_checks.py` passed `compileall`, `unittest`, `ruff`, and `mypy`. YAML parsing via PyYAML could not be run in the local venv because `yaml` is not installed.
 - Latest grounded boost ordering audit: Python `Tank.update()`/`Tank.move_tank()` keeps a grounded jump-jet start on the track-support path for that frame, so thrust/fuel and detachment happen before airborne gravity or position integration. Godot now preserves that one-frame ordering with `TankState.boost_detach_pending`, covered by paired Python and GDScript regressions.
-- Latest jump-jet fuel overspend audit: Python `Tank.move_tank()` subtracts `FuelUsageRate * time` from both `_fuel` and `_total_fuel` before the next frame's `fuel > 0` gate, so the final powered frame can leave a small negative fuel debt. Godot now mirrors that for jump jets only, while shield/hover fuel spends remain clamped adaptation paths.
+- Latest jump-jet fuel overspend audit: Python `Tank.move_tank()` subtracts `FuelUsageRate * time` from both `_fuel` and `_total_fuel` before the next frame's `fuel > 0` gate, so the final powered frame can leave a small negative fuel debt. Godot now mirrors that for jump jets; the Shield input path is a no-op like Python, while hover fuel spend remains a hidden legacy-prototype adaptation path.
+- Latest Shield runtime audit: Python keeps command index 4 / `Use Shield` in controls, but `Tank.update()`/`move_tank()`/`update_gun()` do not query it, and `GameSessionController.explosion()` applies direct/splash damage through `tank.do_damage(...)` without any shield hook. Godot `TankState.update_shield()` now no-ops, `damage_after_shield()` returns raw damage, and Local Match keeps the binding/protocol action without visible shield, fuel drain, or damage reduction. Targeted validation for this slice on 2026-07-17: `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_port_fidelity.py -k 'tank_update_does_not_query_shield_command or explosion_does_not_apply_shield_damage_reduction or direct_hit_delivers_full_damage or splash_damage_quadratic_falloff_formula'` reported `4 passed, 142 deselected`; `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path versao-godot/godot --script res://tests/local_match_fidelity_check.gd` passed.
 - Latest boost turn-limit audit: Python `Tank.move_tank()` checks the +/-15 degree jump-jet turn limit before applying the 90 degrees-per-second rotation step, so one large frame can overshoot the nominal limit. Godot now has matching Python/GDScript regressions for left and right overshoot from +/-14.9 degrees.
 - Latest gun conflicting-input audit: Python `Tank.update_gun()` cancels aim when Gun Left and Gun Right are both pressed, but checks Gun Up before Gun Down, so both power inputs still increase shot power. Godot Local Match now maps those human input conflicts the same way, with paired Python and GDScript regressions.
 - Latest missile free-fall audit: Python `Missile.update()` moves an already-unfueled missile with stored `_x_vel/_y_vel` before subtracting gravity from `_y_vel` for the next frame. Godot Local Match now applies that position-before-gravity ordering for missile free-fall, with paired Python/GDScript regressions.
@@ -972,6 +1149,7 @@ This section is the practical handoff for the next agent that opens this reposit
 - Latest optional mouse cursor validation run for this slice on 2026-07-17: `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path godot --script res://tests/local_match_fidelity_check.gd` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py` reported `16 passed`; `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_fidelity.sh` passed with `247 passed`; and `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed after the documentation update.
 - Latest Local Match setup add/remove icon audit: Python `PlayerMenu.__init__()` creates each roster row with `GfxButton(..., texture=10)` and `GfxButton(..., texture=11)`, which `conf/assets.json` maps to `data/addbutton.png` and `data/removebutton.png`. Godot now ports those assets to `godot/assets/addbutton.png` and `godot/assets/removebutton.png`; the setup roster keeps one Godot toggle for browser/focus simplicity, but its visible states use the same add/remove textures and the existing `button_pressed` roster semantics.
 - Latest Local Match setup add/remove icon validation run for this slice on 2026-07-17: `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py` reported `16 passed`; `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path godot --script res://tests/runtime_smoke_check.gd` passed; `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_fidelity.sh` passed with `247 passed`; `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed after the documentation update; and, after installing the Godot 4.6.2 export templates under `~/.local/share/godot/export_templates/4.6.2.stable/`, `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/qa_godot_web.sh --check` passed browser runtime QA plus browser visual QA for 5 screenshots. That browser QA initially surfaced stale `local_match_setup` and `local_match` goldens; after source review, the approved Godot browser goldens were refreshed for the setup add/remove icon states and the first-frame round-starting banner.
+- Latest Local Match setup AI-vs-AI audit: the setup screen now treats two or more active participants as start-ready even when all active rows are `Computer`, matching the existing computer-only score/final-result timing support and enabling unattended local AI-vs-AI testing. Validation for this slice on 2026-07-17: `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed; `tools/godot/Godot_v4.6.2-stable_linux.x86_64 --headless --path godot --script res://tests/runtime_smoke_check.gd` passed; and `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/validate_godot_fidelity.sh` passed with `248 passed`.
 - Latest browser QA Python fallback audit: `scripts/qa_godot_web.sh` used to fail before export when `.venv/bin/python` was absent; it now falls back to `PYTHON_BIN_FALLBACK` or `python`, matching `scripts/validate_godot_fidelity.sh` unless callers provide `PYTHON_BIN`.
 - Latest browser QA Python fallback validation run for this slice on 2026-07-17: `bash -n scripts/qa_godot_web.sh` passed; `.tmp/codex-py314-venv/bin/python -m pytest -q tests/test_godot_migration_scaffold.py` reported `16 passed`; running `scripts/qa_godot_web.sh --check` without `PYTHON_BIN` now reaches Godot export-template validation instead of failing on Python discovery when `.venv/bin/python` is absent; after the local export-template install, `PYTHON_BIN=.tmp/codex-py314-venv/bin/python scripts/qa_godot_web.sh --check` passed browser runtime QA plus browser visual QA for 5 screenshots; and `.tmp/codex-py314-venv/bin/python scripts/validate_godot_migration_contract.py` passed after the documentation update.
 - Latest Shell configured-values audit: Python `ShellWeapon.read_settings()` loads `[Shell] Damage = 40.0` and `CooldownTime = 4.0` from `conf/options.ini`. Godot `WeaponInventory` now has matching coverage for Shell damage and cooldown metadata, while raw blast-size comparison remains outside this slice because the Godot blast radius is pixel-adapted.
@@ -994,18 +1172,18 @@ Immediate objective:
 
 Start here:
 
-1. Read this file from `Migration Fidelity Contract` through `Recommended Next Large Batch`.
+1. Read this file from `Migration Compatibility Contract` through `Recommended Next Large Batch`.
 2. Inspect `git status --short` before editing. Preserve existing user/agent changes.
 3. Pick one small reference surface from the checklist: preferably `Landscape.clip_slice`/`Landscape.update`, one tank movement behavior, one weapon edge case, or one score/shop/HUD behavior.
-4. Find the Python reference first under `src/`, then inspect the matching Godot implementation under `godot/scripts/`.
+4. Find the Python reference first under `versao-python/src/`, then inspect the matching Godot implementation under `versao-godot/godot/scripts/`.
 5. Add or extend the closest test before or alongside the behavior change.
 6. Update `First Migration Slice`, `Current Status`, and the relevant remaining-work bullet in this document in the same patch.
 
 Recommended first task for the next agent:
 
-- Continue `Local Match Fidelity 2` with one small named behavior from the checklist, preferably a projectile/weapon edge case or a tank-ground behavior beyond the now-covered round-start grounding, grounded bound clamp, and three-point track support alignment, protected by `godot/tests/local_match_fidelity_check.gd` or a paired Python reference test.
+- Continue `Local Match Fidelity 2` with one small named behavior from the checklist, preferably a projectile/weapon edge case or a tank-ground behavior beyond the now-covered round-start grounding, grounded bound clamp, and three-point track support alignment, protected by `versao-godot/godot/tests/local_match_fidelity_check.gd` or a paired Python reference test.
 - If choosing another visual menu slice instead, compare against `docs/references/pygame_visual/main_menu.png` and `options.png` and focus only on exact logo/title vertical placement, disabled/focus-state pixel polish, or final selector placement; the classic font-atlas renderer itself is now in place.
-- Use browser visual QA for intentional pixel changes, and extend `godot/tests/runtime_smoke_check.gd` only for layout invariants that can be protected headlessly.
+- Use browser visual QA for intentional pixel changes, and extend `versao-godot/godot/tests/runtime_smoke_check.gd` only for layout invariants that can be protected headlessly.
 
 Known terrain cases already covered; do not duplicate these unless extending them:
 
@@ -1046,8 +1224,8 @@ Useful files for a future menu visual task:
 
 - `src/mainmenu.py`, `src/optionmenu.py`, `src/menu.py`: authoritative classic menu layout and background behavior.
 - `docs/references/pygame_visual/main_menu.png` and `docs/references/pygame_visual/options.png`: visual reference captures to compare before accepting new Godot goldens.
-- `godot/scripts/main.gd`, `godot/scripts/classic_font.gd`, `godot/scripts/classic_label.gd`, `godot/scripts/classic_button.gd`, and `godot/scripts/classic_selector.gd`: migrated Main Menu/Options implementation and atlas renderer.
-- `godot/tests/runtime_smoke_check.gd`: headless viewport/focus/layout checks for menu routes.
+- `versao-godot/godot/scripts/main.gd`, `versao-godot/godot/scripts/classic_font.gd`, `versao-godot/godot/scripts/classic_label.gd`, `versao-godot/godot/scripts/classic_button.gd`, and `versao-godot/godot/scripts/classic_selector.gd`: migrated Main Menu/Options implementation and atlas renderer.
+- `versao-godot/godot/tests/runtime_smoke_check.gd`: headless viewport/focus/layout checks for menu routes.
 - `scripts/qa_godot_web.sh`: exported-browser runtime and visual screenshot QA when browser/export dependencies are available.
 
 Do not start with these unless the user explicitly asks:
@@ -1090,7 +1268,7 @@ The sections below replace the former standalone Godot migration docs. Keep migr
 
 ### Validated Release Slice Walkthrough
 
-The Groundfire Godot 4 + GDScript migration release slice for version `0.25.0` has been verified, exported, and packaged locally. This closes the validated release-slice milestone, while future public-online deployment choices and newly discovered fidelity deltas remain tracked in this same strategy document.
+The Groundfire Godot 4 + GDScript migration release slice for version `0.25.0` has been verified, exported, and packaged locally. This closes the validated release-slice milestone, while manual public-online deployment notes and newly discovered fidelity deltas remain tracked in this same strategy document.
 
 What was done:
 
@@ -1122,7 +1300,7 @@ Honest release-slice status:
 
 - Covered by the current gate: major Local Match terrain, projectile, weapon, scoring, shop, winner, HUD, audio, focus, runtime, online reliability, signed expiring gateway join tokens, no-store directory-issued session tokens, browser-safe behavior, optional mouse aiming, wind presentation, and controller/keyboard navigation. Browser QA also verifies exported-web persistence, server browser flows, real local WebSocket gateway handling including signed session-token joins, and five Godot browser visual regression screenshots.
 - Important visual nuance: `scripts/qa_godot_web.sh --check` compares current Godot browser captures against approved Godot browser goldens under `docs/references/godot_browser_visual/`. The authoritative Pygame references under `docs/references/pygame_visual/` are the review target before accepting or refreshing those goldens; the current gate is not a direct automatic pixel comparison of Godot against Pygame.
-- Future production work: register real `RELEASE_GPG_PRIVATE_KEY` / `RELEASE_SIGN_KEY` secrets, push a real `v*` tag and verify GitHub Releases publishing, deploy `https://play.groundfire.net/`, staging/production directory endpoints, `wss://play.groundfire.net/gateway`, and the signed `/session-token.json` issuer behind the final authentication/session policy, run `scripts/verify_godot_hosted_deployment.py` against the real URLs, keep the default public-directory static `auth_token` rejection enabled in hosted deployments, and expand browser QA against hosted directory/gateway behavior.
+- Manual production work: register real `RELEASE_GPG_PRIVATE_KEY` / `RELEASE_SIGN_KEY` secrets, push a real `v*` tag and verify GitHub Releases publishing, deploy `https://play.groundfire.net/`, staging/production directory endpoints, `wss://play.groundfire.net/gateway`, and the signed `/session-token.json` issuer behind the final authentication/session policy, run `scripts/verify_godot_hosted_deployment.py` against the real URLs, keep the default public-directory static `auth_token` rejection enabled in hosted deployments, and expand browser QA against hosted directory/gateway behavior. This is release/operations work, not a blocker for the validated local migration slice.
 - Future fidelity work: continue targeted audits for any screen, timing path, multiplayer edge case, economy/fuel-reserve behavior, future-item behavior, or behavior not yet covered by a named Pygame reference regression. These are follow-up hardening items, not evidence that the current validated release slice failed.
 
 ### Build And Runtime
@@ -1284,7 +1462,7 @@ Recommended hosting expectations:
 - Keep compression and cache headers consistent across `index.pck`, `.wasm`, and JavaScript files. For public releases, prefer immutable cache headers on versioned artifacts and short cache headers on `index.html`.
 - Do not expose desktop-only LAN, UDP, process spawning, or local dedicated server tools from the web build.
 
-Verify a hosted staging/production deployment once the host exists:
+Manually verify a hosted staging/production deployment once the host exists:
 
 ```bash
 scripts/verify_godot_hosted_deployment.py \
@@ -1306,10 +1484,10 @@ Before publishing a release:
 - Run `scripts/package_godot_release.sh`.
 - Run `scripts/qa_godot_web.sh --check` on a machine with Chromium/Chrome, export templates, and Python browser QA dependencies.
 - Verify `SHA256SUMS`.
-- After deploying the web archive and directory service, run `scripts/verify_godot_hosted_deployment.py` against the hosted staging/production URLs.
+- After manually deploying the web archive and directory service, run `scripts/verify_godot_hosted_deployment.py` against the hosted staging/production URLs.
 - Attach the Linux archive, Web archive, manifest, checksum file, and release notes together.
 
-The release process now has both local/manual commands and a tag-based GitHub Actions publishing workflow. The remaining release proof is operational: configure the signing secrets, push a real `v*` tag, verify that GitHub Releases receives the Linux/Web archives, manifest, checksum file, and optional signature, and then record the result in this document.
+The release process now has both local/manual commands and a tag-based GitHub Actions publishing workflow. The remaining release proof is operational and manual: configure the signing secrets, push a real `v*` tag, verify that GitHub Releases receives the Linux/Web archives, manifest, checksum file, and optional signature, and then record the result in this document.
 
 #### Browser QA
 
@@ -1350,25 +1528,25 @@ The read-only server browser directory schema is documented in the `Server Direc
 Serve a production-shaped local HTTP directory for browser-safe Godot testing:
 
 ```bash
-groundfire-directory --directory godot/data/server_directory.json
+groundfire-directory --directory versao-godot/godot/data/server_directory.json
 ```
 
 Inject a local gateway entry while running a local `groundfire-web-gateway`:
 
 ```bash
 groundfire-directory \
-  --directory godot/data/server_directory.json \
+  --directory versao-godot/godot/data/server_directory.json \
   --gateway-endpoint ws://127.0.0.1:8765 \
   --server-name "Local Gateway"
 ```
 
-The service responds on `http://127.0.0.1:27880/servers.json` by default, serves schema `1`, filters LAN entries unless `--include-lan` is set, rejects entries that embed static `auth_token` unless `--allow-static-auth-tokens` is set, validates `session_token_url` as HTTP(S), and emits `Cache-Control`, quoted `ETag`, and `X-Groundfire-Directory-Refresh` headers for browser/runtime QA. The Godot client sends `If-None-Match` on later HTTP refreshes when it has a matching cached ETag and reuses the cached listing on `304 Not Modified`; the service accepts quoted, comma-listed, and legacy unquoted validators for local hosted-directory rehearsals. The service also exposes `/healthz` and `/diagnostics.json` for served-server, filtered-LAN, invalid-entry, and invalid injected-gateway checks during hosted-directory rehearsals. Once this service is deployed behind staging/production routing, run `scripts/verify_godot_hosted_deployment.py` against the public web and directory URLs to prove those same headers, token, and conditional-refresh contracts survive the real host.
+The service responds on `http://127.0.0.1:27880/servers.json` by default, serves schema `1`, filters LAN entries unless `--include-lan` is set, rejects entries that embed static `auth_token` unless `--allow-static-auth-tokens` is set, validates `session_token_url` as HTTP(S), and emits `Cache-Control`, quoted `ETag`, and `X-Groundfire-Directory-Refresh` headers for browser/runtime QA. The Godot client sends `If-None-Match` on later HTTP refreshes when it has a matching cached ETag and reuses the cached listing on `304 Not Modified`; the service accepts quoted, comma-listed, and legacy unquoted validators for local hosted-directory rehearsals. The service also exposes `/healthz` and `/diagnostics.json` for served-server, filtered-LAN, invalid-entry, and invalid injected-gateway checks during hosted-directory rehearsals. Once this service is manually deployed behind staging/production routing, run `scripts/verify_godot_hosted_deployment.py` against the public web and directory URLs to prove those same headers, token, and conditional-refresh contracts survive the real host.
 
 For authenticated hosted rehearsals, start the directory and gateway with the same session secret:
 
 ```bash
 groundfire-directory \
-  --directory godot/data/server_directory.json \
+  --directory versao-godot/godot/data/server_directory.json \
   --session-secret "$GROUNDFIRE_SESSION_SECRET"
 
 groundfire-web-gateway \
@@ -1779,10 +1957,10 @@ It emits `banned` when started with one or more `--ban-player` values or comma-s
 
 #### Remaining Protocol Work
 
-- Harden the deployed gateway/server runtime under hosted production load, including real-domain WebSocket routing, close/disconnect cleanup, latency, reconnect, and multi-client edge cases.
+- After manual deployment, harden the gateway/server runtime under hosted production load, including real-domain WebSocket routing, close/disconnect cleanup, latency, reconnect, and multi-client edge cases.
 - Extend the schema `1` required-field constants and WebSocket state-builder tests whenever new snapshot, terrain-patch, or event payload families are added.
 - Keep the current real TCP/WebSocket/UDP gateway transport test as the minimum compatibility guard for handshake/framing, password rejection, join, input forwarding, snapshot forwarding, ping, disconnect, and backend cleanup messages.
-- Keep the signed-token path and `groundfire-directory` `/session-token.json` endpoint as the minimum production auth bridge until it is deployed behind the final hosted account/session policy.
+- Keep the signed-token path and `groundfire-directory` `/session-token.json` endpoint as the minimum production auth bridge until manual deployment places it behind the final hosted account/session policy.
 - Keep browser-level end-to-end tests against the exported Godot web build in the release/manual QA loop; extend them to hosted staging/production endpoints once those services exist.
 
 ### Server Directory Schema
@@ -1848,7 +2026,7 @@ Optional fields reserved for the public service:
 - `tags`: array.
 - `last_seen_msec`: integer timestamp.
 
-Static `auth_token` values are not a final public authentication model. Treat them as temporary fixtures/private-directory bridges. `groundfire-directory` rejects embedded `auth_token` entries by default for public payloads; `--allow-static-auth-tokens` / `GROUNDFIRE_DIRECTORY_ALLOW_STATIC_AUTH_TOKENS=1` is only for private/dev directories that intentionally need the compatibility path. Public directories should prefer short-lived signed tokens generated by the no-store `groundfire-directory /session-token.json?player_name=...` endpoint or, for local administration, `groundfire-web-gateway --session-secret SECRET --issue-token PLAYER_NAME`; the remaining production task is to deploy that issuer behind the final account/session policy.
+Static `auth_token` values are not a final public authentication model. Treat them as temporary fixtures/private-directory bridges. `groundfire-directory` rejects embedded `auth_token` entries by default for public payloads; `--allow-static-auth-tokens` / `GROUNDFIRE_DIRECTORY_ALLOW_STATIC_AUTH_TOKENS=1` is only for private/dev directories that intentionally need the compatibility path. Public directories should prefer short-lived signed tokens generated by the no-store `groundfire-directory /session-token.json?player_name=...` endpoint or, for local administration, `groundfire-web-gateway --session-secret SECRET --issue-token PLAYER_NAME`; deploying that issuer behind the final account/session policy is a manual production task.
 
 #### Client Behavior
 
@@ -1872,8 +2050,8 @@ The Options screen persists these values in `user://groundfire_options.cfg` unde
 
 #### Remaining Service Work
 
-- Choose and fill the real public HTTP endpoints for dev, staging, and production.
-- Use the local `groundfire-directory` service as the first implementation contract for hosted deployments; it already emits `Cache-Control`, quoted `ETag`, and `X-Groundfire-Directory-Refresh`, accepts production-shaped `If-None-Match` validators, rejects static directory-carried `auth_token` by default, validates HTTP(S) `session_token_url` values, can issue no-store signed session tokens, and the Godot client now validates conditional `304 Not Modified` reuse locally, but the public hosting cadence still needs an operational decision.
+- Choose and fill the real public HTTP endpoints for dev, staging, and production during manual deployment.
+- Use the local `groundfire-directory` service as the first implementation contract for hosted deployments; it already emits `Cache-Control`, quoted `ETag`, and `X-Groundfire-Directory-Refresh`, accepts production-shaped `If-None-Match` validators, rejects static directory-carried `auth_token` by default, validates HTTP(S) `session_token_url` values, can issue no-store signed session tokens, and the Godot client now validates conditional `304 Not Modified` reuse locally. Public hosting cadence is a manual operations decision.
 - Add presence/latency updates through WebSocket or another browser-safe channel.
-- Deploy signed token issuance behind the hosted production authentication/session flow; the local directory service now blocks static directory-carried shared-secret tokens by default, leaving only explicit private/dev opt-in as a compatibility escape hatch.
-- Expand the browser runtime QA beyond the current served schema `1` fixture, first-pass cache/refresh header checks, and local `304 Not Modified` rehearsal to cover production directory cache behavior under real hosting.
+- Deploy signed token issuance behind the hosted production authentication/session flow manually; the local directory service now blocks static directory-carried shared-secret tokens by default, leaving only explicit private/dev opt-in as a compatibility escape hatch.
+- After manual deployment, expand browser runtime QA beyond the current served schema `1` fixture, first-pass cache/refresh header checks, and local `304 Not Modified` rehearsal to cover production directory cache behavior under real hosting.

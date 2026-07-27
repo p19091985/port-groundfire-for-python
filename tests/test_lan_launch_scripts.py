@@ -106,7 +106,7 @@ class LanLaunchScriptTests(unittest.TestCase):
                         self.assertIn(needle, result.stdout)
 
     def test_all_ttk_menu_uses_scrollable_layout_to_keep_buttons_visible(self):
-        launcher = (PROJECT_ROOT / "iniciar-all.sh").read_text(encoding="utf-8")
+        launcher = (PROJECT_ROOT / "versao-python" / "iniciar-all.sh").read_text(encoding="utf-8")
 
         self.assertIn('root.geometry("660x720")', launcher)
         self.assertIn("tk.Canvas", launcher)
@@ -166,7 +166,7 @@ class LanLaunchScriptTests(unittest.TestCase):
     def test_graphical_menus_pass_absolute_launcher_path_to_python_callbacks(self):
         for script_name in ("iniciar-all.sh", "iniciar-server.sh", "iniciar-clientes.sh"):
             with self.subTest(script_name=script_name):
-                launcher = (PROJECT_ROOT / script_name).read_text(encoding="utf-8")
+                launcher = (PROJECT_ROOT / "versao-python" / script_name).read_text(encoding="utf-8")
 
                 self.assertIn('SCRIPT_PATH="$SCRIPT_DIR/$(basename -- "${BASH_SOURCE[0]}")"', launcher)
                 if script_name == "iniciar-server.sh":
@@ -345,8 +345,10 @@ class LanLaunchScriptTests(unittest.TestCase):
             self.assertNotIn("DRY-RUN visible client command:", result.stdout)
 
     def test_server_menu_uses_pygame_dedicated_visuals_and_fields(self):
-        launcher = (PROJECT_ROOT / "iniciar-server.sh").read_text(encoding="utf-8")
-        module = (PROJECT_ROOT / "src" / "groundfire" / "app" / "dedicated_server_menu.py").read_text(encoding="utf-8")
+        launcher = (PROJECT_ROOT / "versao-python" / "iniciar-server.sh").read_text(encoding="utf-8")
+        module = (PROJECT_ROOT / "versao-python" / "src" / "groundfire" / "app" / "dedicated_server_menu.py").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("launch_pygame_menu", launcher)
         self.assertIn("src.groundfire.app.dedicated_server_menu", launcher)

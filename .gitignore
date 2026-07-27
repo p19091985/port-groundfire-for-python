@@ -1,4 +1,18 @@
+# Local runtime/log output
+logs/
 *.log
+*.sqlite
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+
+# OS/editor local files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -59,7 +73,6 @@ cover/
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -198,6 +211,7 @@ cython_debug/
 # Local Godot editor/runtime installs and project import cache
 tools/godot/
 godot/.godot/
+versao-godot/godot/.godot/
 
 # PyPI configuration file
 .pypirc

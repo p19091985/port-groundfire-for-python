@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from groundfire_net.browser import ServerBook, ServerListEntry
+from groundfire_net.browser import SQLITE_SUFFIXES, ServerBook, ServerListEntry
 from groundfire_net.websocket_gateway import DEFAULT_SESSION_TOKEN_TTL_SECONDS, generate_join_token
 
 DIRECTORY_SCHEMA_VERSION = 1
@@ -21,7 +21,10 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 27880
 DEFAULT_REFRESH_SECONDS = 30
 DEFAULT_CACHE_SECONDS = 30
-DEFAULT_DIRECTORY_PATH = Path("godot/data/server_directory.json")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DIRECTORY_PATH = PROJECT_ROOT / "versao-godot" / "godot" / "data" / "server_directory.json"
+if not DEFAULT_DIRECTORY_PATH.exists():
+    DEFAULT_DIRECTORY_PATH = PROJECT_ROOT / "godot" / "data" / "server_directory.json"
 REQUIRED_SERVER_FIELDS = ("name", "game", "players", "map", "latency", "source", "endpoint", "passworded")
 STRING_SERVER_FIELDS = ("name", "game", "players", "map", "latency", "source", "endpoint")
 OPTIONAL_STRING_SERVER_FIELDS = ("region", "description", "version", "auth_token", "session_token_url")
@@ -397,9 +400,14 @@ def _handler_for_config(config: DirectoryServiceConfig) -> type[BaseHTTPRequestH
 
 
 def _load_payload_from_path(path: Path) -> dict[str, Any]:
+    if path.suffix.lower() in SQLITE_SUFFIXES:
+        return ServerBook(path).to_payload()
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        sqlite_path = path.with_suffix(".sqlite3")
+        if sqlite_path.exists():
+            return ServerBook(sqlite_path).to_payload()
         return {"schema": DIRECTORY_SCHEMA_VERSION, "servers": []}
 
 

@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source "$ROOT_DIR/scripts/repo_paths.sh"
+repo_paths_init
 RUN_BROWSER_QA="${GROUNDFIRE_RELEASE_BROWSER_QA:-0}"
 RUN_VISUALS="${GROUNDFIRE_RELEASE_VISUALS:-0}"
 PACKAGE_RELEASE="${GROUNDFIRE_RELEASE_PACKAGE:-0}"
@@ -50,7 +52,6 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-"$ROOT_DIR/scripts/validate_godot_migration_contract.py"
 "$ROOT_DIR/scripts/validate_godot_fidelity.sh"
 
 if [[ "$RUN_VISUALS" == "1" ]]; then
@@ -63,7 +64,7 @@ fi
 
 if [[ "$PACKAGE_RELEASE" == "1" ]]; then
     "$ROOT_DIR/scripts/package_godot_release.sh"
-    latest_checksums=$(find "$ROOT_DIR/dist" -maxdepth 1 -name '*-SHA256SUMS' -type f -printf '%T@ %p\n' \
+    latest_checksums=$(find "$DIST_DIR" -maxdepth 1 -name '*-SHA256SUMS' -type f -printf '%T@ %p\n' \
         | sort -nr \
         | awk 'NR == 1 {print $2}')
     if [[ -z "${latest_checksums:-}" ]]; then
@@ -71,7 +72,7 @@ if [[ "$PACKAGE_RELEASE" == "1" ]]; then
         exit 1
     fi
     (
-        cd "$ROOT_DIR/dist"
+        cd "$DIST_DIR"
         sha256sum --check "$(basename "$latest_checksums")"
     )
     if [[ "$SIGN_RELEASE" == "1" ]]; then

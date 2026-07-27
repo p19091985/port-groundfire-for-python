@@ -17,6 +17,7 @@ from .master import (
     MasterServerDirectory,
     parse_master_server_address,
 )
+from .observability import GroundfireEventLogger
 from .server import NativeServerLoop, ServerLoopConfig
 from .transport import Datagram, DatagramEndpoint
 from .websocket_gateway import WebSocketGateway, WebSocketGatewaySession
@@ -28,6 +29,7 @@ __all__ = [
     "DiscoveredServer",
     "DiscoveryService",
     "DirectoryServiceConfig",
+    "GroundfireEventLogger",
     "JsonDataclassCodec",
     "MasterQuery",
     "MasterServerAddress",

@@ -2,6 +2,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PYTHON_VERSION_DIR = PROJECT_ROOT / "versao-python"
+if not (PYTHON_VERSION_DIR / "src").exists():
+    PYTHON_VERSION_DIR = PROJECT_ROOT
 
 
 class PortabilityFilesTests(unittest.TestCase):
@@ -9,17 +12,23 @@ class PortabilityFilesTests(unittest.TestCase):
         bat = (PROJECT_ROOT / "run_game.bat").read_text(encoding="utf-8")
         ps1 = (PROJECT_ROOT / "run_game.ps1").read_text(encoding="utf-8")
         sh = (PROJECT_ROOT / "run_game.sh").read_text(encoding="utf-8")
+        impl_bat = (PYTHON_VERSION_DIR / "run_game.bat").read_text(encoding="utf-8")
+        impl_ps1 = (PYTHON_VERSION_DIR / "run_game.ps1").read_text(encoding="utf-8")
+        impl_sh = (PYTHON_VERSION_DIR / "run_game.sh").read_text(encoding="utf-8")
 
         self.assertIn("%*", bat)
         self.assertIn("@args", ps1)
         self.assertIn('"$@"', sh)
+        self.assertIn("versao-python", bat)
+        self.assertIn("versao-python", ps1)
+        self.assertIn("versao-python", sh)
 
-        self.assertIn("groundfire", bat)
-        self.assertIn("groundfire", ps1)
-        self.assertIn("groundfire", sh)
-        self.assertNotIn("msgpack", bat)
-        self.assertNotIn("msgpack", ps1)
-        self.assertNotIn("msgpack", sh)
+        self.assertIn("groundfire", impl_bat)
+        self.assertIn("groundfire", impl_ps1)
+        self.assertIn("groundfire", impl_sh)
+        self.assertNotIn("msgpack", impl_bat)
+        self.assertNotIn("msgpack", impl_ps1)
+        self.assertNotIn("msgpack", impl_sh)
 
     def test_pyproject_declares_installable_project_and_console_scripts(self):
         pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -34,7 +43,7 @@ class PortabilityFilesTests(unittest.TestCase):
         self.assertNotIn("msgpack", pyproject)
 
     def test_shell_launcher_installs_package_into_virtual_environment(self):
-        sh = (PROJECT_ROOT / "run_game.sh").read_text(encoding="utf-8")
+        sh = (PYTHON_VERSION_DIR / "run_game.sh").read_text(encoding="utf-8")
 
         self.assertIn('version("groundfire")', sh)
         self.assertIn('pip install --only-binary=pygame -e "$PROJECT_DIR"', sh)
@@ -50,7 +59,7 @@ class PortabilityFilesTests(unittest.TestCase):
 
     def test_readme_and_legacy_entrypoint_align_with_canonical_install_flow(self):
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-        legacy_main = (PROJECT_ROOT / "src" / "main.py").read_text(encoding="utf-8")
+        legacy_main = (PYTHON_VERSION_DIR / "src" / "main.py").read_text(encoding="utf-8")
 
         self.assertIn("pip install -e .", readme)
         self.assertIn("groundfire", readme)
@@ -69,12 +78,12 @@ class PortabilityFilesTests(unittest.TestCase):
         }
 
         for relative_path, expected_import in bridge_targets.items():
-            content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+            content = (PYTHON_VERSION_DIR / relative_path).read_text(encoding="utf-8")
             self.assertIn(expected_import, content)
 
     def test_canonical_package_runtime_no_longer_imports_flat_modules_in_shell_and_hud(self):
-        shell = (PROJECT_ROOT / "src" / "groundfire" / "app" / "shell.py").read_text(encoding="utf-8")
-        hud = (PROJECT_ROOT / "src" / "groundfire" / "render" / "hud.py").read_text(encoding="utf-8")
+        shell = (PYTHON_VERSION_DIR / "src" / "groundfire" / "app" / "shell.py").read_text(encoding="utf-8")
+        hud = (PYTHON_VERSION_DIR / "src" / "groundfire" / "render" / "hud.py").read_text(encoding="utf-8")
 
         self.assertNotIn("from src.", shell)
         self.assertNotIn("import src.", shell)

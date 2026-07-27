@@ -9,7 +9,9 @@ import pygame
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = ROOT / "data"
+DATA_DIR = ROOT / "versao-python" / "data"
+if not DATA_DIR.exists():
+    DATA_DIR = ROOT / "data"
 OUT_DIR = ROOT / "media" / "img"
 
 HERO_SIZE = (1600, 900)

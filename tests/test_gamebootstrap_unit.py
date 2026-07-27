@@ -133,7 +133,7 @@ class GameBootstrapperTests(unittest.TestCase):
 
             bootstrapper.bootstrap(game)
 
-            settings_loader.assert_called_once_with("conf/options.ini")
+            settings_loader.assert_called_once_with(str(root / "conf" / "options.ini"))
             self.assertEqual((game._width, game._height, game._fullscreen), (1024, 768, True))
             self.assertEqual(game._show_fps, True)
             self.assertEqual(game._interface.defined_textures, 4)
@@ -141,7 +141,7 @@ class GameBootstrapperTests(unittest.TestCase):
             self.assertEqual(game._font.texture_id, 3)
             self.assertEqual(game._sound.loaded, [(2, "quake.wav")])
             self.assertEqual(game._controls, "controls")
-            self.assertEqual(game._controls_file.file_name, "conf/controls.ini")
+            self.assertEqual(game._controls_file.file_name, str(root / "conf" / "controls.ini"))
             self.assertEqual(game._controls_file.read_calls, 1)
             self.assertEqual(flow.enter_calls[0][1:], (1, 1))
             self.assertEqual(game._current_menu, "main-menu")

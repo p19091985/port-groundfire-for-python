@@ -12,9 +12,9 @@ class QualityToolsTests(unittest.TestCase):
         self.assertTrue(checks[0].required)
         self.assertEqual(checks[1].name, "unittest")
         self.assertTrue(checks[1].required)
-        self.assertIn("src/main.py", checks[2].command)
-        self.assertIn("src/interface.py", checks[2].command)
-        self.assertIn("src/font.py", checks[3].command)
+        self.assertIn("versao-python/src/main.py", checks[2].command)
+        self.assertIn("versao-python/src/interface.py", checks[2].command)
+        self.assertIn("versao-python/src/font.py", checks[3].command)
 
     def test_summarize_results_only_fails_on_required_errors(self):
         with patch.dict("os.environ", {"CI": ""}):

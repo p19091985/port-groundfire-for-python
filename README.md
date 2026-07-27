@@ -63,9 +63,9 @@ O jogo coloca tanques em um terreno deformável. Cada jogador controla ângulo, 
 Oferecer uma versão moderna e verificável do Groundfire para:
 
 - 🎮 Jogar partidas locais com apresentação clássica
-- 🔬 Preservar comportamento, ritmo e sensação do jogo original
-- 🐍 Portar sistemas gradualmente para Python sem transformar o projeto em um remake solto
-- ✅ Manter cobertura automatizada para mecânicas, renderização, rede, terreno e fidelidade
+- 🔬 Usar a versão histórica como referência, não como limite rígido de design
+- 🐍 Evoluir os sistemas em Python e Godot com arquitetura atual, testável e sustentável
+- ✅ Manter cobertura automatizada para mecânicas, renderização, rede, terreno e compatibilidade prática
 - 📚 Facilitar estudo de arquitetura de jogos 2D com Pygame
 
 ### Principais capacidades
@@ -79,12 +79,12 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | 🤖 IA adversária | Oponentes controlados por computador |
 | 🛒 Loja entre rodadas | Compra de armas e upgrades |
 | 🖥️ Entrada clássica | Jogo local clássico + servidor headless |
-| 🧪 Testes de regressão | Fidelidade para manter o port sob controle |
+| 🧪 Testes de regressão | Compatibilidade e comportamento esperado sob controle |
 
 ### Escopo atual
 
 > [!IMPORTANT]
-> Este projeto ainda está em desenvolvimento. O objetivo não é apenas fazer um jogo parecido rodar em Python; o objetivo é preservar a experiência do Groundfire com o máximo de fidelidade prática, enquanto a base é reorganizada para manutenção moderna.
+> Este projeto ainda está em desenvolvimento. O objetivo atual é manter `versao-python/` e `versao-godot/` como edições canônicas e evoluir o jogo com liberdade técnica. A fidelidade histórica continua útil como material de comparação, mas não é mais um preceito obrigatório quando conflita com qualidade, manutenção, web/desktop ou experiência de jogo.
 
 | Área | Estado | Observação |
 |:---|:---:|:---|
@@ -94,8 +94,8 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | Terreno destrutível | 🟢 ativo | Crateras, queda de terreno e efeitos possuem testes dedicados |
 | Loja entre rodadas | 🟢 ativa | Compra de armas e jump jets |
 | Rede | 🟡 em evolução | Cliente, servidor headless, descoberta LAN e transporte seguro |
-| Cliente Godot desktop/web | 🟡 release slice validada | Cliente em [`godot/`](godot/) com builds Linux/Web `0.25.0` empacotados; a migração completa segue rastreada em docs |
-| Fidelidade histórica | 🟡 em evolução | Testes e registros ajudam a comparar comportamento |
+| Cliente Godot desktop/web | 🟡 release slice validada | Cliente em [`versao-godot/godot/`](versao-godot/godot/) com builds Linux/Web `0.25.0` empacotados; a migração completa segue rastreada em docs |
+| Compatibilidade histórica | 🟡 em evolução | Testes e registros ajudam a comparar comportamento sem bloquear melhorias |
 
 ### Migração desktop/web
 
@@ -277,7 +277,7 @@ Alternativas equivalentes:
 
 ```bash
 python -m groundfire.client
-python src/main.py
+python versao-python/src/main.py
 ```
 
 </details>
@@ -363,7 +363,7 @@ python src/main.py
 
 ## 🕹️ Controles padrão
 
-Os controles podem ser ajustados em [`conf/controls.ini`](conf/controls.ini) ou pelos menus internos de controle.
+Os controles podem ser ajustados em [`versao-python/conf/controls.ini`](versao-python/conf/controls.ini) ou pelos menus internos de controle.
 
 | Ação | Tecla (Jogador 1) |
 |:---|:---:|
@@ -379,7 +379,7 @@ Os controles podem ser ajustados em [`conf/controls.ini`](conf/controls.ini) ou 
 | 🔄 Próxima arma | `O` |
 | 🔄 Arma anterior | `U` |
 
-> O arquivo [`conf/controls.ini`](conf/controls.ini) também contém layouts de joystick para até **oito jogadores**. Os códigos seguem o mapeamento usado pelo Pygame/SDL no ambiente local.
+> O arquivo [`versao-python/conf/controls.ini`](versao-python/conf/controls.ini) também contém layouts de joystick para até **oito jogadores**. Os códigos seguem o mapeamento usado pelo Pygame/SDL no ambiente local.
 
 ---
 
@@ -387,7 +387,7 @@ Os controles podem ser ajustados em [`conf/controls.ini`](conf/controls.ini) ou 
 
 ## ⚙️ Configuração do jogo
 
-As configurações principais ficam em [`conf/options.ini`](conf/options.ini).
+As configurações principais ficam em [`versao-python/conf/options.ini`](versao-python/conf/options.ini).
 
 | Seção | O que controla |
 |:---|:---|
@@ -403,7 +403,7 @@ As configurações principais ficam em [`conf/options.ini`](conf/options.ini).
 | `[Interface]` | Mantido apenas para compatibilidade; o jogo local sempre usa o modo clássico |
 
 > [!TIP]
-> Para experimentar balanceamento, altere os valores em `conf/options.ini` e reinicie o jogo. Mantenha mudanças de gameplay acompanhadas por testes quando elas forem parte de uma contribuição.
+> Para experimentar balanceamento, altere os valores em `versao-python/conf/options.ini` e reinicie o jogo. Mantenha mudanças de gameplay acompanhadas por testes quando elas forem parte de uma contribuição.
 > Por padrão, `BuySpecialWeapons=0` e `UseSpecialWeapons=0`, então a AI de rede joga apenas com `shell` como no clássico.
 
 ---
@@ -448,7 +448,7 @@ Se a porta for omitida, o cliente usa a porta padrão definida no protocolo de r
 
 ### 🔑 Chaves do transporte seguro
 
-O servidor usa caminhos padrão em `conf/network/` para chave privada e chave pública. Quando necessário, esses arquivos são criados pelo fluxo do servidor.
+O servidor usa caminhos padrão em `versao-python/conf/network/` para chave privada e chave pública. Quando necessário, esses arquivos são criados pelo fluxo do servidor.
 
 > [!IMPORTANT]
 > O modo de rede existe para evolução e testes. Para jogar sem atrito, prefira o modo local até que a experiência online esteja completamente estabilizada.
@@ -461,15 +461,19 @@ O servidor usa caminhos padrão em `conf/network/` para chave privada e chave p�
 
 ```
 port-groundfire-for-python/
-├── 📁 conf/                configurações do jogo, controles e mapeamento de assets
-├── 📁 data/                imagens, sons, fonte e sprites do jogo
+├── 📁 versao-godot/
+│   └── 📁 godot/           cliente Godot desktop/web, cenas, scripts e assets
+├── 📁 versao-python/
+│   ├── 📁 conf/            configurações do jogo, controles e mapeamento de assets
+│   ├── 📁 data/            imagens, sons, fonte e sprites do jogo Python
+│   ├── 📁 groundfire/      wrappers públicos para execução como pacote
+│   └── 📁 src/             código principal do port Python
+│       └── 📁 groundfire/  subsistemas de rede, renderização e servidor
 ├── 📁 media/
 │   └── 📁 img/             capturas e imagens geradas para o README
-├── 📁 groundfire/          wrappers públicos para execução como pacote
 ├── 📁 groundfire_net/      módulo de rede nativo copiável entre jogos
 ├── 📁 scripts/             ferramentas de QA, arte, assets e perfilamento
-├── 📁 src/                 código principal do port Python
-│   └── 📁 groundfire/      subsistemas de rede, renderização e servidor
+│   └── 📁 dev/             utilitários manuais de análise e scratch
 ├── 📁 tests/               testes automatizados
 ├── 🦇 run_game.bat         inicializador Windows CMD
 ├── ⚡ run_game.ps1         inicializador Windows PowerShell
@@ -477,6 +481,8 @@ port-groundfire-for-python/
 ├── 📋 pyproject.toml       metadados, scripts e configuração de ferramentas
 └── 📋 requirements.txt     dependências de runtime e desenvolvimento
 ```
+
+Utilitários avulsos de investigação ficam em [`scripts/dev/`](scripts/dev/) para manter a raiz reservada a arquivos comuns, launchers e configuração do projeto.
 
 ### Conteúdo técnico incorporado
 
@@ -494,36 +500,39 @@ port-groundfire-for-python/
 
 ## 🏗️ Arquitetura de manutenção
 
-O projeto mantém duas camadas importantes:
+O projeto mantém duas versões coexistindo e uma camada compartilhada:
 
-- **Camada de compatibilidade histórica** em [`src/`](src) — preserva nomes e organização próximos do port inicial
-- **Camada canônica** em [`src/groundfire/`](src/groundfire) — separa aplicação, simulação, rede, renderização, entrada e gameplay
+- **Versão Python/Pygame** em [`versao-python/`](versao-python/) — edição clássica jogável e runtime de servidor
+- **Versão Godot** em [`versao-godot/godot/`](versao-godot/godot/) — cliente desktop/web em evolução
+- **Código compartilhado** em [`groundfire_net/`](groundfire_net/) e na raiz — serviços, scripts, docs, CI e artefatos comuns
+
+Arquivos `.ini` e `.json` ficam reservados a configuração, manifestos e contratos públicos, como `options.ini`, `controls.ini`, `assets.json` e `server_directory.json`. Dados mutáveis de runtime, como favoritos, histórico e listas descobertas de servidores, usam SQLite por padrão (`servers.sqlite3`) com importação automática do antigo `servers.json`.
 
 ### Mapa de módulos principais
 
 | Caminho | Responsabilidade |
 |:---|:---|
-| [`src/main.py`](src/main.py) | Entrada local de compatibilidade |
-| [`groundfire/client.py`](groundfire/client.py) | Wrapper público do cliente |
-| [`groundfire/server.py`](groundfire/server.py) | Wrapper público do servidor |
-| [`src/groundfire/client.py`](src/groundfire/client.py) | Parser e orquestração do cliente canônico |
-| [`src/groundfire/server.py`](src/groundfire/server.py) | Parser e orquestração do servidor headless |
-| [`src/groundfire/app/`](src/groundfire/app) | Fluxos de aplicação local, cliente, servidor e frontend |
-| [`src/groundfire/sim/`](src/groundfire/sim) | Mundo, terreno, registro e partida simulada |
-| [`src/groundfire/gameplay/`](src/groundfire/gameplay) | Controlador de partida e constantes de gameplay |
-| [`src/groundfire/network/`](src/groundfire/network) | Mensagens, codec, LAN, estado do cliente e backend |
-| [`src/groundfire/render/`](src/groundfire/render) | Terreno, cena, HUD, primitivas e visual de entidades |
-| [`src/groundfire/input/`](src/groundfire/input) | Comandos e controles |
-| [`src/game.py`](src/game.py) | Loop e transições do fluxo clássico |
-| [`src/tank.py`](src/tank.py) | Movimentação, dano, disparo e ciclo de vida do tanque |
-| [`src/aiplayer.py`](src/aiplayer.py) | Mira, escolha de alvo e comportamento da IA |
-| [`src/weapons_impl.py`](src/weapons_impl.py) | Implementações concretas de armas |
-| [`src/shopmenu.py`](src/shopmenu.py) | Compra entre rodadas |
+| [`versao-python/src/main.py`](versao-python/src/main.py) | Entrada local de compatibilidade |
+| [`versao-python/groundfire/client.py`](versao-python/groundfire/client.py) | Wrapper público do cliente |
+| [`versao-python/groundfire/server.py`](versao-python/groundfire/server.py) | Wrapper público do servidor |
+| [`versao-python/src/groundfire/client.py`](versao-python/src/groundfire/client.py) | Parser e orquestração do cliente canônico |
+| [`versao-python/src/groundfire/server.py`](versao-python/src/groundfire/server.py) | Parser e orquestração do servidor headless |
+| [`versao-python/src/groundfire/app/`](versao-python/src/groundfire/app) | Fluxos de aplicação local, cliente, servidor e frontend |
+| [`versao-python/src/groundfire/sim/`](versao-python/src/groundfire/sim) | Mundo, terreno, registro e partida simulada |
+| [`versao-python/src/groundfire/gameplay/`](versao-python/src/groundfire/gameplay) | Controlador de partida e constantes de gameplay |
+| [`versao-python/src/groundfire/network/`](versao-python/src/groundfire/network) | Mensagens, codec, LAN, estado do cliente e backend |
+| [`versao-python/src/groundfire/render/`](versao-python/src/groundfire/render) | Terreno, cena, HUD, primitivas e visual de entidades |
+| [`versao-python/src/groundfire/input/`](versao-python/src/groundfire/input) | Comandos e controles |
+| [`versao-python/src/game.py`](versao-python/src/game.py) | Loop e transições do fluxo clássico |
+| [`versao-python/src/tank.py`](versao-python/src/tank.py) | Movimentação, dano, disparo e ciclo de vida do tanque |
+| [`versao-python/src/aiplayer.py`](versao-python/src/aiplayer.py) | Mira, escolha de alvo e comportamento da IA |
+| [`versao-python/src/weapons_impl.py`](versao-python/src/weapons_impl.py) | Implementações concretas de armas |
+| [`versao-python/src/shopmenu.py`](versao-python/src/shopmenu.py) | Compra entre rodadas |
 
 ### Princípios de manutenção
 
 - 🔒 Preservar nomes e comportamentos quando isso ajuda a comparar com o jogo original
-- 📦 Mover regras compartilhadas para `src/groundfire/` quando houver ganho claro
+- 📦 Mover regras compartilhadas para `versao-python/src/groundfire/` quando houver ganho claro
 - 🧱 Manter renderização, simulação, entrada e rede separadas
 - ✅ Acompanhar mudanças de comportamento com testes automatizados
 - ⚠️ Evitar refatorações grandes sem uma razão verificável
@@ -1023,7 +1032,7 @@ O projeto atual e um port funcional e valioso como preservacao, mas ainda nao e 
 
 <a id="modo-online-nativo"></a>
 
-O modo online usa somente biblioteca padrão do Python no transporte: `socket`, `selectors`, `json` e dataclasses. O pacote copiável [`groundfire_net/`](groundfire_net) concentra codec, UDP, descoberta LAN, master server, lista de servidores, favoritos/histórico e loop de servidor.
+O modo online usa somente biblioteca padrão do Python no transporte: `socket`, `selectors`, `json` e dataclasses. O pacote copiável [`groundfire_net/`](groundfire_net) concentra codec, UDP, descoberta LAN, master server, lista de servidores, favoritos/histórico em SQLite e loop de servidor.
 
 #### Key Files
 
@@ -1035,6 +1044,8 @@ O modo online usa somente biblioteca padrão do Python no transporte: `socket`, 
 | [`src/groundfire/master.py`](src/groundfire/master.py) | Master server nativo para a aba Internet |
 
 O cliente de rede usa descoberta LAN e consulta ao master server para localizar servidores Groundfire. No menu clássico, **Find Servers** abre a lista de servidores com filtros de texto, senha, servidor cheio/vazio, região, secure, latência, favoritos, histórico, adição manual por `host:port`, refresh rápido/geral, connect e ping nativo por UDP.
+
+Logs de rede e servidor podem ser emitidos como texto humano ou JSON Lines por `--log-format text|json`; `--log-file` grava o mesmo fluxo em arquivo e mantém `--log-events` para stdout.
 
 #### Start The Master Server
 
@@ -1241,7 +1252,7 @@ LocalMenuMode=classic
 - Confirme host e porta usados no servidor
 - Rode cliente e servidor na mesma máquina com `127.0.0.1` para isolar problema de rede
 - Verifique firewall local
-- Confira se o servidor terminou a criação das chaves em `conf/network/`
+- Confira se o servidor terminou a criação das chaves em `versao-python/conf/network/`
 
 </details>
 
@@ -1343,9 +1354,9 @@ The game places tanks on deformable terrain. Each player controls angle, power, 
 Provide a modern, verifiable version of Groundfire for:
 
 - 🎮 Playing local matches with the classic presentation
-- 🔬 Preserving the behavior, rhythm, and feel of the original game
-- 🐍 Porting systems gradually to Python instead of turning the game into a loose remake
-- ✅ Keeping automated coverage for mechanics, rendering, network code, terrain, and fidelity
+- 🔬 Using the historical version as a reference, not as a hard design limit
+- 🐍 Evolving the Python and Godot systems with current, testable architecture
+- ✅ Keeping automated coverage for mechanics, rendering, network code, terrain, and practical compatibility
 - 📚 Studying a 2D Pygame game architecture
 
 ### Main Capabilities
@@ -1359,12 +1370,12 @@ Provide a modern, verifiable version of Groundfire for:
 | 🤖 AI opponents | Computer-controlled players |
 | 🛒 Between-round shop | Weapon and upgrade purchasing |
 | 🖥️ Classic entry point | Classic local game + headless server |
-| 🧪 Regression tests | Fidelity checks to keep the port under control |
+| 🧪 Regression tests | Compatibility and expected behavior checks |
 
 ### Current Scope
 
 > [!IMPORTANT]
-> This project is still in development. The goal is not only to make a similar game run in Python; the goal is to preserve the Groundfire experience with as much practical fidelity as possible while reorganizing the codebase for modern maintenance.
+> This project is still in development. The current goal is to keep `versao-python/` and `versao-godot/` as the canonical editions while evolving the game with technical freedom. Historical fidelity remains useful comparison material, but it is no longer a mandatory rule when it conflicts with quality, maintainability, desktop/web delivery, or game experience.
 
 | Area | Status | Notes |
 |:---|:---:|:---|
@@ -1374,8 +1385,8 @@ Provide a modern, verifiable version of Groundfire for:
 | Destructible terrain | 🟢 active | Craters, terrain falling, and effects have dedicated tests |
 | Between-round shop | 🟢 active | Weapon and jump jet purchasing |
 | Network | 🟡 evolving | Client, headless server, LAN discovery, native UDP transport, and server registry helpers |
-| Godot desktop/web client | 🟡 validated release slice | Client under [`godot/`](godot/) with packaged Linux/Web `0.25.0` builds; the full migration remains tracked in docs |
-| Historical fidelity | 🟡 evolving | Tests and recorded output help compare behavior |
+| Godot desktop/web client | 🟡 validated release slice | Client under [`versao-godot/godot/`](versao-godot/godot/) with packaged Linux/Web `0.25.0` builds; the full migration remains tracked in docs |
+| Historical compatibility | 🟡 evolving | Tests and recorded output help compare behavior without blocking improvements |
 
 ### Desktop/Web Migration
 
@@ -1542,7 +1553,7 @@ Equivalent options:
 
 ```bash
 python -m groundfire.client
-python src/main.py
+python versao-python/src/main.py
 ```
 
 </details>
@@ -1627,7 +1638,7 @@ python src/main.py
 
 ## 🕹️ Default Controls
 
-Controls can be edited in [`conf/controls.ini`](conf/controls.ini) or through the in-game control menus.
+Controls can be edited in [`versao-python/conf/controls.ini`](versao-python/conf/controls.ini) or through the in-game control menus.
 
 | Action | Player 1 Default Key |
 |:---|:---:|
@@ -1643,7 +1654,7 @@ Controls can be edited in [`conf/controls.ini`](conf/controls.ini) or through th
 | 🔄 Next weapon | `O` |
 | 🔄 Previous weapon | `U` |
 
-> [`conf/controls.ini`](conf/controls.ini) also contains joystick layouts for up to **eight players**. Codes follow the mapping used by Pygame/SDL on the local machine.
+> [`versao-python/conf/controls.ini`](versao-python/conf/controls.ini) also contains joystick layouts for up to **eight players**. Codes follow the mapping used by Pygame/SDL on the local machine.
 
 ---
 
@@ -1651,7 +1662,7 @@ Controls can be edited in [`conf/controls.ini`](conf/controls.ini) or through th
 
 ## ⚙️ Game Configuration
 
-Main settings live in [`conf/options.ini`](conf/options.ini).
+Main settings live in [`versao-python/conf/options.ini`](versao-python/conf/options.ini).
 
 | Section | Controls |
 |:---|:---|
@@ -1667,7 +1678,7 @@ Main settings live in [`conf/options.ini`](conf/options.ini).
 | `[Interface]` | Compatibility only; local play always uses the classic flow |
 
 > [!TIP]
-> To experiment with balance, edit `conf/options.ini` and restart the game. Gameplay changes that are meant to be contributed should be backed by tests.
+> To experiment with balance, edit `versao-python/conf/options.ini` and restart the game. Gameplay changes that are meant to be contributed should be backed by tests.
 > By default, `BuySpecialWeapons=0` and `UseSpecialWeapons=0`, so network AI plays with `shell` only like the classic game.
 
 ---
@@ -1712,7 +1723,7 @@ If the port is omitted, the client uses the default protocol port.
 
 ### 🔑 Secure Transport Keys
 
-The server uses default paths under `conf/network/` for private and public keys. When needed, those files are created by the server flow.
+The server uses default paths under `versao-python/conf/network/` for private and public keys. When needed, those files are created by the server flow.
 
 > [!IMPORTANT]
 > Network mode exists for development and testing. For the smoothest gameplay, prefer local mode until the online experience is fully stabilized.
@@ -1725,15 +1736,19 @@ The server uses default paths under `conf/network/` for private and public keys.
 
 ```
 port-groundfire-for-python/
-├── 📁 conf/                game options, controls, and asset mapping
-├── 📁 data/                game images, sounds, font, and sprites
+├── 📁 versao-godot/
+│   └── 📁 godot/           Godot desktop/web client, scenes, scripts, and assets
+├── 📁 versao-python/
+│   ├── 📁 conf/            game options, controls, and asset mapping
+│   ├── 📁 data/            Python game images, sounds, font, and sprites
+│   ├── 📁 groundfire/      public wrappers for package execution
+│   └── 📁 src/             main Python port code
+│       └── 📁 groundfire/  game, network, rendering, and server subsystems
 ├── 📁 media/
 │   └── 📁 img/             generated screenshots and images
-├── 📁 groundfire/          public wrappers for package execution
 ├── 📁 groundfire_net/      native networking module reusable across games
 ├── 📁 scripts/             QA, artwork, asset, and profiling tools
-├── 📁 src/                 main Python port code
-│   └── 📁 groundfire/      game, network, rendering, and server subsystems
+│   └── 📁 dev/             manual analysis and scratch utilities
 ├── 📁 tests/               automated tests
 ├── 🦇 run_game.bat         Windows CMD launcher
 ├── ⚡ run_game.ps1         Windows PowerShell launcher
@@ -1741,6 +1756,8 @@ port-groundfire-for-python/
 ├── 📋 pyproject.toml       project metadata, scripts, and tool config
 └── 📋 requirements.txt     runtime and development dependencies
 ```
+
+One-off investigation utilities live in [`scripts/dev/`](scripts/dev/) so the repository root stays focused on shared files, launchers, and project configuration.
 
 ### Incorporated Technical Content
 
@@ -1758,36 +1775,37 @@ port-groundfire-for-python/
 
 ## 🏗️ Maintenance Architecture
 
-The project currently has two important layers:
+The project currently has two coexisting versions and one shared layer:
 
-- **Historical compatibility layer** in [`src/`](src) — preserves names and organization close to the initial port
-- **Canonical layer** in [`src/groundfire/`](src/groundfire) — separates application, simulation, network, rendering, input, and gameplay
+- **Python/Pygame version** in [`versao-python/`](versao-python/) — preserves the playable classic port
+- **Godot version** in [`versao-godot/godot/`](versao-godot/godot/) — preservation-focused desktop/web migration client
+- **Shared code** in [`groundfire_net/`](groundfire_net/) and the repository root — services, scripts, docs, CI, and common artifacts
 
 ### Main Modules
 
 | Path | Responsibility |
 |:---|:---|
-| [`src/main.py`](src/main.py) | Compatibility local entry point |
-| [`groundfire/client.py`](groundfire/client.py) | Public client wrapper |
-| [`groundfire/server.py`](groundfire/server.py) | Public server wrapper |
-| [`src/groundfire/client.py`](src/groundfire/client.py) | Canonical client parser and orchestration |
-| [`src/groundfire/server.py`](src/groundfire/server.py) | Headless server parser and orchestration |
-| [`src/groundfire/app/`](src/groundfire/app) | Local, client, server, and frontend application flows |
-| [`src/groundfire/sim/`](src/groundfire/sim) | World, terrain, registry, and simulated match |
-| [`src/groundfire/gameplay/`](src/groundfire/gameplay) | Match controller and gameplay constants |
-| [`src/groundfire/network/`](src/groundfire/network) | Messages, codec, LAN, client state, and backend |
-| [`src/groundfire/render/`](src/groundfire/render) | Terrain, scene, HUD, primitives, and entity visuals |
-| [`src/groundfire/input/`](src/groundfire/input) | Commands and controls |
-| [`src/game.py`](src/game.py) | Classic flow loop and state transitions |
-| [`src/tank.py`](src/tank.py) | Tank movement, damage, firing, and lifecycle |
-| [`src/aiplayer.py`](src/aiplayer.py) | AI targeting and aiming behavior |
-| [`src/weapons_impl.py`](src/weapons_impl.py) | Concrete weapon implementations |
-| [`src/shopmenu.py`](src/shopmenu.py) | Between-round purchasing |
+| [`versao-python/src/main.py`](versao-python/src/main.py) | Compatibility local entry point |
+| [`versao-python/groundfire/client.py`](versao-python/groundfire/client.py) | Public client wrapper |
+| [`versao-python/groundfire/server.py`](versao-python/groundfire/server.py) | Public server wrapper |
+| [`versao-python/src/groundfire/client.py`](versao-python/src/groundfire/client.py) | Canonical client parser and orchestration |
+| [`versao-python/src/groundfire/server.py`](versao-python/src/groundfire/server.py) | Headless server parser and orchestration |
+| [`versao-python/src/groundfire/app/`](versao-python/src/groundfire/app) | Local, client, server, and frontend application flows |
+| [`versao-python/src/groundfire/sim/`](versao-python/src/groundfire/sim) | World, terrain, registry, and simulated match |
+| [`versao-python/src/groundfire/gameplay/`](versao-python/src/groundfire/gameplay) | Match controller and gameplay constants |
+| [`versao-python/src/groundfire/network/`](versao-python/src/groundfire/network) | Messages, codec, LAN, client state, and backend |
+| [`versao-python/src/groundfire/render/`](versao-python/src/groundfire/render) | Terrain, scene, HUD, primitives, and entity visuals |
+| [`versao-python/src/groundfire/input/`](versao-python/src/groundfire/input) | Commands and controls |
+| [`versao-python/src/game.py`](versao-python/src/game.py) | Classic flow loop and state transitions |
+| [`versao-python/src/tank.py`](versao-python/src/tank.py) | Tank movement, damage, firing, and lifecycle |
+| [`versao-python/src/aiplayer.py`](versao-python/src/aiplayer.py) | AI targeting and aiming behavior |
+| [`versao-python/src/weapons_impl.py`](versao-python/src/weapons_impl.py) | Concrete weapon implementations |
+| [`versao-python/src/shopmenu.py`](versao-python/src/shopmenu.py) | Between-round purchasing |
 
 ### Maintenance Principles
 
 - 🔒 Preserve names and behavior when it helps comparison with the original game
-- 📦 Move shared rules into `src/groundfire/` when there is a clear benefit
+- 📦 Move shared rules into `versao-python/src/groundfire/` when there is a clear benefit
 - 🧱 Keep rendering, simulation, input, and networking separated
 - ✅ Cover behavior changes with automated tests
 - ⚠️ Avoid large refactors without a verifiable reason
@@ -1916,7 +1934,9 @@ The roadmap proposes gradual modernization while keeping the game playable after
 
 <a id="native-online-mode-en"></a>
 
-The online client/server path uses only Python's standard library for transport: `socket`, `selectors`, `json`, and dataclasses. The copyable [`groundfire_net/`](groundfire_net) package contains the codec, UDP endpoint, LAN discovery, master server, server list, favorites/history, and server loop.
+The online client/server path uses only Python's standard library for transport: `socket`, `selectors`, `json`, and dataclasses. The copyable [`groundfire_net/`](groundfire_net) package contains the codec, UDP endpoint, LAN discovery, master server, server list, SQLite-backed favorites/history, and server loop.
+
+Network and server logs can be emitted as human text or JSON Lines with `--log-format text|json`; `--log-file` writes the same event stream to disk while `--log-events` keeps stdout behavior.
 
 | File | Purpose |
 |:---|:---|
@@ -2130,7 +2150,7 @@ LocalMenuMode=classic
 - Confirm the host and port used by the server
 - Run client and server on the same machine with `127.0.0.1` to isolate network issues
 - Check the local firewall
-- Confirm the server finished creating the keys under `conf/network/`
+- Confirm the server finished creating the keys under `versao-python/conf/network/`
 
 </details>
 

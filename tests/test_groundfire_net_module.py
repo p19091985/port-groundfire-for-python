@@ -6,13 +6,26 @@ import struct
 import threading
 import unittest
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from src.groundfire.network.codec import decode_message, encode_message
+from src.groundfire.network.messages import (
+    ClientCommandEnvelope,
+    HelloRequest,
+    JoinAccept,
+    JoinRequest,
+    ServerSnapshotEnvelope,
+)
+from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
+from src.groundfire.sim.world import ReplicatedEntityState, TerrainPatch
+
 from groundfire_net import (
     DirectoryServiceConfig,
+    GroundfireEventLogger,
     JsonDataclassCodec,
     ServerBook,
     ServerListEntry,
@@ -48,16 +61,6 @@ from groundfire_net.websocket_gateway import (
     generate_join_token,
     validate_join_token,
 )
-from src.groundfire.network.codec import decode_message, encode_message
-from src.groundfire.network.messages import (
-    ClientCommandEnvelope,
-    HelloRequest,
-    JoinAccept,
-    JoinRequest,
-    ServerSnapshotEnvelope,
-)
-from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
-from src.groundfire.sim.world import ReplicatedEntityState, TerrainPatch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -92,6 +95,35 @@ class GroundfireNetModuleTests(unittest.TestCase):
             self.assertEqual(reloaded.get_favorites()[0].endpoint, "127.0.0.1:27015")
             self.assertEqual(reloaded.get_history()[0].name, "Local")
             self.assertRegex(reloaded.get_history()[0].last_played, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}")
+            self.assertEqual(reloaded.storage_path, Path(temp_dir) / "servers.sqlite3")
+            self.assertTrue(reloaded.storage_path.exists())
+            self.assertFalse(path.exists())
+
+    def test_server_book_imports_legacy_json_into_sqlite(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "servers.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "favorites": [
+                            {
+                                "name": "Legacy",
+                                "host": "127.0.0.1",
+                                "port": 27016,
+                            }
+                        ],
+                        "history": [],
+                        "internet": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            book = ServerBook(path)
+
+            self.assertEqual(book.get_favorites()[0].endpoint, "127.0.0.1:27016")
+            self.assertEqual(book.storage_path, Path(temp_dir) / "servers.sqlite3")
+            self.assertTrue(book.storage_path.exists())
 
     def test_server_book_persists_internet_list_and_password_flag(self):
         with TemporaryDirectory() as temp_dir:
@@ -149,6 +181,42 @@ class GroundfireNetModuleTests(unittest.TestCase):
             self.assertEqual(server["source"], "online")
             self.assertEqual(server["endpoint"], "wss://play.example.test:443")
             self.assertTrue(server["passworded"])
+
+    def test_directory_service_reads_sqlite_server_book_directly(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "servers.sqlite3"
+            book = ServerBook(path)
+            book.set_internet_servers(
+                (
+                    ServerListEntry(
+                        name="SQLite Gateway",
+                        host="play.example.test",
+                        port=443,
+                        map_name="classic",
+                        source="internet",
+                        secure=True,
+                    ),
+                )
+            )
+
+            payload = load_directory_payload(DirectoryServiceConfig(directory_path=path))
+
+            self.assertEqual(payload["servers"][0]["name"], "SQLite Gateway")
+            self.assertEqual(payload["servers"][0]["endpoint"], "wss://play.example.test:443")
+
+    def test_event_logger_can_emit_structured_json_lines(self):
+        stream = StringIO()
+        logger = GroundfireEventLogger("groundfire-test", stream=stream, json_lines=True, run_id="run-1")
+
+        logger("join_accept player_number=2 computer=false player_name='Ana Maria'")
+
+        payload = json.loads(stream.getvalue())
+        self.assertEqual(payload["component"], "groundfire-test")
+        self.assertEqual(payload["event"], "join_accept")
+        self.assertEqual(payload["run_id"], "run-1")
+        self.assertEqual(payload["fields"]["player_number"], 2)
+        self.assertFalse(payload["fields"]["computer"])
+        self.assertEqual(payload["fields"]["player_name"], "Ana Maria")
 
     def test_directory_service_injects_session_token_url_for_gateway_entry(self):
         with TemporaryDirectory() as temp_dir:
@@ -313,7 +381,10 @@ class GroundfireNetModuleTests(unittest.TestCase):
                     urlopen(f"http://{host}:{port}/session-token.json?player_name=Alice", timeout=5)
 
                 self.assertEqual(raised.exception.code, 404)
-                self.assertEqual(json.loads(raised.exception.read().decode("utf-8"))["error"], "session_tokens_disabled")
+                self.assertEqual(
+                    json.loads(raised.exception.read().decode("utf-8"))["error"],
+                    "session_tokens_disabled",
+                )
             finally:
                 server.shutdown()
                 server.server_close()
@@ -449,7 +520,10 @@ class GroundfireNetModuleTests(unittest.TestCase):
             diagnostics = directory_diagnostics(DirectoryServiceConfig(directory_path=path))
 
             self.assertEqual([server["name"] for server in public_payload["servers"]], ["Signed Session"])
-            self.assertEqual([server["name"] for server in private_payload["servers"]], ["Static Secret", "Signed Session"])
+            self.assertEqual(
+                [server["name"] for server in private_payload["servers"]],
+                ["Static Secret", "Signed Session"],
+            )
             self.assertFalse(diagnostics["ok"])
             self.assertFalse(diagnostics["allow_static_auth_tokens"])
             self.assertEqual(diagnostics["accepted_servers"], 1)
@@ -501,7 +575,10 @@ class GroundfireNetModuleTests(unittest.TestCase):
         first = WebSocketGatewaySession(required_password="secret", join_registry=registry)
         second = WebSocketGatewaySession(required_password="secret", join_registry=registry)
 
-        self.assertEqual(first.prepare_join({"player_name": "Alice", "password": "wrong"})["message"], "invalid_password")
+        self.assertEqual(
+            first.prepare_join({"player_name": "Alice", "password": "wrong"})["message"],
+            "invalid_password",
+        )
         self.assertIsNone(first.prepare_join({"player_name": "Alice", "password": "secret"}))
         self.assertEqual(first._player_number, 1)
         self.assertEqual(first.hello_response()["players_connected"], 1)
@@ -687,7 +764,10 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertIn("Compatibility Policy", doc)
         self.assertIn("highest mutually supported protocol", doc)
         self.assertIn("No silent downgrade or upgrade", doc)
-        self.assertIn("normal public compatibility window keeps the current published protocol and the previous public protocol", doc)
+        self.assertIn(
+            "normal public compatibility window keeps the current published protocol and the previous public protocol",
+            doc,
+        )
         self.assertIn("password_required", doc)
         self.assertIn("auth_required", doc)
         self.assertIn("auth_token", doc)

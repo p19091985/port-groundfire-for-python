@@ -9,20 +9,30 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MIGRATION_DOC = PROJECT_ROOT / "docs" / "godot_migration_strategy.md"
 
 REQUIRED_GLOBAL_PHRASES = (
-    "## Migration Fidelity Contract",
-    "User experience cannot be changed by the migration.",
-    "The Python/Pygame client is the behavioral, visual, input, audio, timing, and flow source of truth",
-    "Godot browser goldens are regression captures, not fidelity targets.",
+    "## Migration Compatibility Contract",
+    "This is now an evolution-first migration.",
+    "`versao-python/` and `versao-godot/godot/` are the canonical editions",
+    "historical fidelity is comparison material rather than a hard product rule",
+    "The Python/Pygame client remains the most useful behavioral reference for classic systems",
+    "Prefer modern, testable architecture over exact historical coupling",
+    "use SQLite for mutable runtime state where practical",
     (
-        "Every migration implementation batch must name its Pygame reference, user-visible invariants, "
-        "allowed Godot adaptation, and required validation before code is treated as complete."
+        "Every migration implementation batch must name its reference material, user-visible contract, "
+        "allowed adaptation, and required validation before code is treated as complete."
     ),
-    "### Fidelity Annotation Template",
+    "### Compatibility Annotation Template",
     "scripts/validate_godot_migration_contract.py",
     "docs/references/pygame_visual/",
 )
 
-ANNOTATION_LABELS = (
+COMPATIBILITY_ANNOTATION_LABELS = (
+    "`Reference material:`",
+    "`User-visible contract:`",
+    "`Allowed adaptation:`",
+    "`Required validation:`",
+)
+
+LEGACY_ANNOTATION_LABELS = (
     "`Fidelity target:`",
     "`User-visible invariants:`",
     "`Allowed Godot adaptation:`",
@@ -63,11 +73,11 @@ def validate_migration_contract(markdown: str) -> list[str]:
 
     for phrase in REQUIRED_GLOBAL_PHRASES:
         if phrase not in markdown:
-            errors.append(f"missing required migration fidelity phrase: {phrase}")
+            errors.append(f"missing required migration compatibility phrase: {phrase}")
 
-    for label in ANNOTATION_LABELS:
+    for label in COMPATIBILITY_ANNOTATION_LABELS:
         if label not in markdown:
-            errors.append(f"missing fidelity annotation template label: {label}")
+            errors.append(f"missing compatibility annotation template label: {label}")
 
     if "## What Still Needs To Be Done" not in markdown:
         errors.append("missing pending migration section: ## What Still Needs To Be Done")
@@ -77,15 +87,19 @@ def validate_migration_contract(markdown: str) -> list[str]:
         if not body:
             errors.append(f"missing pending migration subsection: {header}")
             continue
-        if "Fidelity annotations:" not in body:
-            errors.append(f"{header} is missing a Fidelity annotations block")
-        for label in ANNOTATION_LABELS:
+        has_compatibility_block = "Compatibility references:" in body
+        has_legacy_block = "Fidelity annotations:" in body
+        if not has_compatibility_block and not has_legacy_block:
+            errors.append(f"{header} is missing a compatibility/reference annotations block")
+            continue
+        labels = COMPATIBILITY_ANNOTATION_LABELS if has_compatibility_block else LEGACY_ANNOTATION_LABELS
+        for label in labels:
             if label not in body:
                 errors.append(f"{header} is missing annotation label {label}")
 
     recommended_body = _section_body(markdown, "## Recommended Next Large Batch")
-    if "Every recommended batch inherits the `Migration Fidelity Contract`." not in recommended_body:
-        errors.append("Recommended Next Large Batch must explicitly inherit the Migration Fidelity Contract")
+    if "Every recommended batch inherits the `Migration Compatibility Contract`." not in recommended_body:
+        errors.append("Recommended Next Large Batch must explicitly inherit the Migration Compatibility Contract")
 
     return errors
 
@@ -104,12 +118,12 @@ def main() -> int:
     errors = validate_migration_contract(markdown)
     errors += validate_release_files()
     if errors:
-        print("Godot migration fidelity contract validation failed:", file=sys.stderr)
+        print("Godot migration compatibility contract validation failed:", file=sys.stderr)
         for error in errors:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    print("Godot migration fidelity contract validation passed.")
+    print("Godot migration compatibility contract validation passed.")
     return 0
 
 

@@ -1,0 +1,86 @@
+#!/usr/bin/env sh
+# shellcheck shell=sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+VENV_PYTHON="$PROJECT_DIR/.venv/bin/python"
+VENV_GROUNDFIRE="$PROJECT_DIR/.venv/bin/groundfire"
+VERSION_CHECK='import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
+RUNTIME_CHECK='import os, sys; sys.path=[p for p in sys.path if p not in ("", os.getcwd())]; import pygame, groundfire_net; from importlib.metadata import version; version("groundfire"); raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'
+
+die() {
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+test_interpreter() {
+    interpreter=$1
+    code=$2
+
+    "$interpreter" -c "$code" >/dev/null 2>&1
+}
+
+find_python() {
+    for candidate in python3.13 python3.12 python3.11 python3.10 python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 && test_interpreter "$candidate" "$VERSION_CHECK"; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+ensure_venv() {
+    if [ -x "$VENV_PYTHON" ] && [ -x "$VENV_GROUNDFIRE" ] && test_interpreter "$VENV_PYTHON" "$RUNTIME_CHECK"; then
+        return 0
+    fi
+
+    if [ -x "$VENV_PYTHON" ]; then
+        echo "Ambiente virtual existente ausente do sistema, dependencias ou com Python incompativel. Reconfigurando..."
+    else
+        echo "Ambiente virtual nao encontrado. Instalando o sistema..."
+    fi
+
+    PYTHON_BIN=$(find_python) || die "Python compativel nao encontrado no PATH. Use Python 3.10, 3.11, 3.12 ou 3.13."
+
+    echo "Usando interpretador: $PYTHON_BIN"
+
+    if [ -x "$VENV_PYTHON" ] && ! test_interpreter "$VENV_PYTHON" "$VERSION_CHECK"; then
+        echo "Ambiente virtual existente usa um Python incompativel. Recriando a .venv..."
+        rm -rf "$PROJECT_DIR/.venv"
+    fi
+
+    if [ ! -x "$VENV_PYTHON" ]; then
+        echo "Criando ambiente virtual..."
+        "$PYTHON_BIN" -m venv "$PROJECT_DIR/.venv"
+    fi
+
+    if [ "${GROUNDFIRE_SKIP_PIP_UPGRADE:-0}" = "1" ]; then
+        echo "Upgrade de pip ignorado por GROUNDFIRE_SKIP_PIP_UPGRADE=1."
+    else
+        echo "Atualizando pip..."
+        "$VENV_PYTHON" -m pip install --upgrade pip
+    fi
+
+    install_project
+
+    if [ ! -x "$VENV_PYTHON" ] || [ ! -x "$VENV_GROUNDFIRE" ] || ! test_interpreter "$VENV_PYTHON" "$RUNTIME_CHECK"; then
+        echo "Falha: o ambiente virtual nao foi criado corretamente." >&2
+        return 1
+    fi
+}
+
+install_project() {
+    echo "Instalando Groundfire em modo editavel..."
+    if "$VENV_PYTHON" -m pip install --only-binary=pygame -e "$PROJECT_DIR"; then
+        return 0
+    fi
+
+    echo "Instalacao com wheel precompilado do pygame falhou. Tentando fallback generico..."
+    "$VENV_PYTHON" -m pip install -e "$PROJECT_DIR"
+}
+
+ensure_venv
+exec "$VENV_GROUNDFIRE" "$@"
