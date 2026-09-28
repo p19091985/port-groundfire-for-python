@@ -8,12 +8,13 @@ func _init() -> void:
 
 
 func _run() -> void:
-	assert(NetworkAdapter.PROTOCOL_VERSION == 1)
+	assert(NetworkAdapter.PROTOCOL_VERSION == 2)
 	assert(NetworkAdapter.MIN_SUPPORTED_PROTOCOL == 1)
 	assert(NetworkAdapter.MAX_SUPPORTED_PROTOCOL == NetworkAdapter.PROTOCOL_VERSION)
 	assert(NetworkAdapter.client_supports_protocol(1))
+	assert(NetworkAdapter.client_supports_protocol(2))
 	assert(not NetworkAdapter.client_supports_protocol(0))
-	assert(not NetworkAdapter.client_supports_protocol(2))
+	assert(not NetworkAdapter.client_supports_protocol(3))
 
 	var explicit_protocols := {
 		"type": "hello",
@@ -22,34 +23,41 @@ func _run() -> void:
 		"match_snapshot_schema": 1,
 		"event_schema": 1,
 	}
-	assert(NetworkAdapter.negotiated_protocol(explicit_protocols) == 1)
+	assert(NetworkAdapter.negotiated_protocol(explicit_protocols) == 2)
 	assert(NetworkAdapter.server_supports_client_protocol(explicit_protocols))
 	assert(
 		NetworkAdapter.protocol_status_message(explicit_protocols)
-		== "Protocol 1 accepted. Snapshot schema 1, event schema 1."
+		== "Protocol 2 accepted. Snapshot schema 1, event schema 1."
 	)
 
 	var range_protocols := {"type": "hello", "protocol": 2, "min_protocol": 1, "max_protocol": 2}
-	assert(NetworkAdapter.negotiated_protocol(range_protocols) == 1)
+	assert(NetworkAdapter.negotiated_protocol(range_protocols) == 2)
 	assert(NetworkAdapter.server_supports_client_protocol(range_protocols))
 
-	var incompatible := {"type": "hello", "protocol": 2, "supported_protocols": [2, 3]}
+	var incompatible := {"type": "hello", "protocol": 3, "supported_protocols": [3, 4]}
 	assert(NetworkAdapter.negotiated_protocol(incompatible) == 0)
 	assert(not NetworkAdapter.server_supports_client_protocol(incompatible))
-	assert(NetworkAdapter.protocol_status_message(incompatible).contains("server supports [2, 3]"))
+	assert(NetworkAdapter.protocol_status_message(incompatible).contains("server supports [3, 4]"))
 
 	var missing := NetworkAdapter.parse_message(JSON.stringify({"type": "hello"}))
 	assert(missing.get("message", "") == "missing_protocol")
 	assert(missing.get("expected_protocol", 0) == NetworkAdapter.PROTOCOL_VERSION)
 
-	var mismatch := NetworkAdapter.parse_message(JSON.stringify({"type": "hello", "protocol": 2}))
+	var mismatch := NetworkAdapter.parse_message(JSON.stringify({"type": "hello", "protocol": 3}))
 	assert(mismatch.get("message", "") == "protocol_mismatch")
 	assert(mismatch.get("min_protocol", 0) == NetworkAdapter.MIN_SUPPORTED_PROTOCOL)
 	assert(mismatch.get("max_protocol", 0) == NetworkAdapter.MAX_SUPPORTED_PROTOCOL)
-	assert(mismatch.get("received_protocol", 0) == 2)
+	assert(mismatch.get("received_protocol", 0) == 3)
 
 	var parsed := NetworkAdapter.parse_message(JSON.stringify({"type": "hello", "protocol": 1}))
 	assert(parsed.get("type", "") == "hello")
+	var resume := NetworkAdapter.session_resume_message("session-1", 2, "token-1", "Player")
+	assert(resume.get("type", "") == NetworkAdapter.MESSAGE_SESSION_RESUME)
+	assert(resume.get("protocol", 0) == 2)
+	assert(resume.get("player_number", -1) == 2)
+	var spectator_join := NetworkAdapter.join_message("Caster", "", "", true)
+	assert(bool(spectator_join.get("spectator", false)))
+	assert(spectator_join.get("type", "") == NetworkAdapter.MESSAGE_JOIN)
 	assert(NetworkAdapter.server_error_category("invalid_password") == NetworkAdapter.SERVER_ERROR_CATEGORY_CREDENTIALS)
 	assert(NetworkAdapter.server_error_category("authentication_failed") == NetworkAdapter.SERVER_ERROR_CATEGORY_CREDENTIALS)
 	assert(NetworkAdapter.server_error_category("server_full") == NetworkAdapter.SERVER_ERROR_CATEGORY_CAPACITY)

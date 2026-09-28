@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/license-MIT-292929?style=for-the-badge" alt="License">
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%20—%203.13-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Python-3.10%20—%203.14-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Pygame-2.6.1-1f6f43?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiIGZpbGw9IndoaXRlIi8+PC9zdmc+" alt="Pygame">
   <img src="https://img.shields.io/badge/rede-UDP%20nativo%20%7C%20JSON-4B8BBE?style=flat-square" alt="Rede">
 </p>
@@ -54,7 +54,7 @@
 
 ## 🎯 O que é este projeto?
 
-O **Groundfire — Port Python** é uma adaptação em Python/Pygame do jogo **Groundfire v0.25**, criado originalmente por **Tom Russell**. A proposta deste repositório é manter o espírito do jogo original vivo em uma base mais fácil de executar, estudar, testar e evoluir em ambientes Python atuais.
+O **Groundfire — Port Python** começou como uma adaptação em Python/Pygame do **Groundfire v0.25**, criado por **Tom Russell**. Hoje o repositório reúne a edição Python, uma migração jogável para Godot 4 e um serviço externo independente para salas e partidas gerenciadas. A edição Python é a referência de comportamento para a migração Godot; os dois clientes continuam utilizáveis durante o desenvolvimento.
 
 O jogo coloca tanques em um terreno deformável. Cada jogador controla ângulo, potência, movimento, escudo, combustível de salto e escolha de armas. Entre as rodadas, a economia permite comprar munição e melhorias.
 
@@ -63,8 +63,8 @@ O jogo coloca tanques em um terreno deformável. Cada jogador controla ângulo, 
 Oferecer uma versão moderna e verificável do Groundfire para:
 
 - 🎮 Jogar partidas locais com apresentação clássica
-- 🔬 Usar a versão histórica como referência, não como limite rígido de design
-- 🐍 Evoluir os sistemas em Python e Godot com arquitetura atual, testável e sustentável
+- 🔬 Preservar a experiência Python como referência verificável da migração Godot
+- 🐍 Evoluir os dois clientes e o serviço independente com arquitetura testável
 - ✅ Manter cobertura automatizada para mecânicas, renderização, rede, terreno e compatibilidade prática
 - 📚 Facilitar estudo de arquitetura de jogos 2D com Pygame
 
@@ -79,12 +79,14 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | 🤖 IA adversária | Oponentes controlados por computador |
 | 🛒 Loja entre rodadas | Compra de armas e upgrades |
 | 🖥️ Entrada clássica | Jogo local clássico + servidor headless |
+| 🌐 Acesso on-line | Navegador de servidores, LAN, lobby, espectador e retomada de sessão |
+| 🧩 Serviço independente | Contas, presença, grupos, convites, salas e reservas para partidas gerenciadas |
 | 🧪 Testes de regressão | Compatibilidade e comportamento esperado sob controle |
 
 ### Escopo atual
 
 > [!IMPORTANT]
-> Este projeto ainda está em desenvolvimento. O objetivo atual é manter `versao-python/` e `versao-godot/` como edições canônicas e evoluir o jogo com liberdade técnica. A fidelidade histórica continua útil como material de comparação, mas não é mais um preceito obrigatório quando conflita com qualidade, manutenção, web/desktop ou experiência de jogo.
+> Este projeto ainda está em desenvolvimento. `versao-python/` e `versao-godot/` são as duas edições canônicas. A migração Godot deve reproduzir a experiência Python correspondente; mudanças deliberadas na experiência on-line devem ser implementadas nas duas edições. A homologação visual, sonora e de distribuição ainda não está completa.
 
 | Área | Estado | Observação |
 |:---|:---:|:---|
@@ -93,23 +95,27 @@ Oferecer uma versão moderna e verificável do Groundfire para:
 | IA local | 🟢 ativa | Jogadores controlados pelo computador estão implementados |
 | Terreno destrutível | 🟢 ativo | Crateras, queda de terreno e efeitos possuem testes dedicados |
 | Loja entre rodadas | 🟢 ativa | Compra de armas e jump jets |
-| Rede | 🟡 em evolução | Cliente, servidor headless, descoberta LAN e transporte seguro |
-| Cliente Godot desktop/web | 🟡 release slice validada | Cliente em [`versao-godot/godot/`](versao-godot/godot/) com builds Linux/Web `0.25.0` empacotados; a migração completa segue rastreada em docs |
-| Compatibilidade histórica | 🟡 em evolução | Testes e registros ajudam a comparar comportamento sem bloquear melhorias |
+| Rede LAN/direta | 🟢 implementada | Servidor autoritativo UDP, descoberta LAN, lobby, chat, espectador e retomada; testar firewall e endereço em cada ambiente |
+| Serviço externo | 🟡 em validação | API, SQLite, contas, social, salas, reservas e worker de partidas existem em [`servico-externo/`](servico-externo/); implantação pública e UX completa ainda pendentes |
+| Cliente Godot desktop/web | 🟡 em evolução | Cliente em [`versao-godot/godot/`](versao-godot/godot/) com recorte Linux/Web `0.25.0` empacotado anteriormente; isso não homologa o fluxo gerenciado atual |
+| Fidelidade Python/Godot | 🟡 em execução | Combate/loja simultâneos, passo fixo, controles por participante, configuração clássica e UDP/LAN real implementados; comparação completa das cinco armas, visual e áudio ainda aberta |
+| Pastas standalone | 🔴 portateis no Windows; Linux parcial | `versao-python/` e `versao-godot/` serão **duas pastas independentes**: copiar cada pasta inteira e executar seu launcher, sem a raiz ou a outra edição. Veja o [projeto ST00–ST08](docs/godot_migration_strategy.md#projeto-edicoes-standalone) |
 
 ### Migração desktop/web
 
-O projeto iniciou uma migração gradual para um cliente **Godot 4 + GDScript**, mantendo o Python/Pygame atual funcionando durante a transição. A release slice Godot `0.25.0` já foi validada, exportada e empacotada para Linux/Web, mas isso não significa que a migração inteira esteja encerrada. A regra de produto para web e simples: recursos que dependem de comportamento nativo do sistema operacional ou rede local nao aparecem no navegador.
+O projeto migra gradualmente para **Godot 4 + GDScript**, mantendo Python/Pygame executável. O recorte Godot `0.25.0` já teve exportações Linux/Web verificadas em uma etapa anterior; a versão gerenciada atual precisa de novos ensaios de distribuição. Na web, recursos dependentes de UDP, descoberta LAN ou criação de processos locais ficam indisponíveis.
 
 | Recurso | Desktop | Web |
 |:---|:---:|:---:|
 | Partida local contra IA | sim | sim |
-| Browser online | sim | sim |
+| Navegador HTTP e conexão por WebSocket | sim | sim, quando o serviço/gateway está acessível por HTTPS/WSS |
 | LAN discovery | sim | nao |
 | UDP nativo | sim | nao |
 | Ferramentas de servidor dedicado local | sim | nao |
 
-O plano de migracao, as pendencias, o handoff para agentes e o marco de verificacao/empacotamento da release Godot seguem em [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md).
+O contrato de fidelidade, as pendências e os registros de validação ficam em [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md).
+
+**Projeto de alteração (atualizado em 26/09/2026):** [fidelidade Godot à versão Python e evolução on-line nas duas edições](docs/godot_migration_strategy.md#projeto-2026-09). Os lotes de gameplay, navegador, lobby, revanche, chat, retomada de sessão e conexão UDP/LAN Godot com o servidor Python estão implementados e validados. O documento registra as lacunas ainda abertas e impede declarar fidelidade total antes da comparação diferencial e visual completa.
 
 ---
 
@@ -142,9 +148,11 @@ As imagens abaixo foram geradas a partir de assets do próprio projeto e ajudam 
 
 | Item | Requisito |
 |:---|:---|
-| 🐍 Python | 3.10, 3.11, 3.12 ou 3.13 |
+| 🐍 Python | 3.10, 3.11, 3.12, 3.13 ou 3.14 |
 | 🖥️ Interface gráfica | Ambiente com suporte a janela Pygame |
-| 📦 Dependências principais | `pygame` |
+| 📦 Dependências do cliente Python | `pygame`, `pygame_gui` e `pygame-menu`; consulte [`pyproject.toml`](pyproject.toml) |
+| 🎮 Edição Godot | Godot 4; usar versão compatível com [`project.godot`](versao-godot/godot/project.godot) e templates correspondentes ao exportar |
+| 🧩 Serviço externo | Python 3.10–3.14 e shell `sh`; dependências próprias em [`servico-externo/pyproject.toml`](servico-externo/pyproject.toml) |
 | 🖧 Sistema operacional | Windows, Linux, macOS ou WSL com suporte gráfico |
 | 📄 Licença | MIT |
 
@@ -222,7 +230,7 @@ run_game.bat
 
 O fluxo automático executa, em ordem:
 
-1. Procura Python 3.10 a 3.13
+1. Procura Python 3.10 a 3.14
 2. Cria `.venv` quando necessário
 3. Recria `.venv` se o Python for incompatível
 4. Atualiza `pip`
@@ -282,6 +290,27 @@ python versao-python/src/main.py
 
 </details>
 
+### 4️⃣ Abrir a edição Godot
+
+Abra [`versao-godot/godot/project.godot`](versao-godot/godot/project.godot) no editor Godot e execute o projeto. Pela linha de comando, a partir da raiz:
+
+```bash
+godot --path versao-godot/godot
+```
+
+Os launchers equivalentes são `versao-godot/run_game.bat` (CMD), `versao-godot/run_game.ps1` (PowerShell) e `bash versao-godot/run_game.sh` (Bash). Para subir servidor e duas janelas Godot já conectadas: `bash versao-godot/iniciar-all.sh -n 2`.
+
+O executável pode se chamar `godot4` ou `Godot` conforme a instalação. No desktop, o menu oferece partida local e navegação LAN/on-line; no navegador, a edição exportada depende de endpoints HTTP(S)/WS(S) acessíveis.
+
+### 5️⃣ Preparar o serviço externo (opcional para LAN)
+
+```sh
+sh servico-externo/servico-externo.sh check
+sh servico-externo/servico-externo.sh
+```
+
+O launcher cria `servico-externo/.venv` e instala dependências na primeira execução; precisa de acesso ao índice de pacotes nesse momento. No Windows, execute o comando em Git Bash ou WSL, que fornecem `sh`. O serviço escuta em `127.0.0.1:27880` por padrão. Configuração e operação: [`servico-externo/README.md`](servico-externo/README.md). A partida local e a conexão LAN direta não dependem dele.
+
 ---
 
 <a id="como-iniciar-o-jogo"></a>
@@ -293,6 +322,9 @@ python versao-python/src/main.py
 | **Local recomendado** | `groundfire` |
 | Com nome de jogador | `python -m groundfire.client --player-name Jogador` |
 | Smoke test (um frame) | `python -m groundfire.client --once` |
+| Godot desktop | `versao-godot/run_game.bat`, `.ps1` ou `bash versao-godot/run_game.sh` |
+| Servidor LAN/direto | `groundfire-server --host 0.0.0.0 --port 45000` |
+| Serviço externo | `sh servico-externo/servico-externo.sh` |
 
 ---
 
@@ -305,9 +337,19 @@ python versao-python/src/main.py
 | [`run_game.sh`](run_game.sh) | Prepara `.venv`, instala deps e inicia o jogo | 🐧 Linux / 🍎 macOS / WSL |
 | [`run_game.bat`](run_game.bat) | Prepara `.venv`, instala deps e inicia o jogo | 🪟 Windows CMD |
 | [`run_game.ps1`](run_game.ps1) | Prepara `.venv`, instala deps e inicia o jogo | 🪟 Windows PowerShell |
+| [`versao-godot/run_game.sh`](versao-godot/run_game.sh) | Abre o projeto Godot; aceita argumentos da engine | Bash/Git Bash/WSL |
+| [`versao-godot/run_game.bat`](versao-godot/run_game.bat) | Abre o projeto Godot | Windows CMD |
+| [`versao-godot/run_game.ps1`](versao-godot/run_game.ps1) | Abre o projeto Godot | Windows PowerShell |
+| [`versao-godot/iniciar-server.sh`](versao-godot/iniciar-server.sh) | Sobe em primeiro plano o servidor autoritativo Python usado pelo cliente Godot | Hospedar LAN sem janela Pygame |
+| [`versao-godot/iniciar-clientes.sh`](versao-godot/iniciar-clientes.sh) | Abre 1–8 instâncias Godot já conectadas por UDP | Testar vários clientes |
+| [`versao-godot/iniciar-all.sh`](versao-godot/iniciar-all.sh) | Sobe o servidor e os clientes Godot; encerra o servidor ao sair | Partida LAN local completa |
 | [`iniciar-all.sh`](iniciar-all.sh) | Abre menu Ttk ou usa `-A` para iniciar 1 servidor LAN, 6 tanks IA e 6 janelas do jogo | Testes multiplayer automaticos com tela |
 | [`iniciar-server.sh`](iniciar-server.sh) | Inicia servidor LAN por `-A`, com cliente visual local por default | Depuracao de servidor e smoke visual |
 | [`iniciar-clientes.sh`](iniciar-clientes.sh) | Abre N clientes por `-n`; com `-a`, todos os IA ficam visiveis por default | Carga e testes LAN |
+| [`servico-externo/servico-externo.sh`](servico-externo/servico-externo.sh) | Instala o pacote isolado e executa `start`, `check`, `status`, `stop`, `backup`, `restore` ou `test` | Salas e partidas gerenciadas |
+| [`scripts/validate_godot.sh`](scripts/validate_godot.sh) | Executa contratos Godot headless | Verificar a migração |
+| [`scripts/validate_godot_fidelity.sh`](scripts/validate_godot_fidelity.sh) | Executa verificações de fidelidade Godot/Python | Alterações de gameplay/menus |
+| [`scripts/validate_godot_udp_integration.py`](scripts/validate_godot_udp_integration.py) | Exercita cliente Godot contra servidor Python real | Rede desktop/LAN |
 | [`scripts/run_quality_checks.py`](scripts/run_quality_checks.py) | Compilação, testes, lint e tipagem | Validação antes de publicar |
 | [`scripts/profile_round_simulation.py`](scripts/profile_round_simulation.py) | Mede desempenho de simulação | Diagnóstico de performance |
 | [`scripts/generate_readme_art.py`](scripts/generate_readme_art.py) | Gera arte usada no README | Manutenção de imagens |
@@ -316,7 +358,9 @@ python versao-python/src/main.py
 > [!TIP]
 > Use `run_game.*` para jogar localmente, `./iniciar-all.sh -A` para subir uma partida LAN automatica de 20 rounds com uma janela por tank IA e `--sem-tela` quando o ambiente nao tiver display. Os launchers tambem aceitam chamada via `sh iniciar-all.sh`, pois reexecutam em Bash automaticamente.
 > Presets rapidos: `./iniciar-all.sh -A --preset 8` e `./iniciar-clientes.sh --preset 4 -a`. Para validar a LAN antes de abrir janelas, use `./iniciar-clientes.sh --check-only --host 127.0.0.1 --port 27015`.
-> Todos os launchers aceitam `--menu` para abrir a interface grafica Ttk e `--cli` para o modo de comando de texto.
+> Os launchers Python `iniciar-*.sh` aceitam `--menu` para abrir a interface grafica Ttk e `--cli` para o modo de comando de texto.
+
+Os três launchers `iniciar-*.sh` de **`versao-godot/`** têm interface própria de linha de comando (`--help`) e não abrem os menus Ttk da edição Python. Exemplo: `sh versao-godot/iniciar-all.sh -n 2`; para apenas jogar, execute `versao-godot/run_game.bat` no CMD ou `bash versao-godot/run_game.sh` em Bash. Defina `GODOT_BIN` quando o executável Godot 4 não estiver no PATH. Em PowerShell com execução de scripts bloqueada, use `powershell -NoProfile -ExecutionPolicy Bypass -File .\versao-godot\run_game.ps1` para essa invocação.
 
 ---
 
@@ -381,6 +425,8 @@ Os controles podem ser ajustados em [`versao-python/conf/controls.ini`](versao-p
 
 > O arquivo [`versao-python/conf/controls.ini`](versao-python/conf/controls.ini) também contém layouts de joystick para até **oito jogadores**. Os códigos seguem o mapeamento usado pelo Pygame/SDL no ambiente local.
 
+No Godot, cada participante usa um slot/dispositivo próprio e os bindings persistidos pelo jogo. Confira o perfil ativo no menu de controles antes de uma partida com dois teclados ou controles físicos.
+
 ---
 
 <a id="configuracao-do-jogo"></a>
@@ -406,6 +452,8 @@ As configurações principais ficam em [`versao-python/conf/options.ini`](versao
 > Para experimentar balanceamento, altere os valores em `versao-python/conf/options.ini` e reinicie o jogo. Mantenha mudanças de gameplay acompanhadas por testes quando elas forem parte de uma contribuição.
 > Por padrão, `BuySpecialWeapons=0` e `UseSpecialWeapons=0`, então a AI de rede joga apenas com `shell` como no clássico.
 
+A edição Godot mantém suas preferências em `user://groundfire_options.cfg` e usa os dados clássicos versionados em [`versao-godot/godot/data/classic/`](versao-godot/godot/data/classic/) para comparar regras com Python. Alterar o INI Python não modifica automaticamente uma instalação Godot. Para o serviço, `GF_SERVICE_CONFIG` aponta para um `config.toml` opcional; `bind`, `port`, `public_base_url`, `allowed_origins`, banco e limites têm valores padrão em [`config.py`](servico-externo/src/gf_service/config.py). Os clientes usam `GROUNDFIRE_SERVICE_URL` (Python) e `application/config/service_base_url` em [`project.godot`](versao-godot/godot/project.godot).
+
 ---
 
 <a id="modo-local-e-modo-online"></a>
@@ -414,17 +462,17 @@ As configurações principais ficam em [`versao-python/conf/options.ini`](versao
 
 ### 🖥️ Jogo local
 
-O modo local é o caminho principal de uso atual:
+O modo local dispensa rede e serviço externo:
 
 ```bash
 groundfire
 ```
 
-O jogo local abre sempre no fluxo clássico antigo. O menu clássico agora mantém o botão **Find Servers** e abre a lista online/LAN dentro da própria interface clássica.
+O menu clássico mantém **Find Servers** para alternar à lista de servidores. O Godot oferece partida local própria; a paridade das telas e dos sons ainda é um critério de aceite aberto.
 
 ### 🖧 Servidor headless
 
-O projeto também inclui um servidor autoritativo sem interface gráfica:
+Para jogar em LAN ou por endereço direto, inicie o servidor autoritativo em uma máquina acessível pelos clientes:
 
 ```bash
 groundfire-server --server-name "Groundfire Server"
@@ -444,14 +492,16 @@ Para conectar em um servidor:
 groundfire --connect 127.0.0.1:45000 --player-name Jogador
 ```
 
-Se a porta for omitida, o cliente usa a porta padrão definida no protocolo de rede.
+Use no Godot desktop **Find Servers → LAN** ou conexão direta para entrar no mesmo servidor Python. Atualização, filtros, favoritos, histórico, senha, pronto, chat, espectador, retomada e revanche têm implementação; a disponibilidade exata depende do transporte e do servidor escolhido. Para descoberta via master, configure `GROUNDFIRE_MASTER_SERVERS`; a descoberta LAN usa broadcast UDP e pode exigir liberação no firewall.
 
-### 🔑 Chaves do transporte seguro
+### 🔑 Serviço gerenciado e segurança do transporte
 
-O servidor usa caminhos padrão em `versao-python/conf/network/` para chave privada e chave pública. Quando necessário, esses arquivos são criados pelo fluxo do servidor.
+O [`servico-externo`](servico-externo/README.md) é outra forma de entrar: ele gerencia contas/convidados, amigos e presença, grupos, convites com expiração, salas por código, fila e reserva de vagas, além de iniciar workers de partida. Consulte o [contrato da API](servico-externo/CONTRATOS.md) e a documentação interativa em `http://127.0.0.1:27880/docs` com o serviço em execução. O cliente Python tem um adapter HTTP; o Godot tem cliente de serviço e hub on-line. As jornadas de UI completas e a distribuição pública seguem em validação.
+
+O UDP direto do jogo **não cifra o tráfego**. `--server-private-key` e `--server-public-key` são opções antigas de compatibilidade e não geram arquivos nem ativam criptografia. A indicação “secure” no navegador é metadado legado, não prova de TLS. Ao publicar a API e o gateway fora da máquina local, configure HTTPS/WSS em um proxy reverso e exponha apenas os endereços públicos necessários; essa implantação ainda precisa de homologação real.
 
 > [!IMPORTANT]
-> O modo de rede existe para evolução e testes. Para jogar sem atrito, prefira o modo local até que a experiência online esteja completamente estabilizada.
+> Local e LAN direta funcionam sem conta externa. Salas, convites e reserva gerenciada exigem o serviço em execução. Antes de anunciar suporte web hospedado ou paridade on-line completa, execute os testes de implantação e de cliente descritos no plano de migração.
 
 ---
 
@@ -472,6 +522,8 @@ port-groundfire-for-python/
 ├── 📁 media/
 │   └── 📁 img/             capturas e imagens geradas para o README
 ├── 📁 groundfire_net/      módulo de rede nativo copiável entre jogos
+├── 📁 servico-externo/     API, banco, runtime headless e launcher independentes
+├── 📁 docs/               estratégia de migração e referências visuais
 ├── 📁 scripts/             ferramentas de QA, arte, assets e perfilamento
 │   └── 📁 dev/             utilitários manuais de análise e scratch
 ├── 📁 tests/               testes automatizados
@@ -491,7 +543,14 @@ Utilitários avulsos de investigação ficam em [`scripts/dev/`](scripts/dev/) p
 | [`cpp_output.txt`](cpp_output.txt) | Registro de execução histórica para comparação |
 | Análise arquitetural 2026 | [Documentação Técnica ↓](#documentacao-tecnica-incorporada) |
 | Roadmap de refatoração 2026 | [Documentação Técnica ↓](#documentacao-tecnica-incorporada) |
-| Modo online seguro | [Documentação Técnica ↓](#documentacao-tecnica-incorporada) |
+| Registro histórico do modo on-line | [Documentação Técnica ↓](#documentacao-tecnica-incorporada) |
+| Estratégia Godot e aceite | [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md) |
+| Projeto das edições standalone | [ST00–ST08 no documento de migração](docs/godot_migration_strategy.md#projeto-edicoes-standalone) |
+| Serviço externo: uso atual | [`servico-externo/README.md`](servico-externo/README.md) |
+| Serviço: arquitetura alvo | [`servico-externo/PROJETO.md`](servico-externo/PROJETO.md) |
+| Serviço: contrato alvo e lacunas | [`servico-externo/CONTRATOS.md`](servico-externo/CONTRATOS.md) |
+| Serviço: lotes e testes de aceite | [`servico-externo/IMPLEMENTACAO-E-TESTES.md`](servico-externo/IMPLEMENTACAO-E-TESTES.md) |
+| Utilitários manuais de desenvolvimento | [`scripts/dev/README.md`](scripts/dev/README.md) |
 | Playtest do controle clássico | [Documentação Técnica ↓](#documentacao-tecnica-incorporada) |
 
 ---
@@ -500,11 +559,12 @@ Utilitários avulsos de investigação ficam em [`scripts/dev/`](scripts/dev/) p
 
 ## 🏗️ Arquitetura de manutenção
 
-O projeto mantém duas versões coexistindo e uma camada compartilhada:
+O projeto mantém duas edições, ferramentas compartilhadas e um serviço distribuível à parte:
 
 - **Versão Python/Pygame** em [`versao-python/`](versao-python/) — edição clássica jogável e runtime de servidor
 - **Versão Godot** em [`versao-godot/godot/`](versao-godot/godot/) — cliente desktop/web em evolução
-- **Código compartilhado** em [`groundfire_net/`](groundfire_net/) e na raiz — serviços, scripts, docs, CI e artefatos comuns
+- **Código compartilhado** em [`groundfire_net/`](groundfire_net/) e na raiz — protocolos, scripts, docs e CI
+- **Serviço independente** em [`servico-externo/`](servico-externo/) — API FastAPI, SQLite, supervisor e cópia versionada do runtime headless; o pacote instalado não importa pastas irmãs
 
 Arquivos `.ini` e `.json` ficam reservados a configuração, manifestos e contratos públicos, como `options.ini`, `controls.ini`, `assets.json` e `server_directory.json`. Dados mutáveis de runtime, como favoritos, histórico e listas descobertas de servidores, usam SQLite por padrão (`servers.sqlite3`) com importação automática do antigo `servers.json`.
 
@@ -521,6 +581,9 @@ Arquivos `.ini` e `.json` ficam reservados a configuração, manifestos e contra
 | [`versao-python/src/groundfire/sim/`](versao-python/src/groundfire/sim) | Mundo, terreno, registro e partida simulada |
 | [`versao-python/src/groundfire/gameplay/`](versao-python/src/groundfire/gameplay) | Controlador de partida e constantes de gameplay |
 | [`versao-python/src/groundfire/network/`](versao-python/src/groundfire/network) | Mensagens, codec, LAN, estado do cliente e backend |
+| [`versao-python/src/groundfire/service_client.py`](versao-python/src/groundfire/service_client.py) | Adapter HTTP para o serviço externo |
+| [`versao-godot/godot/scripts/online/`](versao-godot/godot/scripts/online/) | Cliente do serviço e fluxo de salas Godot |
+| [`servico-externo/src/gf_service/`](servico-externo/src/gf_service/) | API, domínio, persistência, segurança e supervisor |
 | [`versao-python/src/groundfire/render/`](versao-python/src/groundfire/render) | Terreno, cena, HUD, primitivas e visual de entidades |
 | [`versao-python/src/groundfire/input/`](versao-python/src/groundfire/input) | Comandos e controles |
 | [`versao-python/src/game.py`](versao-python/src/game.py) | Loop e transições do fluxo clássico |
@@ -544,7 +607,7 @@ Arquivos `.ini` e `.json` ficam reservados a configuração, manifestos e contra
 ## 📖 Documentação técnica incorporada
 
 > [!NOTE]
-> Esta seção consolida o conteúdo dos arquivos Markdown técnicos que antes ficavam separados. Os arquivos originais foram incorporados aqui para manter o histórico técnico em um único documento. Clique para expandir cada seção.
+> Esta seção preserva análises e roteiros escritos em fases anteriores. Afirmações como “não existe servidor”, caminhos `src/` na raiz ou contagens antigas de testes descrevem **o momento em que foram redigidas**, não o estado atual. Para uso e status atuais, consulte as seções acima, a [estratégia Godot](docs/godot_migration_strategy.md) e o [README do serviço](servico-externo/README.md). O histórico permanece expandível para explicar decisões e regressões.
 
 ---
 
@@ -1039,11 +1102,11 @@ O modo online usa somente biblioteca padrão do Python no transporte: `socket`, 
 | Arquivo | Propósito |
 |:---|:---|
 | [`groundfire_net/`](groundfire_net) | Módulo de rede nativo e reaproveitável |
-| [`src/groundfire/network/`](src/groundfire/network) | Adaptadores do Groundfire para mensagens, descoberta e browser |
-| [`src/groundfire/app/server.py`](src/groundfire/app/server.py) | Servidor autoritativo headless |
-| [`src/groundfire/master.py`](src/groundfire/master.py) | Master server nativo para a aba Internet |
+| [`versao-python/src/groundfire/network/`](versao-python/src/groundfire/network/) | Adaptadores do Groundfire para mensagens, descoberta e browser |
+| [`versao-python/src/groundfire/app/server.py`](versao-python/src/groundfire/app/server.py) | Servidor autoritativo headless |
+| [`versao-python/src/groundfire/master.py`](versao-python/src/groundfire/master.py) | Master server nativo para a aba Internet |
 
-O cliente de rede usa descoberta LAN e consulta ao master server para localizar servidores Groundfire. No menu clássico, **Find Servers** abre a lista de servidores com filtros de texto, senha, servidor cheio/vazio, região, secure, latência, favoritos, histórico, adição manual por `host:port`, refresh rápido/geral, connect e ping nativo por UDP.
+O cliente de rede usa descoberta LAN e consulta ao master server para localizar servidores Groundfire. No menu clássico, **Find Servers** abre a lista de servidores com filtros de texto, senha, servidor cheio/vazio, região, secure, latência, favoritos, histórico, adição manual por `host:port`, refresh rápido/geral, connect e ping nativo por UDP. O fluxo inspirado no navegador do Counter-Strike 1.6 também oferece **Random Server**, a aba **Spectate**, espectador autenticado sem ocupar vaga, chat, retomada de sessão e **Join when a slot opens**.
 
 Logs de rede e servidor podem ser emitidos como texto humano ou JSON Lines por `--log-format text|json`; `--log-file` grava o mesmo fluxo em arquivo e mantém `--log-events` para stdout.
 
@@ -1082,6 +1145,13 @@ python -m src.groundfire.server --host 0.0.0.0 --port 27015 --discovery-port 270
 
 ```powershell
 python -m src.groundfire.client --connect 127.0.0.1:27015
+```
+
+Para assistir sem ocupar uma vaga ou aguardar automaticamente uma vaga de jogador:
+
+```powershell
+python -m src.groundfire.client --connect 127.0.0.1:27015 --spectate
+python -m src.groundfire.client --connect 127.0.0.1:27015 --auto-retry
 ```
 
 #### Notes
@@ -1151,6 +1221,15 @@ If any step fails, capture:
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
+Para incluir os testes `pytest` e o pacote independente (em ambientes com as dependências instaladas):
+
+```bash
+python -m pytest -q
+sh servico-externo/servico-externo.sh test
+```
+
+Os testes do serviço ficam em `servico-externo/tests/` e usam seu próprio ambiente. Uma suíte verde confirma os cenários cobertos; não substitui comparação visual/sonora pareada nem teste hospedado HTTPS/WSS.
+
 ### Rodar verificações de qualidade
 
 ```bash
@@ -1161,7 +1240,7 @@ Esse script executa:
 
 | Verificação | O que faz |
 |:---|:---|
-| `compileall` | Valida sintaxe importável em `src`, `tests`, `scripts` e `groundfire` |
+| `compileall` | Valida a sintaxe dos caminhos Python configurados no script |
 | `unittest` | Roda a suite automatizada |
 | `ruff` | Roda lint quando a ferramenta está disponível |
 | `mypy` | Roda tipagem quando a ferramenta está disponível |
@@ -1177,6 +1256,9 @@ python -m unittest tests.test_fuzz_gameplay
 python -m unittest tests.test_landscape_fidelity
 python -m unittest tests.test_groundfire_entrypoints
 python -m unittest tests.test_lan_discovery
+python -m pytest -q tests/test_online_match_simulation.py tests/test_external_service_client_contract.py
+python scripts/validate_godot_udp_integration.py
+bash scripts/validate_godot_fidelity.sh
 ```
 
 ### Áreas cobertas pela suite
@@ -1189,6 +1271,8 @@ python -m unittest tests.test_lan_discovery
 | Renderização e HUD | `test_gamerenderer`, `test_gamehudrenderer`, `test_gamegraphics` |
 | Entrada e comandos | `test_commandintents`, `test_client_server_apps` |
 | Rede | `test_networkprotocol`, `test_networkstate`, `test_groundfire_codec`, `test_lan_discovery` |
+| Jornada on-line | `test_online_match_simulation`, `test_server_browser_real_network_paths` e `servico-externo/tests/` |
+| Migração Godot | contratos headless, replays clássicos, comparação visual e integração UDP real |
 | Portabilidade | `test_portability`, `test_runtime_portability` |
 
 </details>
@@ -1211,10 +1295,10 @@ python -m unittest tests.test_lan_discovery
 <details>
 <summary><b>🐍 O script diz que o Python é incompatível</b></summary>
 
-Use Python 3.10, 3.11, 3.12 ou 3.13. Os scripts procuram automaticamente por:
+Use Python 3.10, 3.11, 3.12, 3.13 ou 3.14. Os scripts procuram automaticamente por:
 
 ```text
-python3.13, python3.12, python3.11, python3.10, python3, python
+python3.14, python3.13, python3.12, python3.11, python3.10, python3, python
 ```
 
 </details>
@@ -1252,7 +1336,17 @@ LocalMenuMode=classic
 - Confirme host e porta usados no servidor
 - Rode cliente e servidor na mesma máquina com `127.0.0.1` para isolar problema de rede
 - Verifique firewall local
-- Confira se o servidor terminou a criação das chaves em `versao-python/conf/network/`
+- Para LAN, confirme que o cliente alcança o IP da máquina servidora e que as portas UDP estão liberadas
+- Para salas gerenciadas, execute `sh servico-externo/servico-externo.sh status` e verifique `http://127.0.0.1:27880/readyz`
+
+</details>
+
+<details>
+<summary><b>🧩 O hub on-line não encontra o serviço</b></summary>
+
+- Confirme `GROUNDFIRE_SERVICE_URL` no Python ou `application/config/service_base_url` no Godot
+- O padrão `127.0.0.1` aponta para a máquina de **cada cliente**; use o endereço do host do serviço quando eles estiverem separados
+- Para uma página web em HTTPS, use endpoints HTTPS/WSS acessíveis pelo navegador e uma origem autorizada no serviço
 
 </details>
 
@@ -1296,7 +1390,7 @@ Este repositório é distribuído sob a licença **MIT**. Consulte [`LICENSE`](L
 ---
 
 <p align="center">
-  <strong>🔥 Groundfire vive aqui como memória jogável: um clássico de artilharia preservado em Python. 🔥</strong>
+  <strong>🔥 Groundfire vive aqui como memória jogável: um clássico de artilharia em Python e Godot. 🔥</strong>
 </p>
 
 ---
@@ -1345,7 +1439,7 @@ Este repositório é distribuído sob a licença **MIT**. Consulte [`LICENSE`](L
 
 ## 🎯 What Is This Project?
 
-**Groundfire — Python Port** is a Python/Pygame adaptation of **Groundfire v0.25**, originally created by **Tom Russell**. This repository keeps the spirit of the original game alive in a codebase that is easier to run, inspect, test, and evolve on modern Python environments.
+**Groundfire — Python Port** began as a Python/Pygame adaptation of **Groundfire v0.25**, created by **Tom Russell**. This repository now contains the Python edition, a playable Godot 4 migration, and an independent external service for managed rooms and matches. Python is the behavioral reference for Godot migration; both clients remain usable while development continues.
 
 The game places tanks on deformable terrain. Each player controls angle, power, movement, shield, jump fuel, and weapon selection. Between rounds, the economy lets players buy ammunition and upgrades.
 
@@ -1354,8 +1448,8 @@ The game places tanks on deformable terrain. Each player controls angle, power, 
 Provide a modern, verifiable version of Groundfire for:
 
 - 🎮 Playing local matches with the classic presentation
-- 🔬 Using the historical version as a reference, not as a hard design limit
-- 🐍 Evolving the Python and Godot systems with current, testable architecture
+- 🔬 Preserving the Python experience as the verifiable Godot migration reference
+- 🐍 Evolving both clients and the independent service with testable architecture
 - ✅ Keeping automated coverage for mechanics, rendering, network code, terrain, and practical compatibility
 - 📚 Studying a 2D Pygame game architecture
 
@@ -1370,12 +1464,14 @@ Provide a modern, verifiable version of Groundfire for:
 | 🤖 AI opponents | Computer-controlled players |
 | 🛒 Between-round shop | Weapon and upgrade purchasing |
 | 🖥️ Classic entry point | Classic local game + headless server |
+| 🌐 Online access | Server browser, LAN, lobby, spectator, and session resume |
+| 🧩 Independent service | Accounts, presence, parties, invites, rooms, and managed reservations |
 | 🧪 Regression tests | Compatibility and expected behavior checks |
 
 ### Current Scope
 
 > [!IMPORTANT]
-> This project is still in development. The current goal is to keep `versao-python/` and `versao-godot/` as the canonical editions while evolving the game with technical freedom. Historical fidelity remains useful comparison material, but it is no longer a mandatory rule when it conflicts with quality, maintainability, desktop/web delivery, or game experience.
+> This project is still in development. `versao-python/` and `versao-godot/` are the canonical editions. Godot should reproduce the corresponding Python experience; deliberate online UX changes should reach both editions. Full visual, audio, and distribution acceptance remains open.
 
 | Area | Status | Notes |
 |:---|:---:|:---|
@@ -1384,15 +1480,26 @@ Provide a modern, verifiable version of Groundfire for:
 | Local AI | 🟢 active | Computer-controlled players are implemented |
 | Destructible terrain | 🟢 active | Craters, terrain falling, and effects have dedicated tests |
 | Between-round shop | 🟢 active | Weapon and jump jet purchasing |
-| Network | 🟡 evolving | Client, headless server, LAN discovery, native UDP transport, and server registry helpers |
-| Godot desktop/web client | 🟡 validated release slice | Client under [`versao-godot/godot/`](versao-godot/godot/) with packaged Linux/Web `0.25.0` builds; the full migration remains tracked in docs |
-| Historical compatibility | 🟡 evolving | Tests and recorded output help compare behavior without blocking improvements |
+| LAN/direct network | 🟢 implemented | Authoritative UDP server, LAN discovery, lobby, chat, spectators, and resume; test address and firewall per environment |
+| External service | 🟡 under validation | API, SQLite, accounts, social features, rooms, reservations, and match workers in [`servico-externo/`](servico-externo/); public deployment and full UX remain open |
+| Godot desktop/web client | 🟡 evolving | Client under [`versao-godot/godot/`](versao-godot/godot/) had a prior packaged Linux/Web `0.25.0` slice; this does not certify the current managed flow |
+| Python/Godot fidelity | 🟡 in progress | Simultaneous play/shop, fixed step, per-player controls, classic configuration, and real UDP/LAN implemented; five-weapon, visual, and audio comparisons remain open |
+| Standalone edition folders | 🔴 planned | `versao-python/` and `versao-godot/` will be **two independent folders**: copy either entire folder and run its launcher without the repository root or other edition. See the [ST00–ST08 project](docs/godot_migration_strategy.md#projeto-edicoes-standalone) |
 
 ### Desktop/Web Migration
 
-The project has started a gradual migration to a **Godot 4 + GDScript** client while keeping the current Python/Pygame client alive during the transition. The Godot `0.25.0` release slice has been validated, exported, and packaged for Linux/Web, but that is not a claim that the whole migration is complete.
+The project is gradually migrating to **Godot 4 + GDScript** while keeping Python/Pygame runnable. A prior Godot `0.25.0` slice was exported for Linux/Web; the current managed version needs new distribution tests. Web cannot offer native UDP, LAN broadcast discovery, or local process creation.
+
+| Feature | Desktop | Web |
+|:---|:---:|:---:|
+| Local match against AI | yes | yes |
+| HTTP browser and WebSocket connection | yes | yes, when reachable over HTTPS/WSS |
+| LAN discovery and native UDP | yes | no |
+| Start a local dedicated server | yes | no |
 
 The migration plan, remaining work, agent handoff, and Godot release verification and packaging walkthrough are tracked in [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md).
+
+**Current technical project (updated 2026-09-26):** [Python/Godot fidelity and shared online UX evolution](docs/godot_migration_strategy.md#projeto-2026-09). The gameplay, browser, lobby, rematch, chat, session-resume, and native Godot UDP/LAN slices are implemented and validated. The document keeps the remaining differential weapon, visual/audio, room/invite/matchmaking, hosted, and distribution acceptance work explicit.
 
 ---
 
@@ -1425,9 +1532,11 @@ The images below were generated from assets already stored in this repository.
 
 | Item | Requirement |
 |:---|:---|
-| 🐍 Python | 3.10, 3.11, 3.12, or 3.13 |
+| 🐍 Python | 3.10, 3.11, 3.12, 3.13, or 3.14 |
 | 🖥️ Graphics | Environment capable of opening a Pygame window |
-| 📦 Main dependencies | `pygame` |
+| 📦 Python client dependencies | `pygame`, `pygame_gui`, and `pygame-menu`; see [`pyproject.toml`](pyproject.toml) |
+| 🎮 Godot edition | Godot 4 compatible with [`project.godot`](versao-godot/godot/project.godot); matching export templates for packaging |
+| 🧩 External service | Python 3.10–3.14 and `sh`; own dependencies in [`servico-externo/pyproject.toml`](servico-externo/pyproject.toml) |
 | 🖧 Operating system | Windows, Linux, macOS, or WSL with graphics support |
 | 📄 License | MIT |
 
@@ -1505,7 +1614,7 @@ run_game.bat
 
 The automatic flow:
 
-1. Searches for Python 3.10 to 3.13
+1. Searches for Python 3.10 to 3.14
 2. Creates `.venv` when needed
 3. Recreates `.venv` if the Python version is incompatible
 4. Upgrades `pip`
@@ -1558,6 +1667,27 @@ python versao-python/src/main.py
 
 </details>
 
+### 4️⃣ Open the Godot edition
+
+Open [`versao-godot/godot/project.godot`](versao-godot/godot/project.godot) in the Godot editor and run it, or use this command from the repository root:
+
+```bash
+godot --path versao-godot/godot
+```
+
+The equivalent launchers are `versao-godot/run_game.bat` (CMD), `versao-godot/run_game.ps1` (PowerShell), and `bash versao-godot/run_game.sh` (Bash). To start a server plus two connected Godot windows, run `bash versao-godot/iniciar-all.sh -n 2`.
+
+The executable may be named `godot4` or `Godot`. Desktop includes local play and LAN/online browsing; a web export needs browser-reachable HTTP(S)/WS(S) endpoints.
+
+### 5️⃣ Prepare the external service (optional for LAN)
+
+```sh
+sh servico-externo/servico-externo.sh check
+sh servico-externo/servico-externo.sh
+```
+
+The launcher creates `servico-externo/.venv` and installs dependencies on first use, which requires package-index access at that point. On Windows, run it from Git Bash or WSL, which provide `sh`. Its default address is `127.0.0.1:27880`. See the [service guide](servico-externo/README.md). Local play and direct LAN connections work without it.
+
 ---
 
 <a id="how-to-start-the-game"></a>
@@ -1569,6 +1699,9 @@ python versao-python/src/main.py
 | **Recommended local start** | `groundfire` |
 | With player name | `python -m groundfire.client --player-name Player` |
 | Smoke test (single frame) | `python -m groundfire.client --once` |
+| Godot desktop | `versao-godot/run_game.bat`, `.ps1`, or `bash versao-godot/run_game.sh` |
+| LAN/direct server | `groundfire-server --host 0.0.0.0 --port 45000` |
+| External service | `sh servico-externo/servico-externo.sh` |
 
 ---
 
@@ -1581,9 +1714,19 @@ python versao-python/src/main.py
 | [`run_game.sh`](run_game.sh) | Prepares `.venv`, installs deps, and starts the game | 🐧 Linux / 🍎 macOS / WSL |
 | [`run_game.bat`](run_game.bat) | Prepares `.venv`, installs deps, and starts the game | 🪟 Windows CMD |
 | [`run_game.ps1`](run_game.ps1) | Prepares `.venv`, installs deps, and starts the game | 🪟 Windows PowerShell |
+| [`versao-godot/run_game.sh`](versao-godot/run_game.sh) | Opens the Godot project and forwards engine arguments | Bash/Git Bash/WSL |
+| [`versao-godot/run_game.bat`](versao-godot/run_game.bat) | Opens the Godot project | Windows CMD |
+| [`versao-godot/run_game.ps1`](versao-godot/run_game.ps1) | Opens the Godot project | Windows PowerShell |
+| [`versao-godot/iniciar-server.sh`](versao-godot/iniciar-server.sh) | Runs the shared Python authoritative server in the foreground | Host LAN without a Pygame window |
+| [`versao-godot/iniciar-clientes.sh`](versao-godot/iniciar-clientes.sh) | Opens 1–8 Godot clients connected over UDP | Multi-client tests |
+| [`versao-godot/iniciar-all.sh`](versao-godot/iniciar-all.sh) | Starts server and Godot clients, then stops the server on exit | Complete local LAN match |
 | [`iniciar-all.sh`](iniciar-all.sh) | Opens a Ttk menu or uses `-A` to start 1 LAN server, 6 AI tanks, and 6 visible game windows | Automated multiplayer tests with screens |
 | [`iniciar-server.sh`](iniciar-server.sh) | Starts a LAN server via `-A`, with a visible local client by default | Server debugging and visual smoke tests |
 | [`iniciar-clientes.sh`](iniciar-clientes.sh) | Opens N clients with `-n`; with `-a`, every AI client is visible by default | LAN load testing |
+| [`servico-externo/servico-externo.sh`](servico-externo/servico-externo.sh) | Installs isolated package; runs `start`, `check`, `status`, `stop`, `backup`, `restore`, or `test` | Managed rooms and matches |
+| [`scripts/validate_godot.sh`](scripts/validate_godot.sh) | Runs headless Godot contracts | Migration checks |
+| [`scripts/validate_godot_fidelity.sh`](scripts/validate_godot_fidelity.sh) | Checks Python/Godot fidelity | Gameplay and menu changes |
+| [`scripts/validate_godot_udp_integration.py`](scripts/validate_godot_udp_integration.py) | Runs a real Godot client against the Python server | Desktop/LAN networking |
 | [`scripts/run_quality_checks.py`](scripts/run_quality_checks.py) | Compile, test, lint, and type checks | Validation before publishing |
 | [`scripts/profile_round_simulation.py`](scripts/profile_round_simulation.py) | Profiles round simulation performance | Performance diagnostics |
 | [`scripts/generate_readme_art.py`](scripts/generate_readme_art.py) | Generates README artwork into `media/img/` | Documentation image maintenance |
@@ -1591,7 +1734,9 @@ python versao-python/src/main.py
 
 > The launchers also tolerate `sh iniciar-all.sh` style calls by re-executing themselves with Bash before using Bash-only options.
 > Quick presets are available with `./iniciar-all.sh -A --preset 8` and `./iniciar-clientes.sh --preset 4 -a`; `./iniciar-all.sh -A` uses 20 rounds by default, and `--rounds` can override it. Use `./iniciar-clientes.sh --check-only --host 127.0.0.1 --port 27015` to validate UDP reachability first.
-> Every launcher accepts `--menu` for the graphical Ttk interface and `--cli` for text-command mode.
+> The Python `iniciar-*.sh` launchers accept `--menu` for the graphical Ttk interface and `--cli` for text-command mode.
+
+The **`versao-godot/`** `iniciar-*.sh` launchers have their own command-line options (`--help`) and do not open the Python edition's Ttk menus. For example, run `bash versao-godot/iniciar-all.sh -n 2`; for the game alone use `versao-godot/run_game.bat` in CMD or `bash versao-godot/run_game.sh` in Bash. Set `GODOT_BIN` if Godot 4 is not on PATH. If PowerShell blocks scripts, invoke `powershell -NoProfile -ExecutionPolicy Bypass -File .\versao-godot\run_game.ps1` for that run.
 
 ---
 
@@ -1656,6 +1801,8 @@ Controls can be edited in [`versao-python/conf/controls.ini`](versao-python/conf
 
 > [`versao-python/conf/controls.ini`](versao-python/conf/controls.ini) also contains joystick layouts for up to **eight players**. Codes follow the mapping used by Pygame/SDL on the local machine.
 
+Godot assigns a separate input slot/device to each participant and persists its bindings. Check the selected profiles in the controls menu before playing with two keyboards or physical controllers.
+
 ---
 
 <a id="game-configuration"></a>
@@ -1681,6 +1828,8 @@ Main settings live in [`versao-python/conf/options.ini`](versao-python/conf/opti
 > To experiment with balance, edit `versao-python/conf/options.ini` and restart the game. Gameplay changes that are meant to be contributed should be backed by tests.
 > By default, `BuySpecialWeapons=0` and `UseSpecialWeapons=0`, so network AI plays with `shell` only like the classic game.
 
+Godot keeps user preferences in `user://groundfire_options.cfg` and uses versioned [classic data](versao-godot/godot/data/classic/) to compare its rules with Python. Editing the Python INI does not automatically change a Godot installation. The external service accepts an optional `config.toml` via `GF_SERVICE_CONFIG`; default bind, port, public URL, origins, database, and limits are in its [`config.py`](servico-externo/src/gf_service/config.py). Clients use `GROUNDFIRE_SERVICE_URL` (Python) and `application/config/service_base_url` in Godot's [`project.godot`](versao-godot/godot/project.godot).
+
 ---
 
 <a id="local-and-online-modes"></a>
@@ -1689,17 +1838,17 @@ Main settings live in [`versao-python/conf/options.ini`](versao-python/conf/opti
 
 ### 🖥️ Local Game
 
-Local play is the main current usage path:
+Local play does not require networking or the external service:
 
 ```bash
 groundfire
 ```
 
-Local play always opens the old classic flow. The classic menu now keeps the **Find Servers** button and opens the online/LAN browser inside the classic interface.
+The classic menu retains **Find Servers** for the server list. Godot has its own local mode; complete visual and audio parity remains an open acceptance criterion.
 
 ### 🖧 Headless Server
 
-The project also includes an authoritative headless server:
+For LAN or direct address play, start the authoritative server on a machine reachable by the clients:
 
 ```bash
 groundfire-server --server-name "Groundfire Server"
@@ -1719,14 +1868,16 @@ To connect to a server:
 groundfire --connect 127.0.0.1:45000 --player-name Player
 ```
 
-If the port is omitted, the client uses the default protocol port.
+In Godot desktop, use **Find Servers → LAN** or direct connection to join the same Python server. Refresh, filters, favorites, history, password, ready state, chat, spectators, resume, and rematch have implementations; precise availability depends on the server and transport. `GROUNDFIRE_MASTER_SERVERS` sets the master directory address. LAN discovery uses UDP broadcast and may need firewall rules.
 
-### 🔑 Secure Transport Keys
+### 🔑 Managed Service And Transport Security
 
-The server uses default paths under `versao-python/conf/network/` for private and public keys. When needed, those files are created by the server flow.
+The [external service](servico-externo/README.md) offers another route: accounts/guests, friends and presence, parties, expiring invites, code-based rooms, queues and slot reservations, and hosted match workers. See the [target API contract](servico-externo/CONTRATOS.md) and the live API documentation at `http://127.0.0.1:27880/docs` when it is running. Python has an HTTP adapter; Godot has a service client and online hub. Complete UI journeys and public distribution still need acceptance testing.
+
+Direct game UDP is **not encrypted**. `--server-private-key` and `--server-public-key` are deprecated compatibility arguments; they neither create keys nor enable encryption. The browser's legacy “secure” label is metadata, not a TLS guarantee. For public use, configure HTTPS/WSS at a reverse proxy and expose only the required public endpoints; real hosted deployment is not yet certified.
 
 > [!IMPORTANT]
-> Network mode exists for development and testing. For the smoothest gameplay, prefer local mode until the online experience is fully stabilized.
+> Local and direct LAN play work without an external account. Managed rooms, invites, and reservations require a running service. Complete the migration plan's hosted and client tests before claiming full web or online parity.
 
 ---
 
@@ -1747,6 +1898,8 @@ port-groundfire-for-python/
 ├── 📁 media/
 │   └── 📁 img/             generated screenshots and images
 ├── 📁 groundfire_net/      native networking module reusable across games
+├── 📁 servico-externo/     independent API, database, headless runtime, and launcher
+├── 📁 docs/               Godot strategy and visual references
 ├── 📁 scripts/             QA, artwork, asset, and profiling tools
 │   └── 📁 dev/             manual analysis and scratch utilities
 ├── 📁 tests/               automated tests
@@ -1766,7 +1919,14 @@ One-off investigation utilities live in [`scripts/dev/`](scripts/dev/) so the re
 | [`cpp_output.txt`](cpp_output.txt) | Execution log used as historical comparison material |
 | Architecture assessment 2026 | [Technical Documentation ↓](#incorporated-technical-documentation-en) |
 | Refactoring roadmap 2026 | [Technical Documentation ↓](#incorporated-technical-documentation-en) |
-| Secure online mode | [Technical Documentation ↓](#incorporated-technical-documentation-en) |
+| Historical online-mode record | [Technical Documentation ↓](#incorporated-technical-documentation-en) |
+| Godot strategy and acceptance | [`docs/godot_migration_strategy.md`](docs/godot_migration_strategy.md) |
+| Standalone editions project | [ST00–ST08 in the migration document](docs/godot_migration_strategy.md#projeto-edicoes-standalone) |
+| External service: current use | [`servico-externo/README.md`](servico-externo/README.md) |
+| External service: target architecture | [`servico-externo/PROJETO.md`](servico-externo/PROJETO.md) |
+| External service: target API and gaps | [`servico-externo/CONTRATOS.md`](servico-externo/CONTRATOS.md) |
+| External service: phases and tests | [`servico-externo/IMPLEMENTACAO-E-TESTES.md`](servico-externo/IMPLEMENTACAO-E-TESTES.md) |
+| Manual development utilities | [`scripts/dev/README.md`](scripts/dev/README.md) |
 | Classic controller playtest | [Technical Documentation ↓](#incorporated-technical-documentation-en) |
 
 ---
@@ -1775,11 +1935,12 @@ One-off investigation utilities live in [`scripts/dev/`](scripts/dev/) so the re
 
 ## 🏗️ Maintenance Architecture
 
-The project currently has two coexisting versions and one shared layer:
+The project has two editions, shared tooling, and a separately distributable service:
 
 - **Python/Pygame version** in [`versao-python/`](versao-python/) — preserves the playable classic port
 - **Godot version** in [`versao-godot/godot/`](versao-godot/godot/) — preservation-focused desktop/web migration client
-- **Shared code** in [`groundfire_net/`](groundfire_net/) and the repository root — services, scripts, docs, CI, and common artifacts
+- **Shared code** in [`groundfire_net/`](groundfire_net/) and the repository root — protocols, scripts, docs, and CI
+- **Independent service** in [`servico-externo/`](servico-externo/) — FastAPI, SQLite, supervisor, and a versioned copy of the headless runtime; an installed package does not import sibling folders
 
 ### Main Modules
 
@@ -1794,6 +1955,9 @@ The project currently has two coexisting versions and one shared layer:
 | [`versao-python/src/groundfire/sim/`](versao-python/src/groundfire/sim) | World, terrain, registry, and simulated match |
 | [`versao-python/src/groundfire/gameplay/`](versao-python/src/groundfire/gameplay) | Match controller and gameplay constants |
 | [`versao-python/src/groundfire/network/`](versao-python/src/groundfire/network) | Messages, codec, LAN, client state, and backend |
+| [`versao-python/src/groundfire/service_client.py`](versao-python/src/groundfire/service_client.py) | External service HTTP adapter |
+| [`versao-godot/godot/scripts/online/`](versao-godot/godot/scripts/online/) | Godot service client and room flow |
+| [`servico-externo/src/gf_service/`](servico-externo/src/gf_service/) | API, domain, storage, security, and supervisor |
 | [`versao-python/src/groundfire/render/`](versao-python/src/groundfire/render) | Terrain, scene, HUD, primitives, and entity visuals |
 | [`versao-python/src/groundfire/input/`](versao-python/src/groundfire/input) | Commands and controls |
 | [`versao-python/src/game.py`](versao-python/src/game.py) | Classic flow loop and state transitions |
@@ -1817,7 +1981,7 @@ The project currently has two coexisting versions and one shared layer:
 ## 📖 Incorporated Technical Documentation
 
 > [!NOTE]
-> The Portuguese section above contains the complete original technical notes that were merged from the former Markdown files. This English section provides condensed summaries. Click to expand each section.
+> These expandable notes preserve earlier assessments and roadmaps. Claims such as “there is no server,” root-level `src/` paths, and old test counts describe **their original point in time**, not the current code. Use the sections above, the [Godot migration strategy](docs/godot_migration_strategy.md), and the [service guide](servico-externo/README.md) for current status. The Portuguese section contains the complete historical notes; the English section summarizes them.
 
 ---
 
@@ -1941,11 +2105,11 @@ Network and server logs can be emitted as human text or JSON Lines with `--log-f
 | File | Purpose |
 |:---|:---|
 | [`groundfire_net/`](groundfire_net) | Reusable native networking module |
-| [`src/groundfire/network/`](src/groundfire/network) | Groundfire-specific message, discovery, and browser adapters |
-| [`src/groundfire/app/server.py`](src/groundfire/app/server.py) | Authoritative headless server |
-| [`src/groundfire/master.py`](src/groundfire/master.py) | Native master server for server registration and lookup |
+| [`versao-python/src/groundfire/network/`](versao-python/src/groundfire/network/) | Groundfire-specific message, discovery, and browser adapters |
+| [`versao-python/src/groundfire/app/server.py`](versao-python/src/groundfire/app/server.py) | Authoritative headless server |
+| [`versao-python/src/groundfire/master.py`](versao-python/src/groundfire/master.py) | Native master server for server registration and lookup |
 
-Server lookup is available from the classic **Find Servers** menu through native LAN discovery and master-server helpers; the local game itself stays on the classic interface.
+Server lookup is available from the classic **Find Servers** menu through native LAN discovery and master-server helpers. The Counter-Strike 1.6-inspired flow includes **Random Server**, a **Spectate** tab, authenticated spectators that do not consume player slots, chat, session resume, and **Join when a slot opens**.
 
 **Start the master server:**
 
@@ -1982,6 +2146,13 @@ python -m src.groundfire.server --host 0.0.0.0 --port 27015 --discovery-port 270
 
 ```powershell
 python -m src.groundfire.client --connect 127.0.0.1:27015
+```
+
+**Spectate or wait automatically for a player slot:**
+
+```powershell
+python -m src.groundfire.client --connect 127.0.0.1:27015 --spectate
+python -m src.groundfire.client --connect 127.0.0.1:27015 --auto-retry
 ```
 
 **Notes:**
@@ -2049,6 +2220,15 @@ python -m src.groundfire.client --player-name "Controller Test"
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
+To include pytest cases and the separately packaged service, once dependencies are installed:
+
+```bash
+python -m pytest -q
+sh servico-externo/servico-externo.sh test
+```
+
+The service tests live in `servico-externo/tests/` and use their own environment. Passing tests cover specific scenarios; they do not replace paired visual/audio review or hosted HTTPS/WSS testing.
+
 ### Run quality checks
 
 ```bash
@@ -2059,7 +2239,7 @@ The quality script runs:
 
 | Check | Purpose |
 |:---|:---|
-| `compileall` | Validates importable syntax in `src`, `tests`, `scripts`, and `groundfire` |
+| `compileall` | Validates syntax in the Python paths configured by the script |
 | `unittest` | Runs the automated suite |
 | `ruff` | Runs linting when available |
 | `mypy` | Runs type checks when available |
@@ -2075,6 +2255,9 @@ python -m unittest tests.test_fuzz_gameplay
 python -m unittest tests.test_landscape_fidelity
 python -m unittest tests.test_groundfire_entrypoints
 python -m unittest tests.test_lan_discovery
+python -m pytest -q tests/test_online_match_simulation.py tests/test_external_service_client_contract.py
+python scripts/validate_godot_udp_integration.py
+bash scripts/validate_godot_fidelity.sh
 ```
 
 ### Covered areas
@@ -2087,6 +2270,8 @@ python -m unittest tests.test_lan_discovery
 | Rendering and HUD | `test_gamerenderer`, `test_gamehudrenderer`, `test_gamegraphics` |
 | Input and commands | `test_commandintents`, `test_client_server_apps` |
 | Network | `test_networkprotocol`, `test_networkstate`, `test_groundfire_codec`, `test_lan_discovery` |
+| Online journeys | `test_online_match_simulation`, `test_server_browser_real_network_paths`, and `servico-externo/tests/` |
+| Godot migration | Headless contracts, classic replays, visual comparison, and real UDP integration |
 | Portability | `test_portability`, `test_runtime_portability` |
 
 </details>
@@ -2109,10 +2294,10 @@ python -m unittest tests.test_lan_discovery
 <details>
 <summary><b>🐍 The script says Python is incompatible</b></summary>
 
-Use Python 3.10, 3.11, 3.12, or 3.13. The scripts automatically search for:
+Use Python 3.10, 3.11, 3.12, 3.13, or 3.14. The scripts automatically search for:
 
 ```text
-python3.13, python3.12, python3.11, python3.10, python3, python
+python3.14, python3.13, python3.12, python3.11, python3.10, python3, python
 ```
 
 </details>
@@ -2150,7 +2335,17 @@ LocalMenuMode=classic
 - Confirm the host and port used by the server
 - Run client and server on the same machine with `127.0.0.1` to isolate network issues
 - Check the local firewall
-- Confirm the server finished creating the keys under `versao-python/conf/network/`
+- For LAN, confirm that the client can reach the server machine's IP and that the UDP ports are allowed
+- For managed rooms, run `sh servico-externo/servico-externo.sh status` and check `http://127.0.0.1:27880/readyz`
+
+</details>
+
+<details>
+<summary><b>🧩 The online hub cannot reach the service</b></summary>
+
+- Check `GROUNDFIRE_SERVICE_URL` in Python or `application/config/service_base_url` in Godot
+- The default `127.0.0.1` points to **each client's own machine**; set the service host address for remote clients
+- A web page served over HTTPS needs browser-reachable HTTPS/WSS endpoints and an allowed origin
 
 </details>
 
@@ -2194,5 +2389,5 @@ This repository is distributed under the **MIT License**. See [`LICENSE`](LICENS
 ---
 
 <p align="center">
-  <strong>🔥 Groundfire lives here as playable memory: a classic artillery game preserved in Python. 🔥</strong>
+  <strong>🔥 Groundfire lives here as playable memory: a classic artillery game in Python and Godot. 🔥</strong>
 </p>

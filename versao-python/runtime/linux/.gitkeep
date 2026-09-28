@@ -1,0 +1,5 @@
+# runtime/linux/ — binarios portateis Linux da edicao Python (ST02/ST06).
+# Gerar via versao-python/scripts/build_portable.py (PyInstaller):
+#   Groundfire, groundfire-server, groundfire-master,
+#   groundfire-web-gateway, groundfire-directory
+# O launcher run_game.* prefere este diretorio quando presente.

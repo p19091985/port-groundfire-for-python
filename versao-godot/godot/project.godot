@@ -13,6 +13,7 @@ config/server_directory_environment="dev"
 config/server_directory_url_dev="http://127.0.0.1:27880/servers.json"
 config/server_directory_url_staging="https://staging.groundfire.net/directory/servers.json"
 config/server_directory_url_production="https://play.groundfire.net/directory/servers.json"
+config/service_base_url="http://127.0.0.1:27880"
 
 [autoload]
 

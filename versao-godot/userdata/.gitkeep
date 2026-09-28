@@ -1,0 +1,4 @@
+# userdata/ — dados portateis da edicao Godot (ST05).
+# Configuracoes, favoritos, historico, logs e saves locais ficam aqui
+# (Godot user:// e redirecionado para esta pasta nos builds portateis).
+# O launcher indica erro claro se esta pasta nao for gravavel.

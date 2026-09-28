@@ -1,5 +1,7 @@
 extends RefCounted
 
+const PythonRandom := preload("res://scripts/python_random.gd")
+
 const CLASSIC_SURFACE_TOP := Color(0.40, 0.40, 0.00)
 const CLASSIC_SURFACE_BOTTOM := Color(0.80, 0.80, 0.00)
 const CLASSIC_BASE := Color(0.80, 0.80, 0.00)
@@ -7,23 +9,34 @@ const CLASSIC_COLOUR_EQUAL_EPSILON := 0.0001
 const MIN_CHUNK_THICKNESS := 0.5
 const CLASSIC_MIN_LAND_HEIGHT := -7.0
 const TANK_EDGE_MARGIN := 30.0
+const CLASSIC_SLICE_COUNT := 500
 
 var _width := 1024.0
 var _height := 768.0
-var _step := 10.0
+var _step := 1024.0 / CLASSIC_SLICE_COUNT
 var _seed := 1337
-var _slice_count := 96
+var _slice_count := CLASSIC_SLICE_COUNT
 var _samples := PackedFloat32Array()
 var _chunks: Array = []
-var _fall_pause := 0.10
+var _fall_pause := 0.20
 var _fall_acceleration := 240.0
 var _fall_terminal_speed := 420.0
+
+
+func configure_classic(settings: Dictionary) -> void:
+	var terrain := Dictionary(settings.get("terrain", {}))
+	_slice_count = max(1, int(terrain.get("slices", CLASSIC_SLICE_COUNT)))
+	_fall_pause = max(0.0, float(terrain.get("fall_pause", 0.20)))
+	# Keep the established world-to-screen conversion while making the Python
+	# value authoritative and preserving the classic default exactly.
+	_fall_acceleration = 240.0 * float(terrain.get("fall_acceleration", 5.0)) / 5.0
 
 
 func rebuild(width: float, height: float) -> void:
 	_width = max(width, 64.0)
 	_height = max(height, 64.0)
-	_slice_count = max(24, int(_width / _step))
+	_slice_count = max(1, _slice_count)
+	_step = _width / float(_slice_count)
 	_generate_original_style_samples()
 
 
@@ -35,8 +48,7 @@ func rebuild_with_seed(width: float, height: float, seed: int) -> void:
 func _generate_original_style_samples() -> void:
 	_samples.clear()
 	_chunks.clear()
-	var rng := RandomNumberGenerator.new()
-	rng.seed = _seed
+	var rng := PythonRandom.new(_seed)
 	var heights := PackedFloat32Array()
 	var smoothed := PackedFloat32Array()
 	for _index in range(_slice_count + 1):
@@ -44,10 +56,10 @@ func _generate_original_style_samples() -> void:
 		smoothed.append(0.0)
 
 	for _pass in range(18):
-		var center: int = rng.randi_range(-int((_slice_count + 1) / 2), (_slice_count + 1) * 2)
-		var mound_height: float = float(rng.randi_range(0, 999)) / 300.0
-		var mound_width: int = rng.randi_range(3, max(3, int((_slice_count + 1) / 2) + 2))
-		var plateau: int = rng.randi_range(0, max(0, int(mound_width / 3)))
+		var center: int = rng.randbelow((_slice_count + 1) * 2) - int((_slice_count + 1) / 2)
+		var mound_height: float = float(rng.randbelow(1000)) / 300.0
+		var mound_width: int = rng.randbelow(int((_slice_count + 1) / 2)) + 3
+		var plateau: int = rng.randbelow(max(1, int(mound_width / 3)))
 		for index in range(_slice_count + 1):
 			var distance: int = abs(center - index)
 			if distance < plateau:
@@ -116,6 +128,16 @@ func _make_chunk(
 
 func is_empty() -> bool:
 	return _samples.is_empty()
+
+
+func world_height_samples() -> PackedFloat32Array:
+	var result := PackedFloat32Array()
+	var screen_bottom := _height - 72.0
+	var screen_top := _height * 0.38
+	for screen_height in _samples:
+		var normalized := inverse_lerp(screen_bottom, screen_top, screen_height)
+		result.append(lerpf(-8.0, 5.0, normalized))
+	return result
 
 
 func height_at(x: float) -> float:

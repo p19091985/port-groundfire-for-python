@@ -7,6 +7,7 @@ const ClassicButton := preload("res://scripts/classic_button.gd")
 const LocalMatchScene := preload("res://scenes/local_match.tscn")
 const OnlineMatchScene := preload("res://scenes/online_match.tscn")
 const ServerBrowserScene := preload("res://scenes/server_browser.tscn")
+const OnlineHubScene := preload("res://scenes/online_hub.tscn")
 const ControlSettings := preload("res://scripts/control_settings.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
 const BrowserStore := preload("res://scripts/browser_store.gd")
@@ -81,9 +82,11 @@ const LOCAL_MATCH_PLAYER_COLORS := [
 	Color("#ff8080"),
 	Color("#ffffff"),
 ]
+const GROUNDFIRE_LOCAL_GATEWAY_NOTE := "ST04: companion local em runtime, sem venv externo"
 const GATEWAY_EXECUTABLE_CANDIDATES := [
-	"res://../.venv/bin/groundfire-web-gateway",
-	"res://../.venv/Scripts/groundfire-web-gateway.exe",
+	"res://../runtime/linux/groundfire-web-gateway",
+	"res://../runtime/windows/groundfire-web-gateway.exe",
+	"res://../runtime/headless/groundfire-web-gateway",
 ]
 
 var _content: MarginContainer
@@ -137,6 +140,34 @@ func _ready() -> void:
 	set_process(true)
 	_show_main_menu()
 	_apply_web_start_screen.call_deferred()
+	_apply_desktop_launch_args.call_deferred()
+
+
+func _apply_desktop_launch_args() -> void:
+	if OS.has_feature("web"):
+		return
+	var launch_args := OS.get_cmdline_user_args()
+	if launch_args.is_empty():
+		return
+	var entry: Dictionary = {}
+	var index := 0
+	while index < launch_args.size():
+		var option := launch_args[index]
+		if option == "--spectator":
+			entry["spectator"] = true
+		elif option == "--connect" or option == "--player-name" or option == "--password":
+			if index + 1 >= launch_args.size() or str(launch_args[index + 1]).is_empty():
+				push_warning("Argumento incompleto para %s." % option)
+				return
+			index += 1
+			var key := "endpoint" if option == "--connect" else option.trim_prefix("--").replace("-", "_")
+			entry[key] = launch_args[index]
+		else:
+			push_warning("Argumento de inicializacao desconhecido: %s." % option)
+			return
+		index += 1
+	if entry.has("endpoint"):
+		_show_online_match(entry)
 
 
 func _exit_tree() -> void:
@@ -1112,6 +1143,25 @@ func _setup_name_or_default(text: String, fallback: String) -> String:
 
 
 func _on_find_servers() -> void:
+	_show_online_hub()
+
+
+func _show_online_hub() -> void:
+	_discard_paused_match_screen()
+	_set_classic_fullscreen_layout(true)
+	_stack.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_clear_content()
+	_screen = OnlineHubScene.instantiate()
+	_screen.name = "OnlineHub"
+	_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_screen.servers_requested.connect(_show_server_browser)
+	_screen.back_requested.connect(_show_main_menu)
+	_screen.match_ready.connect(_show_online_match)
+	_stack.add_child(_screen)
+
+
+func _show_server_browser() -> void:
 	_discard_paused_match_screen()
 	_set_classic_fullscreen_layout(true)
 	_stack.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -1338,7 +1388,7 @@ func _show_dedicated_server_tools() -> void:
 
 	_dedicated_status_label = Label.new()
 	_dedicated_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_dedicated_status_label.text = "Ready to start groundfire-web-gateway from the local .venv."
+	_dedicated_status_label.text = "Ready to start groundfire-web-gateway from the local runtime companion."
 	GroundfireTheme.apply_label(_dedicated_status_label, 14, GroundfireTheme.COLOR_CYAN)
 	inner.add_child(_dedicated_status_label)
 
@@ -1448,7 +1498,7 @@ func _start_web_gateway(config: Dictionary) -> void:
 		return
 	var executable := _gateway_executable()
 	if executable.is_empty():
-		_dedicated_status_label.text = "groundfire-web-gateway was not found in .venv. Install the Python package in editable mode first."
+		_dedicated_status_label.text = "groundfire-web-gateway was not found in runtime/. Vendor the headless companion first."
 		return
 	var args := _gateway_args(config)
 	var pid := OS.create_process(executable, args, false)
@@ -1607,6 +1657,13 @@ func _gateway_banned_players(value: Variant) -> PackedStringArray:
 
 
 func _gateway_executable() -> String:
+	if not OS.has_feature("editor"):
+		var base := OS.get_executable_path().get_base_dir()
+		for candidate in ["groundfire-web-gateway", "groundfire-web-gateway.exe"]:
+			var bundled := base.path_join(candidate)
+			if FileAccess.file_exists(bundled):
+				return bundled
+		return ""
 	for candidate in GATEWAY_EXECUTABLE_CANDIDATES:
 		var path := ProjectSettings.globalize_path(candidate)
 		if FileAccess.file_exists(path):

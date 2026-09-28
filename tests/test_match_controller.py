@@ -6,6 +6,85 @@ from src.groundfire.network.messages import ClientCommandEnvelope
 
 
 class MatchControllerTests(unittest.TestCase):
+    def test_explicit_lobby_rematch_and_chat_commands_are_authoritative(self):
+        controller = MatchController(session_id="session-1", seed=3)
+        alice, alice_token = controller.join_player("Alice")
+        bob, bob_token = controller.join_player("Bob")
+
+        self.assertEqual(controller.set_lobby_ready(alice.player_number, True, session_token="bad"), (False, "authentication_failed"))
+        self.assertEqual(controller.set_lobby_ready(alice.player_number, True, session_token=alice_token.token), (True, ""))
+        self.assertEqual(controller.set_lobby_ready(bob.player_number, True, session_token=bob_token.token), (True, ""))
+        self.assertEqual(controller.match_state.game_phase, "round_starting")
+
+        controller.match_state.game_phase = "winner"
+        controller.match_state.winner_player_number = alice.player_number
+        self.assertEqual(controller.set_match_rematch(alice.player_number, True, session_token=alice_token.token), (True, ""))
+        self.assertEqual(controller.set_match_rematch(bob.player_number, True, session_token=bob_token.token), (True, ""))
+        self.assertEqual(controller.match_state.game_phase, "round_starting")
+        self.assertEqual(controller.match_state.current_round, 1)
+
+        self.assertEqual(controller.send_chat_message(alice.player_number, "  hello   lobby  ", session_token=alice_token.token), (True, ""))
+        events = controller.build_snapshot_envelope().events
+        chat_events = [event for event in events if event["event_type"] == "chat_message"]
+        self.assertEqual(chat_events[-1]["payload"]["text"], "hello lobby")
+
+    def test_session_resume_preserves_player_state_and_rebinds_address(self):
+        controller = MatchController(session_id="session-1", seed=3)
+        player, token = controller.join_player("Alice", address=("127.0.0.1", 5001))
+        controller.match_state.update_player(player.player_number, score=240, money=73, connected=False)
+
+        self.assertIsNone(
+            controller.resume_player(
+                player.player_number,
+                session_token="wrong-token",
+                address=("127.0.0.1", 5002),
+            )
+        )
+        resumed = controller.resume_player(
+            player.player_number,
+            session_token=token.token,
+            address=("127.0.0.1", 5002),
+        )
+
+        self.assertIsNotNone(resumed)
+        resumed_player, resumed_token = resumed
+        self.assertEqual(resumed_token, token)
+        self.assertEqual(resumed_player.score, 240)
+        self.assertEqual(resumed_player.money, 73)
+        self.assertTrue(resumed_player.connected)
+        self.assertEqual(controller.get_player_addresses(), (("127.0.0.1", 5002),))
+        self.assertEqual(controller.build_snapshot_envelope().snapshot_kind, "full")
+
+    def test_inactive_network_session_has_a_bounded_resume_window(self):
+        controller = MatchController(session_id="session-1", seed=3)
+        player, token = controller.join_player("Alice", address=("127.0.0.1", 5001))
+        controller.match_state.update_player(player.player_number, score=90, money=61)
+
+        for _ in range(controller.CONNECTION_LOST_TICKS):
+            controller.step()
+
+        disconnected = controller.match_state.get_player(player.player_number)
+        self.assertFalse(disconnected.connected)
+        self.assertEqual(controller.get_player_addresses(), ())
+        resumed = controller.resume_player(
+            player.player_number,
+            session_token=token.token,
+            address=("127.0.0.1", 5002),
+        )
+        self.assertEqual((resumed[0].score, resumed[0].money), (90, 61))
+
+        for _ in range(controller.SESSION_RESUME_GRACE_TICKS):
+            controller.step()
+
+        self.assertIsNone(controller.match_state.get_player(player.player_number))
+        self.assertIsNone(
+            controller.resume_player(
+                player.player_number,
+                session_token=token.token,
+                address=("127.0.0.1", 5003),
+            )
+        )
+
     def test_controller_is_deterministic_for_same_seed_and_commands(self):
         first = self._run_match(seed=7, session_id="shared-session")
         second = self._run_match(seed=7, session_id="shared-session")
@@ -27,7 +106,7 @@ class MatchControllerTests(unittest.TestCase):
         self.assertEqual(controller.match_state.current_round, 1)
         self.assertIsNotNone(controller.match_state.get_player(player.player_number).tank_entity_id)
 
-    def test_match_starts_automatically_when_lobby_reaches_max_players(self):
+    def test_full_lobby_still_waits_for_player_readiness(self):
         controller = MatchController(session_id="session-1", seed=3, max_players=2)
         controller.join_player("Alice")
 
@@ -35,11 +114,114 @@ class MatchControllerTests(unittest.TestCase):
 
         controller.join_player("Bob")
 
+        self.assertEqual(controller.match_state.game_phase, "lobby")
+        self.assertEqual(controller.match_state.current_round, 0)
+        self.assertTrue(
+            all(player.tank_entity_id is None for player in controller.match_state.player_slots.values())
+        )
+
+    def test_lobby_ready_is_edge_triggered_and_starts_when_every_human_is_ready(self):
+        controller = MatchController(session_id="session-1", seed=3, max_players=8)
+        alice, alice_token = controller.join_player("Alice")
+        bob, bob_token = controller.join_player("Bob")
+
+        self.assertTrue(controller.match_state.get_player(alice.player_number).is_leader)
+        self.assertFalse(controller.match_state.get_player(bob.player_number).is_leader)
+
+        def send_ready(player, token, sequence, pressed):
+            return controller.apply_command_envelope(
+                ClientCommandEnvelope(
+                    session_id="session-1",
+                    player_number=player.player_number,
+                    client_sequence=sequence,
+                    acknowledged_snapshot_sequence=None,
+                    simulation_tick=0,
+                    issued_at=0.0,
+                    source="test",
+                    commands={"ready": pressed},
+                    session_token=token.token,
+                )
+            )
+
+        self.assertTrue(send_ready(alice, alice_token, 1, True))
+        self.assertTrue(send_ready(alice, alice_token, 2, True))
+        self.assertTrue(controller.match_state.get_player(alice.player_number).is_ready)
+        self.assertEqual(controller.match_state.game_phase, "lobby")
+
+        self.assertTrue(send_ready(alice, alice_token, 3, False))
+        self.assertTrue(send_ready(bob, bob_token, 1, True))
+        self.assertEqual(controller.match_state.game_phase, "round_starting")
+
+    def test_lobby_leadership_transfers_when_leader_disconnects(self):
+        controller = MatchController(session_id="session-1", seed=3)
+        alice, alice_token = controller.join_player("Alice")
+        bob, _bob_token = controller.join_player("Bob")
+
+        self.assertTrue(controller.disconnect_player(alice.player_number, session_token=alice_token.token))
+        self.assertTrue(controller.match_state.get_player(bob.player_number).is_leader)
+
+    def test_lobby_membership_changes_clear_human_readiness(self):
+        controller = MatchController(session_id="session-1", seed=3, max_players=8)
+        alice, alice_token = controller.join_player("Alice")
+        controller.join_player("Bob")
+        self.assertTrue(
+            controller.apply_command_envelope(
+                ClientCommandEnvelope(
+                    session_id="session-1",
+                    player_number=alice.player_number,
+                    client_sequence=1,
+                    acknowledged_snapshot_sequence=None,
+                    simulation_tick=0,
+                    issued_at=0.0,
+                    source="test",
+                    commands={"ready": True},
+                    session_token=alice_token.token,
+                )
+            )
+        )
+        self.assertTrue(controller.match_state.get_player(alice.player_number).is_ready)
+
+        charlie, charlie_token = controller.join_player("Charlie")
+        self.assertFalse(controller.match_state.get_player(alice.player_number).is_ready)
+
+        controller.match_state.update_player(alice.player_number, is_ready=True)
+        self.assertTrue(
+            controller.disconnect_player(charlie.player_number, session_token=charlie_token.token)
+        )
+        self.assertFalse(controller.match_state.get_player(alice.player_number).is_ready)
+
+    def test_all_players_can_request_a_server_authoritative_rematch(self):
+        controller = MatchController(session_id="session-1", seed=3, num_rounds=1)
+        alice, alice_token = controller.join_player("Alice")
+        bob, bob_token = controller.join_player("Bob")
+        controller.match_state.game_phase = "winner"
+        controller.match_state.current_round = 1
+        controller.match_state.winner_player_number = alice.player_number
+        controller.match_state.update_player(alice.player_number, score=100, money=85)
+
+        def request_rematch(player, token, sequence):
+            return controller.apply_command_envelope(
+                ClientCommandEnvelope(
+                    session_id="session-1",
+                    player_number=player.player_number,
+                    client_sequence=sequence,
+                    acknowledged_snapshot_sequence=None,
+                    simulation_tick=controller.match_state.simulation_tick,
+                    issued_at=0.0,
+                    source="test",
+                    commands={"rematch": True},
+                    session_token=token.token,
+                )
+            )
+
+        self.assertTrue(request_rematch(alice, alice_token, 1))
+        self.assertEqual(controller.match_state.game_phase, "winner")
+        self.assertTrue(controller.match_state.get_player(alice.player_number).rematch_ready)
+        self.assertTrue(request_rematch(bob, bob_token, 1))
         self.assertEqual(controller.match_state.game_phase, "round_starting")
         self.assertEqual(controller.match_state.current_round, 1)
-        self.assertTrue(
-            all(player.tank_entity_id is not None for player in controller.match_state.player_slots.values())
-        )
+        self.assertTrue(all(player.score == 0 for player in controller.match_state.player_slots.values()))
+        self.assertTrue(all(player.money == controller.INITIAL_MONEY for player in controller.match_state.player_slots.values()))
 
     def test_fire_command_produces_snapshot_events_and_terrain_patch(self):
         controller = MatchController(session_id="session-1", seed=3)

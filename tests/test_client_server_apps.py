@@ -10,14 +10,21 @@ from src.groundfire.app.server import ServerApp
 from src.groundfire.gameplay.constants import TANK_MOVE_STEP
 from src.groundfire.network.codec import encode_message
 from src.groundfire.network.messages import (
+    ChatSendRequest,
+    CommandResult,
     DisconnectNotice,
     HelloRequest,
     JoinAccept,
     JoinReject,
     JoinRequest,
+    LobbySetReadyRequest,
+    MatchRematchRequest,
     Ping,
     RconCommand,
     RconResponse,
+    ResumeAccept,
+    ResumeReject,
+    ResumeRequest,
     ServerSnapshotEnvelope,
 )
 from src.groundfire.sim.match import MatchSnapshot
@@ -211,6 +218,26 @@ class OnlineConnectLegacyGameStub(LegacyGameStub):
 
 
 class ClientServerAppTests(unittest.TestCase):
+    def test_python_client_builds_protocol_two_session_commands(self):
+        client = ClientApp(game_factory=DummyGame)
+        client.get_client_state().apply_join_accept(
+            JoinAccept(session_id="session-1", player_number=2, session_token="token-2")
+        )
+        sent = []
+        client.send_message = sent.append
+
+        ready = client.set_lobby_ready(True)
+        rematch = client.request_rematch(True)
+        chat = client.send_chat("Hello")
+        result = CommandResult(chat.request_id, "chat_send", True)
+        client._handle_message(result, ("127.0.0.1", 27015))
+
+        self.assertIsInstance(ready, LobbySetReadyRequest)
+        self.assertIsInstance(rematch, MatchRematchRequest)
+        self.assertIsInstance(chat, ChatSendRequest)
+        self.assertEqual([message.request_id for message in sent], ["ready-1", "rematch-2", "chat-3"])
+        self.assertEqual(client.get_last_command_result(), result)
+
     def test_client_state_accepts_join_and_ignores_older_snapshots(self):
         client = ClientApp(game_factory=DummyGame)
         join = JoinAccept(session_id="session-1", player_number=1, session_token="token-1")
@@ -244,6 +271,66 @@ class ClientServerAppTests(unittest.TestCase):
         server = ServerApp(enable_discovery=False, num_rounds=20)
 
         self.assertEqual(server.get_match_controller().match_state.num_rounds, 20)
+
+    def test_server_resumes_session_and_rejects_expired_or_invalid_credentials(self):
+        server = ServerApp(enable_discovery=False)
+        joined = server.handle_message(JoinRequest(player_name="Alice"), ("127.0.0.1", 5001))[0]
+        controller = server.get_match_controller()
+        controller.match_state.update_player(joined.player_number, score=120, money=44)
+
+        invalid = server.handle_message(
+            ResumeRequest(joined.session_id, joined.player_number, "invalid", "Alice"),
+            ("127.0.0.1", 5002),
+        )[0]
+        expired = server.handle_message(
+            ResumeRequest("old-session", joined.player_number, joined.session_token, "Alice"),
+            ("127.0.0.1", 5002),
+        )[0]
+        resumed = server.handle_message(
+            ResumeRequest(joined.session_id, joined.player_number, joined.session_token, "Alice"),
+            ("127.0.0.1", 5002),
+        )[0]
+
+        self.assertIsInstance(invalid, ResumeReject)
+        self.assertEqual(invalid.reason, "resume_rejected")
+        self.assertIsInstance(expired, ResumeReject)
+        self.assertEqual(expired.reason, "session_expired")
+        self.assertIsInstance(resumed, ResumeAccept)
+        self.assertEqual(resumed.player_number, joined.player_number)
+        preserved = controller.match_state.get_player(joined.player_number)
+        self.assertEqual((preserved.score, preserved.money), (120, 44))
+
+    def test_server_session_commands_are_idempotent_and_emit_chat_event(self):
+        server = ServerApp(enable_discovery=False)
+        joined = server.handle_message(JoinRequest(player_name="Alice"), ("127.0.0.1", 5001))[0]
+        ready_request = LobbySetReadyRequest(
+            joined.session_id,
+            joined.player_number,
+            joined.session_token,
+            True,
+            "ready-1",
+        )
+        first = server.handle_message(ready_request, ("127.0.0.1", 5001))[0]
+        duplicate = server.handle_message(ready_request, ("127.0.0.1", 5001))[0]
+        chat_request = ChatSendRequest(
+            joined.session_id,
+            joined.player_number,
+            joined.session_token,
+            "Hello everyone",
+            "chat-1",
+        )
+        chat_result = server.handle_message(chat_request, ("127.0.0.1", 5001))[0]
+        duplicate_chat = server.handle_message(chat_request, ("127.0.0.1", 5001))[0]
+        events = server.get_match_controller().build_snapshot_envelope().events
+
+        self.assertIsInstance(first, CommandResult)
+        self.assertTrue(first.accepted)
+        self.assertEqual(duplicate, first)
+        self.assertTrue(chat_result.accepted)
+        self.assertEqual(duplicate_chat, chat_result)
+        chat_events = [event for event in events if event["event_type"] == "chat_message"]
+        self.assertEqual(len(chat_events), 1)
+        self.assertEqual(chat_events[0]["payload"]["text"], "Hello everyone")
 
     def test_server_loads_ai_special_weapon_policy_from_options(self):
         with TemporaryDirectory() as temp_dir:

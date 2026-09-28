@@ -116,7 +116,10 @@ class ReplicatedSceneTests(unittest.TestCase):
             acknowledged_command_sequences={0: 3},
             snapshot=snapshot,
             terrain_patches=(),
-            events=({"event_type": "round_started", "payload": {"round": 4}},),
+            events=(
+                {"event_type": "round_started", "payload": {"round": 4}},
+                {"event_type": "chat_message", "payload": {"player_name": "Alice", "text": "Hello"}},
+            ),
             snapshot_kind="full",
             baseline_snapshot_sequence=5,
         )
@@ -135,6 +138,7 @@ class ReplicatedSceneTests(unittest.TestCase):
         self.assertEqual(frame.metadata["phase_ticks_remaining"], 60)
         self.assertEqual(frame.metadata["snapshot_kind"], "full")
         self.assertEqual(frame.metadata["baseline_snapshot_sequence"], 5)
+        self.assertEqual(frame.metadata["chat_messages"], ("Alice: Hello",))
 
     def test_multiplayer_terrain_uses_full_game_width_and_classic_layers(self):
         terrain = TerrainState(seed=1, width=20.0, heights=[-1.0, 0.0, -0.5])
@@ -367,8 +371,8 @@ class ReplicatedSceneTests(unittest.TestCase):
         self.assertTrue(any(call[2] == "Waiting for Server" for call in game.font.centred_calls))
         self.assertTrue(any(call[2] == "2 players connected" for call in game.font.centred_calls))
         self.assertTrue(any(call[2] == "Online Lobby" for call in game.font.centred_calls))
-        self.assertTrue(any(call[2] == "Human" for call in game.font.centred_calls))
-        self.assertTrue(any(call[2] == "AI" for call in game.font.centred_calls))
+        self.assertTrue(any(call[2] == "WAITING" for call in game.font.centred_calls))
+        self.assertTrue(any(call[2] == "AI READY" for call in game.font.centred_calls))
         self.assertTrue(any(call[2] == "%s" and call[3] == "Alice" for call in game.font.printf_calls))
         self.assertTrue(any(call[2] == "%s" and call[3] == "CPU LAN 1" for call in game.font.printf_calls))
         self.assertGreaterEqual(len(game.graphics.rects), 7)

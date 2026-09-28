@@ -11,7 +11,14 @@ const MESSAGE_PING := "ping"
 const MESSAGE_PONG := "pong"
 const MESSAGE_DISCONNECT := "disconnect"
 const MESSAGE_ERROR := "error"
-const PROTOCOL_VERSION := 1
+const MESSAGE_SESSION_RESUME := "session_resume"
+const MESSAGE_SESSION_RESUMED := "session_resumed"
+const MESSAGE_LOBBY_SET_READY := "lobby_set_ready"
+const MESSAGE_MATCH_REMATCH := "match_rematch"
+const MESSAGE_CHAT_SEND := "chat_send"
+const MESSAGE_CHAT_EVENT := "chat_event"
+const MESSAGE_COMMAND_RESULT := "command_result"
+const PROTOCOL_VERSION := 2
 const MIN_SUPPORTED_PROTOCOL := 1
 const MAX_SUPPORTED_PROTOCOL := PROTOCOL_VERSION
 const PLAYER_NAME_DEFAULT := "GodotPlayer"
@@ -59,12 +66,13 @@ static func hello_message(protocol_version := PROTOCOL_VERSION) -> Dictionary:
 	return {"type": MESSAGE_HELLO, "protocol": protocol_version, "client": "godot"}
 
 
-static func join_message(player_name: String, password := "", auth_token := "") -> Dictionary:
+static func join_message(player_name: String, password := "", auth_token := "", spectator := false) -> Dictionary:
 	var message := {
 		"type": MESSAGE_JOIN,
 		"protocol": PROTOCOL_VERSION,
 		"player_name": player_name,
 		"password": password,
+		"spectator": spectator,
 	}
 	if not str(auth_token).is_empty():
 		message["auth_token"] = auth_token
@@ -73,6 +81,29 @@ static func join_message(player_name: String, password := "", auth_token := "") 
 
 static func input_message(sequence: int, command: Dictionary) -> Dictionary:
 	return {"type": MESSAGE_INPUT, "protocol": PROTOCOL_VERSION, "sequence": sequence, "command": command}
+
+
+static func session_resume_message(session_id: String, player_number: int, resume_token: String, player_name := PLAYER_NAME_DEFAULT) -> Dictionary:
+	return {
+		"type": MESSAGE_SESSION_RESUME,
+		"protocol": PROTOCOL_VERSION,
+		"session_id": session_id,
+		"player_number": player_number,
+		"resume_token": resume_token,
+		"player_name": player_name,
+	}
+
+
+static func lobby_set_ready_message(request_id: String, ready: bool) -> Dictionary:
+	return {"type": MESSAGE_LOBBY_SET_READY, "protocol": PROTOCOL_VERSION, "request_id": request_id, "ready": ready}
+
+
+static func match_rematch_message(request_id: String, ready: bool) -> Dictionary:
+	return {"type": MESSAGE_MATCH_REMATCH, "protocol": PROTOCOL_VERSION, "request_id": request_id, "ready": ready}
+
+
+static func chat_send_message(request_id: String, text: String) -> Dictionary:
+	return {"type": MESSAGE_CHAT_SEND, "protocol": PROTOCOL_VERSION, "request_id": request_id, "text": text}
 
 
 static func command_from_local_match(action: String, value = true) -> Dictionary:

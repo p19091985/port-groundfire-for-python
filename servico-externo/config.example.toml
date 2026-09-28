@@ -1,0 +1,30 @@
+[service]
+profile = "local"
+bind = "127.0.0.1"
+port = 27880
+public_base_url = "http://127.0.0.1:27880"
+allowed_origins = ["http://127.0.0.1:8060", "http://localhost:8060"]
+
+[storage]
+database = "data/service.sqlite3"
+backup_dir = "backups"
+
+[identity]
+allow_guests = true
+access_ttl_seconds = 900
+refresh_ttl_seconds = 2592000
+
+[social]
+presence_ttl_seconds = 60
+invite_ttl_seconds = 600
+party_max_members = 8
+
+[matches]
+reservation_ttl_seconds = 30
+queue_ttl_seconds = 300
+reconnect_window_seconds = 60
+max_workers = 8
+worker_bind = "127.0.0.1"
+worker_public_host = "127.0.0.1"
+worker_startup_seconds = 8
+admission_redeem_enabled = true

@@ -233,6 +233,8 @@ class Game:
         password: str = "",
         entry=None,
         is_computer: bool = False,
+        spectator: bool = False,
+        auto_retry_when_full: bool = False,
     ):
         self._online_connect_request = {
             "host": host,
@@ -240,8 +242,16 @@ class Game:
             "password": password,
             "entry": entry,
             "is_computer": bool(is_computer),
+            "spectator": bool(spectator),
+            "auto_retry_when_full": bool(auto_retry_when_full),
         }
-        self.queue_network_event("online_connect_requested", host=host, port=int(port), is_computer=bool(is_computer))
+        self.queue_network_event(
+            "online_connect_requested",
+            host=host,
+            port=int(port),
+            is_computer=bool(is_computer),
+            spectator=bool(spectator),
+        )
 
     def consume_online_connect_request(self):
         request = self._online_connect_request

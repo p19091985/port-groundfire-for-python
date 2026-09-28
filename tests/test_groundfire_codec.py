@@ -1,7 +1,19 @@
 import unittest
 
 from src.groundfire.network.codec import decode_json, decode_message, encode_json, encode_message
-from src.groundfire.network.messages import ClientCommandEnvelope, JoinRequest, ServerSnapshotEnvelope
+from src.groundfire.network.messages import (
+    ClientCommandEnvelope,
+    ChatSendRequest,
+    CommandResult,
+    JoinAccept,
+    JoinRequest,
+    LobbySetReadyRequest,
+    MatchRematchRequest,
+    ResumeAccept,
+    ResumeReject,
+    ResumeRequest,
+    ServerSnapshotEnvelope,
+)
 from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
 from src.groundfire.sim.world import ReplicatedEntityState, TerrainPatch
 
@@ -12,6 +24,18 @@ class GroundfireCodecTests(unittest.TestCase):
 
         self.assertEqual(decode_message(encode_message(request)), request)
         self.assertEqual(decode_json(encode_json(request)), request)
+
+    def test_spectator_join_role_round_trips_as_additive_protocol_fields(self):
+        request = JoinRequest(player_name="Caster", spectator=True)
+        accepted = JoinAccept(
+            session_id="match-1",
+            player_number=-1,
+            session_token="spectator-token",
+            role="spectator",
+        )
+
+        self.assertEqual(decode_message(encode_message(request)), request)
+        self.assertEqual(decode_message(encode_message(accepted)), accepted)
 
     def test_client_command_round_trips_through_native_json_bytes_and_text(self):
         envelope = ClientCommandEnvelope(
@@ -28,6 +52,22 @@ class GroundfireCodecTests(unittest.TestCase):
 
         self.assertEqual(decode_message(encode_message(envelope)), envelope)
         self.assertEqual(decode_json(encode_json(envelope)), envelope)
+
+    def test_session_resume_messages_round_trip(self):
+        messages = (
+            ResumeRequest("session-1", 0, "secret-token", "Alice"),
+            ResumeAccept("session-1", 0, "secret-token"),
+            ResumeReject("session_expired", "session-2"),
+            LobbySetReadyRequest("session-1", 0, "secret-token", True, "ready-1"),
+            MatchRematchRequest("session-1", 0, "secret-token", True, "rematch-1"),
+            ChatSendRequest("session-1", 0, "secret-token", "hello", "chat-1"),
+            CommandResult("chat-1", "chat_send", True),
+        )
+
+        for message in messages:
+            with self.subTest(message=type(message).__name__):
+                self.assertEqual(decode_message(encode_message(message)), message)
+                self.assertEqual(decode_json(encode_json(message)), message)
 
     def test_server_snapshot_round_trips_nested_state(self):
         snapshot = MatchSnapshot(

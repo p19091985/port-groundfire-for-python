@@ -20,6 +20,17 @@ const DEFAULT_BINDINGS := {
 	"gf_move_right": KEY_L,
 	"gf_jump": KEY_I,
 	"gf_shield": KEY_K,
+	"gf_p2_fire": KEY_KP_ENTER,
+	"gf_p2_weapon_next": KEY_KP_ADD,
+	"gf_p2_weapon_prev": KEY_KP_SUBTRACT,
+	"gf_p2_jump": KEY_KP_MULTIPLY,
+	"gf_p2_shield": KEY_KP_5,
+	"gf_p2_move_left": KEY_KP_4,
+	"gf_p2_move_right": KEY_KP_6,
+	"gf_p2_aim_left": KEY_F4,
+	"gf_p2_aim_right": KEY_F5,
+	"gf_p2_power_up": KEY_F2,
+	"gf_p2_power_down": KEY_F3,
 }
 
 const CLASSIC_ACTION_DISPLAY_NAMES := {
@@ -35,6 +46,17 @@ const CLASSIC_ACTION_DISPLAY_NAMES := {
 	"gf_power_up": "Increase Gun Power",
 	"gf_power_down": "Decrease Gun Power",
 	"gf_pause": "Pause",
+	"gf_p2_fire": "P2 Fire Weapon",
+	"gf_p2_weapon_next": "P2 Change Weapon Up",
+	"gf_p2_weapon_prev": "P2 Change Weapon Down",
+	"gf_p2_jump": "P2 Use Jump Jets",
+	"gf_p2_shield": "P2 Use Shield",
+	"gf_p2_move_left": "P2 Move Tank Left",
+	"gf_p2_move_right": "P2 Move Tank Right",
+	"gf_p2_aim_left": "P2 Rotate Gun Left",
+	"gf_p2_aim_right": "P2 Rotate Gun Right",
+	"gf_p2_power_up": "P2 Increase Gun Power",
+	"gf_p2_power_down": "P2 Decrease Gun Power",
 }
 
 const CLASSIC_AXIS_NAMES := [
@@ -61,6 +83,17 @@ const ACTION_ORDER := [
 	"gf_power_up",
 	"gf_power_down",
 	"gf_pause",
+	"gf_p2_fire",
+	"gf_p2_weapon_next",
+	"gf_p2_weapon_prev",
+	"gf_p2_jump",
+	"gf_p2_shield",
+	"gf_p2_move_left",
+	"gf_p2_move_right",
+	"gf_p2_aim_left",
+	"gf_p2_aim_right",
+	"gf_p2_power_up",
+	"gf_p2_power_down",
 ]
 
 const CLASSIC_REBIND_ACTION_ORDER := [
@@ -75,6 +108,17 @@ const CLASSIC_REBIND_ACTION_ORDER := [
 	"gf_aim_right",
 	"gf_power_up",
 	"gf_power_down",
+	"gf_p2_fire",
+	"gf_p2_weapon_next",
+	"gf_p2_weapon_prev",
+	"gf_p2_jump",
+	"gf_p2_shield",
+	"gf_p2_move_left",
+	"gf_p2_move_right",
+	"gf_p2_aim_left",
+	"gf_p2_aim_right",
+	"gf_p2_power_up",
+	"gf_p2_power_down",
 ]
 
 const CLASSIC_LINKED_ACTIONS := {
@@ -86,6 +130,14 @@ const CLASSIC_LINKED_ACTIONS := {
 	"gf_aim_right": "gf_aim_left",
 	"gf_power_up": "gf_power_down",
 	"gf_power_down": "gf_power_up",
+	"gf_p2_weapon_next": "gf_p2_weapon_prev",
+	"gf_p2_weapon_prev": "gf_p2_weapon_next",
+	"gf_p2_move_left": "gf_p2_move_right",
+	"gf_p2_move_right": "gf_p2_move_left",
+	"gf_p2_aim_left": "gf_p2_aim_right",
+	"gf_p2_aim_right": "gf_p2_aim_left",
+	"gf_p2_power_up": "gf_p2_power_down",
+	"gf_p2_power_down": "gf_p2_power_up",
 }
 
 const DEFAULT_GAMEPAD_BUTTONS := {

@@ -499,13 +499,16 @@ func _check_server_browser_scene() -> void:
 	assert(_has_button(browser, "Add Favorite"))
 	assert(_has_button(browser, "Quick Refresh"))
 	assert(_has_button(browser, "Refresh All"))
+	assert(_has_button(browser, "Random Server"))
 	assert(_has_button(browser, "Connect"))
 	var change_filters := _find_control_with_text(browser, "Button", "Change Filters") as Button
 	var add_favorite := _find_control_with_text(browser, "Button", "Add Favorite") as Button
 	var connect := _find_control_with_text(browser, "Button", "Connect") as Button
+	var random_server := _find_control_with_text(browser, "Button", "Random Server") as Button
 	assert(change_filters != null)
 	assert(add_favorite != null)
 	assert(connect != null)
+	assert(random_server != null)
 	assert(add_favorite.disabled)
 	assert(connect.disabled)
 	assert(add_favorite.focus_neighbor_left == NodePath())
@@ -513,9 +516,23 @@ func _check_server_browser_scene() -> void:
 	assert(connect.focus_neighbor_left == NodePath())
 	assert(connect.focus_neighbor_right == NodePath())
 	assert(change_filters.focus_neighbor_right != add_favorite.get_path())
+	var browser_bounds: Rect2 = browser.get_global_rect()
+	for action in [change_filters, add_favorite, random_server, connect]:
+		var action_bounds: Rect2 = (action as Button).get_global_rect()
+		assert(action_bounds.end.x <= browser_bounds.end.x)
+		assert(action_bounds.end.y <= browser_bounds.end.y)
 	var tabs := _find_first(browser, "TabBar") as TabBar
 	assert(tabs != null)
 	assert(tabs.tab_count >= 3)
+	assert(_tab_titles(tabs).has("Spectate"))
+	var quick_match_entries: Array[Dictionary] = [
+		{"endpoint": "full.test:1", "players": "8/8", "latency": "5", "passworded": false},
+		{"endpoint": "locked.test:1", "players": "1/8", "latency": "8", "passworded": true},
+		{"endpoint": "best.test:1", "players": "3/8", "latency": "20", "passworded": false},
+		{"endpoint": "slow.test:1", "players": "0/8", "latency": "40", "passworded": false},
+	]
+	var best_quick_match: int = browser.call("_best_quick_match_index", quick_match_entries)
+	assert(best_quick_match == 2)
 	var table_scroll := _find_first(browser, "ScrollContainer") as ScrollContainer
 	assert(table_scroll != null)
 	assert(table_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED)
@@ -579,12 +596,12 @@ func _check_local_match_scene() -> void:
 	local_match.call("_set_turn_index", 0)
 	local_match.set("_last_shot_owner", "Player")
 	local_match.call("_start_next_turn_or_round")
-	assert(str(local_match.get("_turn_owner")) == "Enemy")
+	assert(str(local_match.get("_turn_owner")) == "Player")
 	var spare_tank: RefCounted = Dictionary(participants[2]).get("tank")
 	enemy_tank.set("state", "dead")
 	local_match.set("_last_shot_owner", "Player")
 	local_match.call("_start_next_turn_or_round")
-	assert(str(local_match.get("_turn_owner")) == "Slot 3")
+	assert(str(local_match.get("_turn_owner")) == "Player")
 	enemy_tank.set("state", "alive")
 	assert(spare_tank != null)
 	var score_rows: Array = local_match.call("_score_rows_snapshot")

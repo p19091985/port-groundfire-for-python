@@ -10,11 +10,12 @@ MIGRATION_DOC = PROJECT_ROOT / "docs" / "godot_migration_strategy.md"
 
 REQUIRED_GLOBAL_PHRASES = (
     "## Migration Compatibility Contract",
-    "This is now an evolution-first migration.",
+    "This is now a fidelity-first migration.",
     "`versao-python/` and `versao-godot/godot/` are the canonical editions",
-    "historical fidelity is comparison material rather than a hard product rule",
-    "The Python/Pygame client remains the most useful behavioral reference for classic systems",
-    "Prefer modern, testable architecture over exact historical coupling",
+    "Python behavior is the acceptance reference for the corresponding local or connected mode.",
+    "The Python/Pygame client is the authoritative behavioral reference for fidelity work.",
+    "First close the audited fidelity gaps; then evolve online UX in both editions",
+    "Prefer modern, testable architecture without changing the Python user-visible behavior during fidelity work.",
     "use SQLite for mutable runtime state where practical",
     (
         "Every migration implementation batch must name its reference material, user-visible contract, "

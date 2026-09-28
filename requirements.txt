@@ -6,9 +6,10 @@ packaging==26.2
 pathspec==1.1.1
 Pillow>=10,<13
 pluggy==1.6.0
-pygame==2.6.1
+pygame==2.6.1; python_version < "3.14"
+pygame-ce>=2.5.8,<3; python_version >= "3.14"
 pygame_gui>=0.6.14,<0.7
-pygame-menu>=4.4,<5
+pygame-menu>=4.4,<5; python_version < "3.14"
 Pygments==2.20.0
 pytest==9.0.2
 ruff==0.15.7

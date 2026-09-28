@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from pathlib import Path
 
 from groundfire_net.browser import ServerBook, ServerListEntry
 
 from .common import GameState
 from .menu import Menu
 from .groundfire.network.browser import GroundfireServerScanner, default_server_book_path
+from .groundfire.core.paths import edition_dir
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = edition_dir()
 
 
 @dataclass
@@ -35,6 +35,8 @@ class _BrowserState:
     password_value: str = ""
     pending_endpoint: str = ""
     join_as_computer: bool = False
+    join_as_spectator: bool = False
+    auto_retry_when_full: bool = False
     dialog: str = ""
     last_clicked_index: int = -1
     last_clicked_time: float = 0.0
@@ -46,6 +48,7 @@ class ServerBrowserMenu(Menu):
     _tabs = (
         ("internet", "Internet"),
         ("favorites", "Favorites"),
+        ("spectate", "Spectate"),
         ("unique", "Unique"),
         ("history", "History"),
         ("lan", "Lan"),
@@ -202,13 +205,14 @@ class ServerBrowserMenu(Menu):
             "close": (9.35, 7.05, 9.8, 6.55),
             "filters": (-9.7, -5.95, -7.8, -6.55),
             "connect": (8.55, -5.95, 9.75, -6.55),
+            "random_server": (3.65, -6.72, 5.8, -7.22),
             "open_all": (5.9, -6.75, 9.55, -7.15),
             "scroll_up": (9.55, 4.85, 9.75, 4.45),
             "scroll_down": (9.55, -5.45, 9.75, -5.85),
         }
         tab_left = -9.75
         for tab_key, _label in self._tabs:
-            width = 1.45 if tab_key != "favorites" else 1.65
+            width = 1.45 if tab_key not in {"favorites", "spectate"} else 1.65
             rects[f"tab_{tab_key}"] = (tab_left, 6.05, tab_left + width, 5.45)
             tab_left += width + 0.05
         for key, _label, left, right in self._columns_for_tab(self._state.tab):
@@ -267,6 +271,8 @@ class ServerBrowserMenu(Menu):
                     "join_password_text": (-4.7, 1.05, 4.7, 0.4),
                     "join_human_radio": (-4.7, -0.1, -1.2, -0.75),
                     "join_ai_radio": (0.3, -0.1, 3.8, -0.75),
+                    "join_spectator_radio": (-2.2, -1.0, 2.2, -1.65),
+                    "join_auto_retry": (-4.7, -1.7, -0.2, -2.2),
                     "join_connect": (0.85, -2.25, 2.7, -2.85),
                     "join_cancel": (2.85, -2.25, 4.65, -2.85),
                 }
@@ -350,8 +356,9 @@ class ServerBrowserMenu(Menu):
 
         self._draw_button(rects["filters"], "Change filters", enabled=True)
         self._draw_button(rects["connect"], "Connect", enabled=bool(state.entries))
+        self._draw_button(rects["random_server"], "Random Server", enabled=self._has_quick_match_candidate())
         self._ui.draw_text(
-            6.15,
+            6.2,
             -7.08,
             "Open the list of all servers",
             style=self._ui.style(0.2, self._cyan_text, spacing=0.08, shadow=True),
@@ -406,8 +413,26 @@ class ServerBrowserMenu(Menu):
                 "Player type",
                 style=ui.style(0.24, self._dim_text, spacing=0.1),
             )
-        self._draw_radio_button(rects["join_human_radio"], "Human", checked=not self._state.join_as_computer)
-        self._draw_radio_button(rects["join_ai_radio"], "AI", checked=self._state.join_as_computer)
+        self._draw_radio_button(
+            rects["join_human_radio"],
+            "Human",
+            checked=not self._state.join_as_computer and not self._state.join_as_spectator,
+        )
+        self._draw_radio_button(
+            rects["join_ai_radio"],
+            "AI",
+            checked=self._state.join_as_computer and not self._state.join_as_spectator,
+        )
+        self._draw_radio_button(
+            rects["join_spectator_radio"],
+            "Spectator (read only)",
+            checked=self._state.join_as_spectator,
+        )
+        self._draw_checkbox(
+            rects["join_auto_retry"],
+            self._state.auto_retry_when_full,
+            "Join when a slot opens",
+        )
         self._draw_button(rects["join_connect"], "Connect", enabled=True)
         self._draw_button(rects["join_cancel"], "Cancel", enabled=True)
 
@@ -489,6 +514,8 @@ class ServerBrowserMenu(Menu):
             self._quick_refresh_selected()
         elif self._contains(rects.get("add_favorite"), mouse_x, mouse_y):
             self._add_selected_favorite()
+        elif self._contains(rects.get("random_server"), mouse_x, mouse_y):
+            self._connect_random_server()
         elif self._contains(rects.get("connect"), mouse_x, mouse_y):
             self._connect_selected()
 
@@ -533,8 +560,15 @@ class ServerBrowserMenu(Menu):
     def _handle_join_click(self, rects, mouse_x: float, mouse_y: float):
         if self._contains(rects.get("join_human_radio"), mouse_x, mouse_y):
             self._state.join_as_computer = False
+            self._state.join_as_spectator = False
         elif self._contains(rects.get("join_ai_radio"), mouse_x, mouse_y):
             self._state.join_as_computer = True
+            self._state.join_as_spectator = False
+        elif self._contains(rects.get("join_spectator_radio"), mouse_x, mouse_y):
+            self._state.join_as_computer = False
+            self._state.join_as_spectator = True
+        elif self._contains(rects.get("join_auto_retry"), mouse_x, mouse_y):
+            self._state.auto_retry_when_full = not self._state.auto_retry_when_full
         elif self._contains(rects.get("join_connect"), mouse_x, mouse_y):
             self._finish_connect_selected()
         elif self._contains(rects.get("join_cancel"), mouse_x, mouse_y):
@@ -692,19 +726,53 @@ class ServerBrowserMenu(Menu):
         self._state.password_value = ""
         self._state.pending_endpoint = selected.endpoint
         self._state.join_as_computer = False
+        self._state.join_as_spectator = self._state.tab == "spectate"
+
+    def _quick_match_candidates(self) -> tuple[tuple[int, ServerListEntry], ...]:
+        return tuple(
+            (index, entry)
+            for index, entry in enumerate(self._state.entries)
+            if not entry.requires_password
+            and (entry.max_players <= 0 or entry.player_count < entry.max_players)
+            and entry.latency_ms is not None
+        )
+
+    def _has_quick_match_candidate(self) -> bool:
+        return bool(self._quick_match_candidates())
+
+    def _connect_random_server(self):
+        candidates = self._quick_match_candidates()
+        if not candidates:
+            self._state.status = "No compatible server with an open slot is available."
+            return
+        index, _entry = min(
+            candidates,
+            key=lambda item: (
+                item[1].latency_ms,
+                -item[1].player_count,
+                item[1].endpoint,
+            ),
+        )
+        self._state.selected_index = index
+        self._connect_selected()
 
     def _finish_connect_selected(self):
         selected = self._selected_entry()
         if selected is None:
             return
         self.close()
-        self._game.request_online_connect(
-            host=selected.host,
-            port=selected.port,
-            password=self._state.password_value,
-            entry=selected,
-            is_computer=self._state.join_as_computer,
-        )
+        options = {
+            "host": selected.host,
+            "port": selected.port,
+            "password": self._state.password_value,
+            "entry": selected,
+            "is_computer": self._state.join_as_computer,
+        }
+        if self._state.join_as_spectator:
+            options["spectator"] = True
+        if self._state.auto_retry_when_full:
+            options["auto_retry_when_full"] = True
+        self._game.request_online_connect(**options)
 
     def _verified_selected_entry(self) -> ServerListEntry | None:
         selected = self._selected_entry()

@@ -14,10 +14,17 @@ from urllib.request import Request, urlopen
 
 from src.groundfire.network.codec import decode_message, encode_message
 from src.groundfire.network.messages import (
+    ChatSendRequest,
     ClientCommandEnvelope,
+    CommandResult,
+    DisconnectNotice,
     HelloRequest,
     JoinAccept,
     JoinRequest,
+    LobbySetReadyRequest,
+    ResumeAccept,
+    ResumeRequest,
+    ServerEventEnvelope,
     ServerSnapshotEnvelope,
 )
 from src.groundfire.sim.match import MatchSnapshot, ReplicatedPlayerState
@@ -613,6 +620,29 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertIsNone(session.prepare_join({"player_name": "Alice", "auth_token": token}))
         self.assertEqual(session.player_name, "Alice")
 
+    def test_websocket_spectator_does_not_consume_player_capacity(self):
+        registry = GatewayJoinRegistry(max_players=1)
+        player = WebSocketGatewaySession(join_registry=registry)
+        spectator = WebSocketGatewaySession(join_registry=registry)
+
+        self.assertIsNone(player.prepare_join({"player_name": "Alice"}))
+        self.assertEqual(registry.metadata()["players_connected"], 1)
+        self.assertIsNone(spectator.prepare_join({"player_name": "Caster", "spectator": True}))
+        self.assertEqual(spectator._player_number, -1)
+        self.assertEqual(registry.metadata()["players_connected"], 1)
+
+        spectator.confirm_join(
+            -1,
+            session_id="match-1",
+            session_token="spectator-token",
+            role="spectator",
+        )
+        notice = spectator.disconnect_notice("leaving")
+        self.assertEqual(notice.player_number, -1)
+        self.assertEqual(notice.session_token, "spectator-token")
+        spectator.close()
+        self.assertEqual(registry.metadata()["players_connected"], 1)
+
     def test_websocket_gateway_advertises_protocol_compatibility_window(self):
         hello = WebSocketGatewaySession().hello_response()
 
@@ -626,6 +656,7 @@ class GroundfireNetModuleTests(unittest.TestCase):
         )
         self.assertEqual(hello["match_snapshot_schema"], MATCH_SNAPSHOT_SCHEMA_VERSION)
         self.assertEqual(hello["event_schema"], EVENT_SCHEMA_VERSION)
+        self.assertIn("spectator", hello["capabilities"])
 
     def test_websocket_gateway_versions_schema_one_snapshot_payloads(self):
         session = WebSocketGatewaySession()
@@ -701,6 +732,26 @@ class GroundfireNetModuleTests(unittest.TestCase):
         self.assertEqual(command_envelopes[0].acknowledged_snapshot_sequence, 1)
         self.assertEqual(command_envelopes[0].commands, {"move_right": True, "shield": False})
 
+    def test_websocket_gateway_resumes_protocol_two_session_after_abrupt_close(self):
+        messages, udp_messages = asyncio.run(_exercise_websocket_gateway_resume_over_tcp())
+
+        first_hello, first_snapshot, second_hello, resumed, resumed_snapshot, ready_result, chat_result, chat_event = messages
+        self.assertEqual(first_hello["protocol"], 2)
+        self.assertIn("session_resume", first_hello["capabilities"])
+        self.assertEqual(first_snapshot["state"]["session_id"], "test-session")
+        self.assertEqual(first_snapshot["state"]["resume_token"], "session-token")
+        self.assertEqual(second_hello["protocol"], 2)
+        self.assertEqual(resumed["type"], "session_resumed")
+        self.assertEqual(resumed["player_number"], 1)
+        self.assertEqual(resumed_snapshot["state"]["player_number"], 1)
+        self.assertEqual(ready_result["type"], "command_result")
+        self.assertTrue(ready_result["accepted"])
+        self.assertEqual(chat_result["command"], "chat_send")
+        self.assertEqual(chat_event["type"], "chat_event")
+        self.assertEqual(chat_event["text"], "Hello from Godot")
+        self.assertTrue(any(isinstance(message, ResumeRequest) for message in udp_messages))
+        self.assertFalse(any(isinstance(message, DisconnectNotice) for message in udp_messages))
+
     def test_websocket_gateway_parser_exposes_optional_password(self):
         args = build_parser().parse_args([
             "--host",
@@ -758,8 +809,8 @@ class GroundfireNetModuleTests(unittest.TestCase):
     def test_godot_migration_strategy_documents_gateway_contract(self):
         doc = (PROJECT_ROOT / "docs" / "godot_migration_strategy.md").read_text(encoding="utf-8")
 
-        self.assertIn("Current protocol: `1`", doc)
-        self.assertIn("Supported protocol range: `1..1`", doc)
+        self.assertIn("Current protocol: `2`", doc)
+        self.assertIn("Supported protocol range: `1..2`", doc)
         self.assertIn("supported_protocols", doc)
         self.assertIn("Compatibility Policy", doc)
         self.assertIn("highest mutually supported protocol", doc)
@@ -830,6 +881,48 @@ class _FakeGroundfireUdpProtocol(asyncio.DatagramProtocol):
                 ),
                 addr,
             )
+        elif isinstance(message, ResumeRequest):
+            self.transport.sendto(
+                encode_message(
+                    ResumeAccept(
+                        session_id="test-session",
+                        player_number=message.player_number,
+                        session_token="session-token",
+                    )
+                ),
+                addr,
+            )
+            self.transport.sendto(encode_message(_snapshot_envelope(message.player_name, snapshot_sequence=3)), addr)
+        elif isinstance(message, LobbySetReadyRequest):
+            self.transport.sendto(
+                encode_message(CommandResult(message.request_id, "lobby_set_ready", True)),
+                addr,
+            )
+        elif isinstance(message, ChatSendRequest):
+            self.transport.sendto(
+                encode_message(CommandResult(message.request_id, "chat_send", True)),
+                addr,
+            )
+            self.transport.sendto(
+                encode_message(
+                    ServerEventEnvelope(
+                        session_id="test-session",
+                        event_sequence=7,
+                        simulation_tick=3,
+                        events=(
+                            {
+                                "event_type": "chat_message",
+                                "payload": {
+                                    "player_number": 1,
+                                    "player_name": "GodotPlayer",
+                                    "text": message.text,
+                                },
+                            },
+                        ),
+                    )
+                ),
+                addr,
+            )
 
 
 async def _exercise_websocket_gateway_over_tcp() -> tuple[list[dict], list[object]]:
@@ -861,6 +954,68 @@ async def _exercise_websocket_gateway_over_tcp() -> tuple[list[dict], list[objec
     finally:
         writer.close()
         await writer.wait_closed()
+        server.close()
+        await server.wait_closed()
+        udp_transport.close()
+
+
+async def _exercise_websocket_gateway_resume_over_tcp() -> tuple[list[dict], list[object]]:
+    loop = asyncio.get_running_loop()
+    udp_transport, udp_protocol = await loop.create_datagram_endpoint(
+        lambda: _FakeGroundfireUdpProtocol(),
+        local_addr=("127.0.0.1", 0),
+    )
+    udp_host, udp_port = udp_transport.get_extra_info("sockname")[:2]
+    gateway = WebSocketGateway(udp_host=udp_host, udp_port=udp_port)
+    server = await asyncio.start_server(gateway._handle_client, gateway.host, 0)
+    host, port = server.sockets[0].getsockname()[:2]
+    messages: list[dict] = []
+    try:
+        reader, writer = await asyncio.open_connection(host, port)
+        await _send_websocket_handshake(reader, writer, host, port)
+        await _write_client_message(writer, {"type": "hello", "protocol": 2, "client": "godot"})
+        messages.append(await _read_server_message(reader))
+        await _write_client_message(
+            writer,
+            {"type": "join", "protocol": 2, "player_name": "GodotPlayer", "password": ""},
+        )
+        messages.append(await _read_server_message(reader))
+        writer.close()
+        await writer.wait_closed()
+        await asyncio.sleep(0.05)
+
+        reader, writer = await asyncio.open_connection(host, port)
+        await _send_websocket_handshake(reader, writer, host, port)
+        await _write_client_message(writer, {"type": "hello", "protocol": 2, "client": "godot"})
+        messages.append(await _read_server_message(reader))
+        await _write_client_message(
+            writer,
+            {
+                "type": "session_resume",
+                "protocol": 2,
+                "session_id": "test-session",
+                "player_number": 1,
+                "resume_token": "session-token",
+                "player_name": "GodotPlayer",
+            },
+        )
+        messages.append(await _read_server_message(reader))
+        messages.append(await _read_server_message(reader))
+        await _write_client_message(
+            writer,
+            {"type": "lobby_set_ready", "protocol": 2, "request_id": "ready-1", "ready": True},
+        )
+        messages.append(await _read_server_message(reader))
+        await _write_client_message(
+            writer,
+            {"type": "chat_send", "protocol": 2, "request_id": "chat-1", "text": "Hello from Godot"},
+        )
+        messages.append(await _read_server_message(reader))
+        messages.append(await _read_server_message(reader))
+        writer.close()
+        await writer.wait_closed()
+        return messages, list(udp_protocol.messages)
+    finally:
         server.close()
         await server.wait_closed()
         udp_transport.close()

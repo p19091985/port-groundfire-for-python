@@ -44,6 +44,13 @@ func _run() -> void:
 	assert(token_url.contains("Godot%20Player"))
 	online.set("_auth_token", "static-token")
 	assert(not bool(online.call("_needs_session_token")))
+	online.set("_auto_retry_when_full", true)
+	online.set("_server_protocol_ready", true)
+	online.set("_join_sent", true)
+	online.call("_on_websocket_message_received", {"type": "error", "protocol": 2, "message": "server_full"})
+	assert(not bool(online.get("_join_sent")))
+	assert(abs(float(online.get("_capacity_retry_timer")) - 3.0) < 0.01)
+	assert(str(online.get("_status")).contains("slot opens"))
 
 	online.set("_endpoint", "ws://127.0.0.1:9")
 	online.call("_force_reconnect", "snapshot_timeout")
@@ -77,6 +84,7 @@ func _run() -> void:
 			"velocity": Vector2(100.0, 0.0),
 		},
 	})
+	online.set("_local_player_number", 1)
 	online.call("_apply_local_prediction", {"move_right": true, "aim_left": true})
 	var render_entities := Dictionary(online.get("_render_entities"))
 	var predicted_tank := Dictionary(render_entities[42])
@@ -98,6 +106,27 @@ func _run() -> void:
 	predicted_tank = Dictionary(render_entities[42])
 	assert(not bool(predicted_tank.get("predicted", true)))
 	assert(float(online.get("_last_prediction_error")) > 0.0)
+
+	online.set("_local_player_number", 2)
+	online.set("_render_entities", {
+		42: {"entity_id": 42, "entity_type": "tank", "owner_player": 1, "render_position": Vector2.ZERO},
+		43: {"entity_id": 43, "entity_type": "tank", "owner_player": 2, "render_position": Vector2.ZERO},
+		44: {"entity_id": 44, "entity_type": "tank", "owner_player": 8, "render_position": Vector2.ZERO},
+	})
+	online.call("_apply_local_prediction", {"move_right": true})
+	render_entities = Dictionary(online.get("_render_entities"))
+	assert(not bool(Dictionary(render_entities[42]).get("predicted", false)))
+	assert(bool(Dictionary(render_entities[43]).get("predicted", false)))
+	assert(not bool(Dictionary(render_entities[44]).get("predicted", false)))
+	online.set("_local_player_number", 8)
+	online.call("_apply_local_prediction", {"move_left": true})
+	render_entities = Dictionary(online.get("_render_entities"))
+	assert(bool(Dictionary(render_entities[44]).get("predicted", false)))
+
+	online.set("_spectating", true)
+	online.set("_local_player_number", -1)
+	online.set("_match_snapshot", {"players": [{"player_number": 1, "name": "Alice", "is_ready": false}]})
+	assert(str(online.call("_lobby_summary")).contains("Spectating lobby"))
 
 	await _free_node(online)
 	quit(0)

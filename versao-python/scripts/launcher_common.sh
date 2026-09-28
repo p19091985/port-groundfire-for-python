@@ -1,15 +1,27 @@
 #!/usr/bin/env bash
 
-# Shared helpers for the Groundfire shell launchers.  This file assumes the
-# caller already re-execed under Bash and set PROJECT_DIR, LOG_DIR and LOG_FILE.
+# Shared helpers for the Groundfire shell launchers (edicao standalone).
+# O chamador define EDITION_DIR (versao-python/), LOG_DIR e LOG_FILE.
+# PROJECT_DIR e mantido como alias de EDITION_DIR para compatibilidade.
 
 launcher_init_logs() {
     mkdir -p "$LOG_DIR"
+    if [[ -n "${EDITION_DIR:-}" ]]; then
+        mkdir -p "${GROUNDFIRE_USERDATA_DIR:-$EDITION_DIR/userdata}" 2>/dev/null || true
+    fi
 }
 
 log() {
     local message="$1"
     printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$message" | tee -a "$LOG_FILE"
+}
+
+edition_root() {
+    if [[ -n "${EDITION_DIR:-}" ]]; then
+        printf '%s\n' "$EDITION_DIR"
+    else
+        printf '%s\n' "$PROJECT_DIR"
+    fi
 }
 
 find_python() {
@@ -18,13 +30,16 @@ find_python() {
         return 0
     fi
 
-    if [[ -x "$PROJECT_DIR/.venv/bin/python" ]]; then
-        printf '%s\n' "$PROJECT_DIR/.venv/bin/python"
+    local root
+    root=$(edition_root)
+
+    if [[ -x "$root/.venv/bin/python" ]]; then
+        printf '%s\n' "$root/.venv/bin/python"
         return 0
     fi
 
     local candidate
-    for candidate in python3.13 python3.12 python3.11 python3.10 python3 python; do
+    for candidate in python3.14 python3.13 python3.12 python3.11 python3.10 python3 python; do
         if command -v "$candidate" >/dev/null 2>&1; then
             printf '%s\n' "$candidate"
             return 0
@@ -32,6 +47,12 @@ find_python() {
     done
 
     return 1
+}
+
+edition_pythonpath_prefix() {
+    local root
+    root=$(edition_root)
+    printf '%s\n' "$root:$root/src"
 }
 
 quote_command() {
@@ -144,4 +165,24 @@ process_is_running() {
         fi
     fi
     return 0
+}
+# ST02: binario portatil interno (<edicao>/runtime/<plat>/), ou vazio.
+edition_runtime_binary() {
+    local name="$1"
+    if [[ "${GROUNDFIRE_FORCE_SOURCE:-0}" == "1" ]]; then
+        return 1
+    fi
+    local root platform candidate
+    root=$(edition_root)
+    case "$(uname -s 2>/dev/null || printf unknown)" in
+        Linux*) platform="linux" ;;
+        MINGW*|MSYS*|CYGWIN*) platform="windows"; name="$name.exe" ;;
+        *) platform="linux" ;;
+    esac
+    candidate="$root/runtime/$platform/$name"
+    if [[ -x "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+    return 1
 }

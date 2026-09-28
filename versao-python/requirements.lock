@@ -1,0 +1,8 @@
+# Lock da edicao Python standalone (fonte isolada).
+# Instalar somente a partir desta pasta:
+#   python -m pip install -r requirements.lock
+#   python -m pip install -e .
+pygame==2.6.1; python_version < '3.14'
+pygame-ce>=2.5.8,<3; python_version >= '3.14'
+pygame_gui>=0.6.14,<0.7
+pygame-menu>=4.4,<5; python_version < '3.14'

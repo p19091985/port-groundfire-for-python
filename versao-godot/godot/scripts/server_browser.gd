@@ -5,17 +5,18 @@ const BrowserStore := preload("res://scripts/browser_store.gd")
 const NetworkAdapter := preload("res://scripts/network_adapter.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
 const WebSocketClient := preload("res://scripts/websocket_client.gd")
+const LanDiscovery := preload("res://scripts/lan_discovery.gd")
 
 const TABLE_COLUMN_WIDTHS := [560.0, 115.0, 80.0, 110.0, 75.0]
 const TABLE_REFERENCE_WIDTH := 1024.0
-const TABLE_HORIZONTAL_MARGIN := 44.0
+const TABLE_HORIZONTAL_MARGIN := 96.0
 const TABLE_MIN_TOTAL_WIDTH := 440.0
 const TABLE_MAX_TOTAL_WIDTH := 980.0
 const TABLE_HEADER_HEIGHT := 30.0
 const TABLE_ROW_HEIGHT := 26.0
 const TABLE_SCROLL_MIN_HEIGHT := 220.0
 const TABLE_SCROLL_MAX_HEIGHT := 520.0
-const TABLE_VERTICAL_RESERVED_HEIGHT := 250.0
+const TABLE_VERTICAL_RESERVED_HEIGHT := 420.0
 const TABLE_HORIZONTAL_SCROLL_MODE := ScrollContainer.SCROLL_MODE_DISABLED
 const TABLE_VERTICAL_SCROLL_MODE := ScrollContainer.SCROLL_MODE_AUTO
 const TABLE_HEADER_BG := Color("#00000066")
@@ -31,18 +32,24 @@ var _favorite_button: Button
 var _clear_history_button: Button
 var _undo_button: Button
 var _refresh_all_button: Button
+var _random_server_button: Button
 var _action_buttons: Array[Button] = []
 var _filter_controls: Array[Control] = []
 var _filter_line: LineEdit
 var _password_line: LineEdit
+var _direct_address_line: LineEdit
+var _direct_join_mode := false
 var _join_modal: PanelContainer
 var _join_modal_title: Label
 var _join_modal_hint: Label
 var _join_cancel_button: Button
 var _join_connect_button: Button
+var _auto_retry_check: CheckButton
 var _http_request: HTTPRequest
 var _websocket_client: Node
 var _capabilities: Node
+var _lan_discovery: Node
+var _lan_entries: Array[Dictionary] = []
 var _entries: Array[Dictionary] = []
 var _visible_entries: Array[Dictionary] = []
 var _favorites: Array[String] = []
@@ -52,6 +59,10 @@ var _hovered_index := -1
 var _filter_text := ""
 var _hide_passworded := false
 var _hide_full := false
+var _hide_empty := false
+var _secure_only := false
+var _region := ""
+var _max_latency := 0
 var _sort_mode := "latency"
 var _directory_url := ""
 var _directory_retry_count := 0
@@ -97,6 +108,11 @@ func _build() -> void:
 	_websocket_client.status_changed.connect(_on_websocket_status_changed)
 	_websocket_client.message_received.connect(_on_websocket_message_received)
 	add_child(_websocket_client)
+	if _capabilities.supports(_capabilities.FEATURE_LAN_DISCOVERY):
+		_lan_discovery = LanDiscovery.new()
+		_lan_discovery.servers_changed.connect(_on_lan_servers_changed)
+		add_child(_lan_discovery)
+		_lan_discovery.start()
 
 	var root := VBoxContainer.new()
 	root.anchor_right = 1.0
@@ -185,6 +201,57 @@ func _build() -> void:
 	filters.add_child(sort_menu)
 	_filter_controls.append(sort_menu)
 
+	var advanced_filters := HBoxContainer.new()
+	advanced_filters.add_theme_constant_override("separation", 10)
+	root.add_child(advanced_filters)
+	var hide_empty := CheckButton.new()
+	hide_empty.text = "Hide Empty"
+	hide_empty.button_pressed = _hide_empty
+	GroundfireTheme.apply_button(hide_empty)
+	hide_empty.toggled.connect(func(value: bool) -> void:
+		_hide_empty = value
+		_save_browser_store()
+		_render_entries()
+	)
+	advanced_filters.add_child(hide_empty)
+	_filter_controls.append(hide_empty)
+	var secure_only := CheckButton.new()
+	secure_only.text = "Secure Only"
+	secure_only.button_pressed = _secure_only
+	GroundfireTheme.apply_button(secure_only)
+	secure_only.toggled.connect(func(value: bool) -> void:
+		_secure_only = value
+		_save_browser_store()
+		_render_entries()
+	)
+	advanced_filters.add_child(secure_only)
+	_filter_controls.append(secure_only)
+	var region_menu := OptionButton.new()
+	for label in ["Any Region", "World", "NA", "SA", "EU", "Asia", "Local"]:
+		region_menu.add_item(label)
+	region_menu.select(["", "world", "na", "sa", "eu", "asia", "local"].find(_region))
+	GroundfireTheme.apply_button(region_menu)
+	region_menu.item_selected.connect(func(index: int) -> void:
+		_region = ["", "world", "na", "sa", "eu", "asia", "local"][index]
+		_save_browser_store()
+		_render_entries()
+	)
+	advanced_filters.add_child(region_menu)
+	_filter_controls.append(region_menu)
+	var ping_menu := OptionButton.new()
+	for label in ["Any Ping", "<= 50 ms", "<= 100 ms", "<= 150 ms", "<= 250 ms", "<= 500 ms"]:
+		ping_menu.add_item(label)
+	var ping_values := [0, 50, 100, 150, 250, 500]
+	ping_menu.select(max(0, ping_values.find(_max_latency)))
+	GroundfireTheme.apply_button(ping_menu)
+	ping_menu.item_selected.connect(func(index: int) -> void:
+		_max_latency = ping_values[index]
+		_save_browser_store()
+		_render_entries()
+	)
+	advanced_filters.add_child(ping_menu)
+	_filter_controls.append(ping_menu)
+
 	var panel := PanelContainer.new()
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", GroundfireTheme.classic_panel_style())
@@ -218,13 +285,17 @@ func _build() -> void:
 	GroundfireTheme.apply_label(_status, 15, GroundfireTheme.COLOR_CYAN)
 	panel_stack.add_child(_status)
 
-	var actions := HBoxContainer.new()
-	actions.alignment = BoxContainer.ALIGNMENT_END
+	var actions := GridContainer.new()
+	actions.columns = 3
+	actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions.add_theme_constant_override("separation", 10)
 	root.add_child(actions)
 	var filter_button := _add_action(actions, "Change Filters")
 	filter_button.pressed.connect(_focus_filter)
 	_action_buttons.append(filter_button)
+	var direct_button := _add_action(actions, "Add Server")
+	direct_button.pressed.connect(_show_direct_join_dialog)
+	_action_buttons.append(direct_button)
 	_favorite_button = _add_action(actions, "Add Favorite")
 	_favorite_button.pressed.connect(_toggle_selected_favorite)
 	_action_buttons.append(_favorite_button)
@@ -240,6 +311,9 @@ func _build() -> void:
 	_refresh_all_button = _add_action(actions, "Refresh All", true)
 	_refresh_all_button.pressed.connect(_refresh_online_directory)
 	_action_buttons.append(_refresh_all_button)
+	_random_server_button = _add_action(actions, "Random Server", true)
+	_random_server_button.pressed.connect(_connect_random_server)
+	_action_buttons.append(_random_server_button)
 	_connect_button = _add_action(actions, "Connect", true)
 	_connect_button.disabled = true
 	_connect_button.pressed.connect(_on_connect_pressed)
@@ -274,8 +348,30 @@ func _table_header_style() -> StyleBoxFlat:
 
 
 func _refresh_entries() -> void:
-	_entries = ServerDirectory.browser_entries(_capabilities.supports(_capabilities.FEATURE_LAN_DISCOVERY))
+	_entries = _merge_lan_entries(ServerDirectory.browser_entries(_capabilities.supports(_capabilities.FEATURE_LAN_DISCOVERY)))
 	_render_entries()
+
+
+func _on_lan_servers_changed(entries: Array[Dictionary]) -> void:
+	_lan_entries = entries.duplicate(true)
+	_entries = _merge_lan_entries(_entries)
+	if _tabs != null:
+		var tab_name := _tabs.get_tab_title(_tabs.current_tab).to_lower()
+		if tab_name == "lan" or tab_name == "unique":
+			_render_entries()
+
+
+func _merge_lan_entries(entries: Array[Dictionary]) -> Array[Dictionary]:
+	var merged: Array[Dictionary] = []
+	var by_endpoint: Dictionary = {}
+	for entry in entries:
+		var endpoint := str(entry.get("endpoint", ""))
+		by_endpoint[endpoint] = entry
+	for entry in _lan_entries:
+		by_endpoint[str(entry.get("endpoint", ""))] = entry
+	for entry in by_endpoint.values():
+		merged.append(Dictionary(entry))
+	return merged
 
 
 func _render_entries() -> void:
@@ -413,6 +509,7 @@ func _add_action(parent: Container, text: String, accent := false) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(128, 44)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.focus_mode = Control.FOCUS_ALL
 	GroundfireTheme.apply_classic_button(button, GroundfireTheme.BUTTON_FONT_SIZE)
 	parent.add_child(button)
@@ -429,28 +526,43 @@ func _empty_message(tab_name := "") -> String:
 		if _history.is_empty():
 			return "No connection history yet."
 		return "No history entries match the current filters."
+	if normalized_tab == "spectate":
+		return "No live servers are available to spectate."
 	if _capabilities.is_web():
 		return "No online servers responded. LAN discovery is not available in web builds."
 	return "No servers responded. Use Refresh for online servers or LAN discovery on desktop builds."
 
 
 func _filter_entries(entries: Array[Dictionary], tab_name: String) -> Array[Dictionary]:
-	var normalized_filter := _filter_text.to_lower()
 	var filtered := entries
 	if tab_name.to_lower() == "favorites":
 		filtered = _favorite_entries(entries)
+	elif tab_name.to_lower() == "unique":
+		filtered = _unique_entries(_entries + _favorite_entries(_entries) + _history)
 	elif tab_name.to_lower() == "history":
 		filtered = _history.duplicate()
-	if _hide_passworded:
-		filtered = filtered.filter(func(entry: Dictionary) -> bool: return str(entry.get("passworded", "false")) != "true")
-	if _hide_full:
-		filtered = filtered.filter(func(entry: Dictionary) -> bool: return _entry_has_open_slot(entry))
-	if normalized_filter.is_empty():
-		_sort_entries(filtered)
-		return filtered
-	filtered = filtered.filter(func(entry: Dictionary) -> bool: return _entry_matches_filter(entry, normalized_filter))
+	filtered = BrowserStore.filter_entries(filtered, _browser_filter_state())
 	_sort_entries(filtered)
 	return filtered
+
+
+func _unique_entries(entries: Array[Dictionary]) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var seen: Dictionary = {}
+	for entry in entries:
+		var endpoint := str(entry.get("endpoint", ""))
+		if endpoint.is_empty() or seen.has(endpoint):
+			continue
+		seen[endpoint] = true
+		result.append(entry)
+	return result
+
+
+func _entry_is_secure(entry: Dictionary) -> bool:
+	if entry.has("secure"):
+		var value = entry.get("secure")
+		return bool(value) if typeof(value) == TYPE_BOOL else str(value).to_lower() == "true"
+	return str(entry.get("endpoint", "")).begins_with("wss://")
 
 
 func _favorite_entries(entries: Array[Dictionary]) -> Array[Dictionary]:
@@ -570,7 +682,7 @@ func _build_join_dialog() -> void:
 	var center := CenterContainer.new()
 	_join_modal.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(460, 210)
+	panel.custom_minimum_size = Vector2(460, 270)
 	panel.add_theme_stylebox_override("panel", GroundfireTheme.panel_style())
 	center.add_child(panel)
 
@@ -589,12 +701,25 @@ func _build_join_dialog() -> void:
 	GroundfireTheme.apply_label(_join_modal_hint, 15, GroundfireTheme.COLOR_CYAN)
 	stack.add_child(_join_modal_hint)
 
+	_direct_address_line = LineEdit.new()
+	_direct_address_line.placeholder_text = "ws://host:port or host:port"
+	_direct_address_line.focus_mode = Control.FOCUS_ALL
+	_direct_address_line.add_theme_stylebox_override("normal", GroundfireTheme.field_style())
+	_direct_address_line.visible = false
+	stack.add_child(_direct_address_line)
+
 	_password_line = LineEdit.new()
 	_password_line.placeholder_text = "Password"
 	_password_line.secret = true
 	_password_line.focus_mode = Control.FOCUS_ALL
 	_password_line.add_theme_stylebox_override("normal", GroundfireTheme.field_style())
 	stack.add_child(_password_line)
+
+	_auto_retry_check = CheckButton.new()
+	_auto_retry_check.text = "Join when a slot opens"
+	_auto_retry_check.focus_mode = Control.FOCUS_ALL
+	GroundfireTheme.apply_button(_auto_retry_check)
+	stack.add_child(_auto_retry_check)
 
 	var actions := HBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_END
@@ -680,17 +805,19 @@ func _wire_table_focus() -> void:
 
 
 func _wire_join_modal_focus() -> void:
-	if _password_line == null or _join_cancel_button == null or _join_connect_button == null:
+	if _password_line == null or _auto_retry_check == null or _join_cancel_button == null or _join_connect_button == null:
 		return
-	_password_line.focus_neighbor_bottom = _join_connect_button.get_path()
+	_password_line.focus_neighbor_bottom = _auto_retry_check.get_path()
 	_password_line.focus_neighbor_top = _join_connect_button.get_path()
+	_auto_retry_check.focus_neighbor_top = _password_line.get_path()
+	_auto_retry_check.focus_neighbor_bottom = _join_connect_button.get_path()
 	_join_cancel_button.focus_neighbor_left = _join_connect_button.get_path()
 	_join_cancel_button.focus_neighbor_right = _join_connect_button.get_path()
-	_join_cancel_button.focus_neighbor_top = _password_line.get_path()
+	_join_cancel_button.focus_neighbor_top = _auto_retry_check.get_path()
 	_join_cancel_button.focus_neighbor_bottom = _password_line.get_path()
 	_join_connect_button.focus_neighbor_left = _join_cancel_button.get_path()
 	_join_connect_button.focus_neighbor_right = _join_cancel_button.get_path()
-	_join_connect_button.focus_neighbor_top = _password_line.get_path()
+	_join_connect_button.focus_neighbor_top = _auto_retry_check.get_path()
 	_join_connect_button.focus_neighbor_bottom = _password_line.get_path()
 
 
@@ -877,7 +1004,7 @@ func _on_http_directory_completed(result: int, response_code: int, headers: Pack
 		_load_directory_fallback("Online server directory invalid or empty (%s). Using local fallback." % directory_diagnostic)
 	else:
 		_directory_loading = false
-		_entries = loaded_entries
+		_entries = _merge_lan_entries(loaded_entries)
 		_directory_cached_entries = _copy_entries(_entries)
 		_directory_cached_url = _directory_retry_url
 		_directory_cached_diagnostic = directory_diagnostic
@@ -897,7 +1024,7 @@ func _load_directory_from_cache(headers: PackedStringArray) -> void:
 		_load_directory_fallback("Online server directory returned 304 without a cached listing. Using local fallback.")
 		return
 	_directory_loading = false
-	_entries = _copy_entries(_directory_cached_entries)
+	_entries = _merge_lan_entries(_copy_entries(_directory_cached_entries))
 	var cache_diagnostic := ServerDirectory.http_cache_diagnostic(headers)
 	var directory_diagnostic := _directory_cached_diagnostic
 	if directory_diagnostic.is_empty():
@@ -911,7 +1038,7 @@ func _load_directory_from_cache(headers: PackedStringArray) -> void:
 
 func _load_directory_fallback(message: String) -> void:
 	_directory_loading = false
-	_entries = ServerDirectory.browser_entries(_capabilities.supports(_capabilities.FEATURE_LAN_DISCOVERY))
+	_entries = _merge_lan_entries(ServerDirectory.browser_entries(_capabilities.supports(_capabilities.FEATURE_LAN_DISCOVERY)))
 	_render_entries()
 	_status.text = message
 
@@ -983,6 +1110,7 @@ func _render_selected_row_styles() -> void:
 func _update_action_buttons() -> void:
 	if _connect_button != null:
 		_connect_button.disabled = _selected_index < 0
+		_connect_button.text = "Spectate" if _tabs != null and _tabs.get_tab_title(_tabs.current_tab).to_lower() == "spectate" else "Connect"
 	if _favorite_button != null:
 		_favorite_button.disabled = _selected_index < 0
 		_favorite_button.text = "Add Favorite"
@@ -997,6 +1125,8 @@ func _update_action_buttons() -> void:
 	if _refresh_all_button != null:
 		_refresh_all_button.disabled = _directory_loading
 		_refresh_all_button.text = "Loading..." if _directory_loading else "Refresh All"
+	if _random_server_button != null:
+		_random_server_button.disabled = _best_quick_match_index(_visible_entries) < 0
 	_wire_server_browser_focus()
 	_wire_table_focus()
 
@@ -1005,45 +1135,119 @@ func _on_connect_pressed() -> void:
 	if _selected_index < 0 or _selected_index >= _visible_entries.size():
 		return
 	var entry := _visible_entries[_selected_index]
-	if str(entry.get("passworded", "false")) == "true":
-		_password_line.text = ""
-		_show_join_dialog(entry)
+	_password_line.text = ""
+	_auto_retry_check.button_pressed = false
+	_show_join_dialog(entry)
+
+
+func _best_quick_match_index(entries: Array[Dictionary]) -> int:
+	var best_index := -1
+	var best_latency := 10000
+	var best_player_count := -1
+	for index in range(entries.size()):
+		var entry := entries[index]
+		if str(entry.get("passworded", "false")).to_lower() == "true":
+			continue
+		if not _entry_has_open_slot(entry):
+			continue
+		var latency := _latency_value(entry)
+		if latency >= 9999:
+			continue
+		var player_count := _players_current_count(entry)
+		if best_index < 0 or latency < best_latency \
+			or (latency == best_latency and player_count > best_player_count):
+			best_index = index
+			best_latency = latency
+			best_player_count = player_count
+	return best_index
+
+
+func _connect_random_server() -> void:
+	var index := _best_quick_match_index(_visible_entries)
+	if index < 0:
+		_status.text = "No compatible server with an open slot is available."
 		return
-	_stage_connect(entry)
+	_select_row(index)
+	_on_connect_pressed()
 
 
 func _confirm_join_dialog() -> void:
+	if _direct_join_mode:
+		var endpoint := _direct_address_line.text.strip_edges()
+		var allow_udp: bool = _capabilities.supports(_capabilities.FEATURE_UDP_TRANSPORT)
+		if not NetworkAdapter.can_connect(endpoint, allow_udp):
+			_join_modal_hint.text = "Invalid address for this platform. Use ws:// or wss:// for online play."
+			return
+		var direct_entry := {
+			"name": endpoint,
+			"game": "Groundfire",
+			"players": "-",
+			"map": "Direct",
+			"latency": "-",
+			"source": ServerDirectory.SOURCE_ONLINE if endpoint.begins_with("ws") else ServerDirectory.SOURCE_LAN,
+			"endpoint": endpoint,
+			"passworded": "true" if not _password_line.text.is_empty() else "false",
+			"password": _password_line.text,
+			"auto_retry_when_full": _auto_retry_check.button_pressed,
+		}
+		_favorites = BrowserStore.remember_favorite(_favorites, endpoint)
+		_save_browser_store()
+		_hide_join_dialog()
+		_stage_connect(direct_entry)
+		return
 	if _selected_index < 0 or _selected_index >= _visible_entries.size():
 		return
 	var entry := _visible_entries[_selected_index].duplicate()
 	entry["password"] = _password_line.text
+	entry["auto_retry_when_full"] = _auto_retry_check.button_pressed
 	_hide_join_dialog()
 	_stage_connect(entry)
 
 
 func _show_join_dialog(entry: Dictionary) -> void:
+	_direct_join_mode = false
+	_direct_address_line.visible = false
 	_join_modal_title.text = "Connect to %s" % entry.get("name", "server")
 	_join_modal_hint.text = "Enter server password if required. Endpoint: %s" % entry.get("endpoint", "")
 	_join_modal.visible = true
 	_password_line.grab_focus()
 
 
+func _show_direct_join_dialog() -> void:
+	_direct_join_mode = true
+	_join_modal_title.text = "Add Server"
+	_join_modal_hint.text = "Enter a direct server address and an optional password."
+	_direct_address_line.text = ""
+	_direct_address_line.visible = true
+	_password_line.text = ""
+	_auto_retry_check.button_pressed = false
+	_join_modal.visible = true
+	_direct_address_line.grab_focus()
+
+
 func _hide_join_dialog() -> void:
 	_join_modal.visible = false
+	_direct_join_mode = false
 
 
 func _stage_connect(entry: Dictionary) -> void:
-	_history = BrowserStore.remember_history(_history, entry)
-	_save_browser_store()
+	var prepared_entry := entry.duplicate(true)
+	if _tabs != null and _tabs.get_tab_title(_tabs.current_tab).to_lower() == "spectate":
+		prepared_entry["spectator"] = true
 	var allow_udp: bool = _capabilities.supports(_capabilities.FEATURE_UDP_TRANSPORT)
-	var endpoint := str(entry.get("endpoint", ""))
+	var endpoint := str(prepared_entry.get("endpoint", ""))
 	var transport := NetworkAdapter.transport_for_endpoint(endpoint, allow_udp)
 	if transport == NetworkAdapter.TRANSPORT_WEBSOCKET:
-		_pending_join_entry = entry.duplicate()
+		_pending_join_entry = prepared_entry
 		_status.text = "Connecting to %s..." % endpoint
 		get_parent().get_parent()._show_online_match(_pending_join_entry)
 		return
-	_status.text = NetworkAdapter.staged_connect_message(entry, allow_udp)
+	if transport == NetworkAdapter.TRANSPORT_UDP:
+		_pending_join_entry = prepared_entry
+		_status.text = "Opening native UDP connection to %s..." % endpoint
+		get_parent().get_parent()._show_online_match(_pending_join_entry)
+		return
+	_status.text = NetworkAdapter.staged_connect_message(prepared_entry, allow_udp)
 
 
 func _on_websocket_status_changed(status: String) -> void:
@@ -1087,6 +1291,10 @@ func _load_browser_store() -> void:
 	_filter_text = str(filters.get("text", ""))
 	_hide_passworded = bool(filters.get("hide_passworded", false))
 	_hide_full = bool(filters.get("hide_full", false))
+	_hide_empty = bool(filters.get("hide_empty", false))
+	_secure_only = bool(filters.get("secure_only", false))
+	_region = str(filters.get("region", ""))
+	_max_latency = int(filters.get("max_latency", 0))
 	_sort_mode = str(filters.get("sort_mode", "latency"))
 
 
@@ -1095,7 +1303,16 @@ func _save_browser_store() -> void:
 
 
 func _browser_filter_state() -> Dictionary:
-	return BrowserStore.filter_state(_filter_text, _hide_passworded, _hide_full, _sort_mode)
+	return BrowserStore.filter_state(
+		_filter_text,
+		_hide_passworded,
+		_hide_full,
+		_sort_mode,
+		_hide_empty,
+		_secure_only,
+		_region,
+		_max_latency
+	)
 
 
 func _sort_index(sort_mode: String) -> int:

@@ -1,0 +1,2 @@
+# runtime/windows/ — export Godot Windows + companion (ST04/ST06).
+# presets gravam Groundfire.exe aqui; launchers .bat/.ps1 usam-na sem Git Bash.

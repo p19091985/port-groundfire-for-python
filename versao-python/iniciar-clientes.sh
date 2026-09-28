@@ -7,8 +7,9 @@ set -Eeuo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SCRIPT_PATH="$SCRIPT_DIR/$(basename -- "${BASH_SOURCE[0]}")"
-PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
-PYTHONPATH_PREFIX="$PROJECT_DIR/versao-python:$PROJECT_DIR"
+EDITION_DIR="$SCRIPT_DIR"
+PROJECT_DIR="$EDITION_DIR"
+PYTHONPATH_PREFIX="$EDITION_DIR:$EDITION_DIR/src"
 LOG_DIR="${GROUNDFIRE_LAUNCHER_LOG_DIR:-$PROJECT_DIR/logs}"
 RUN_ID=$(date '+%Y%m%d-%H%M%S')
 LOG_FILE="${GROUNDFIRE_CLIENTS_LOG_FILE:-$LOG_DIR/clients_debug.log}"
@@ -570,9 +571,14 @@ start_clients() {
             player_name="$player_prefix $index"
         fi
 
+        local runtime_client=""
+        runtime_client=$(edition_runtime_binary "Groundfire") || runtime_client=""
+        local client_front=("$python_bin" -m groundfire.client)
+        if [[ -n "$runtime_client" ]]; then
+            client_front=("$runtime_client")
+        fi
         local cmd=(
-            "$python_bin"
-            -m groundfire.client
+            "${client_front[@]}"
             --connect "$host:$port"
             --player-name "$player_name"
             --log-network-events

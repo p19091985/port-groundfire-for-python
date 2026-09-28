@@ -3,6 +3,8 @@ extends Control
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
 const NetworkAdapter := preload("res://scripts/network_adapter.gd")
 const WebSocketClient := preload("res://scripts/websocket_client.gd")
+const BrowserStore := preload("res://scripts/browser_store.gd")
+const UdpClient := preload("res://scripts/udp_client.gd")
 
 const INPUT_INTERVAL := 0.08
 const PING_INTERVAL := 1.5
@@ -17,6 +19,14 @@ const PREDICTION_ANGLE_STEP := 1.5
 const INTERPOLATION_RATE := 12.0
 const LOCAL_RECONCILE_RATE := 18.0
 const PROJECTILE_EXTRAPOLATION_SECONDS := 0.06
+const PROJECTILE_ENTITY_TYPES := {
+	"projectile": true,
+	"shell": true,
+	"missile": true,
+	"machinegun": true,
+	"mirv": true,
+	"nuke": true,
+}
 
 var _websocket_client: Node
 var _entry: Dictionary = {}
@@ -44,6 +54,8 @@ var _last_ack_sequence := 0
 var _last_snapshot_tick := 0
 var _last_terrain_revision := 0
 var _last_prediction_error := 0.0
+var _local_player_number := -1
+var _seen_effect_ids: Dictionary = {}
 var _snapshot_age := 0.0
 var _handshake_age := 0.0
 var _server_protocol_ready := false
@@ -54,6 +66,18 @@ var _fatal_server_failure := false
 var _pending_commands: Dictionary = {}
 var _manual_reconnect_button: Button
 var _back_button: Button
+var _show_diagnostics := false
+var _history_recorded := false
+var _resume_session_id := ""
+var _resume_token := ""
+var _resume_player_number := -1
+var _resume_pending := false
+var _chat_input: LineEdit
+var _chat_messages: Array[String] = []
+var _spectating := false
+var _auto_retry_when_full := false
+var _capacity_retry_timer := 0.0
+var _player_name := NetworkAdapter.PLAYER_NAME_DEFAULT
 
 
 func setup(entry: Dictionary) -> void:
@@ -63,6 +87,9 @@ func setup(entry: Dictionary) -> void:
 	_static_auth_token = str(_entry.get("auth_token", ""))
 	_auth_token = _static_auth_token
 	_session_token_url = str(_entry.get("session_token_url", ""))
+	_spectating = bool(_entry.get("spectator", false))
+	_auto_retry_when_full = bool(_entry.get("auto_retry_when_full", false))
+	_player_name = str(_entry.get("player_name", NetworkAdapter.PLAYER_NAME_DEFAULT))
 
 
 func _ready() -> void:
@@ -72,7 +99,8 @@ func _ready() -> void:
 	_session_token_request.timeout = 5.0
 	_session_token_request.request_completed.connect(_on_session_token_request_completed)
 	add_child(_session_token_request)
-	_websocket_client = WebSocketClient.new()
+	var transport := NetworkAdapter.transport_for_endpoint(_endpoint, not OS.has_feature("web"))
+	_websocket_client = UdpClient.new() if transport == NetworkAdapter.TRANSPORT_UDP else WebSocketClient.new()
 	_websocket_client.status_changed.connect(_on_websocket_status_changed)
 	_websocket_client.message_received.connect(_on_websocket_message_received)
 	add_child(_websocket_client)
@@ -107,6 +135,12 @@ func _process(delta: float) -> void:
 		queue_redraw()
 		return
 	if not _join_sent:
+		if _capacity_retry_timer > 0.0:
+			_capacity_retry_timer = max(0.0, _capacity_retry_timer - delta)
+			_update_interpolation(delta)
+			_update_effects(delta)
+			queue_redraw()
+			return
 		_send_join_after_hello()
 		if not _join_sent:
 			_update_interpolation(delta)
@@ -135,8 +169,21 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _chat_input != null and _chat_input.has_focus():
+		if event.is_action_pressed("ui_cancel"):
+			_chat_input.clear()
+			_chat_input.release_focus()
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_T:
+		_chat_input.grab_focus()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("gf_pause"):
 		_return_to_main_menu()
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_F1:
+		_show_diagnostics = not _show_diagnostics
+		queue_redraw()
 
 
 func _send_input_snapshot() -> void:
@@ -144,18 +191,30 @@ func _send_input_snapshot() -> void:
 		return
 	if not _websocket_client.is_websocket_connected():
 		return
+	if _spectating:
+		return
+	var typing_chat := _chat_input != null and _chat_input.has_focus()
+	var phase := str(_match_snapshot.get("game_phase", ""))
+	if not typing_chat and Input.is_action_just_pressed("gf_fire"):
+		var local_player := _player_snapshot(_local_player_number)
+		if phase == "lobby" and _websocket_client.has_method("set_lobby_ready"):
+			_websocket_client.set_lobby_ready(not bool(local_player.get("is_ready", false)))
+		elif phase == "winner" and _websocket_client.has_method("request_rematch"):
+			_websocket_client.request_rematch(not bool(local_player.get("rematch_ready", false)))
 	var command := {
-		"aim_left": Input.is_action_pressed("gf_aim_left"),
-		"aim_right": Input.is_action_pressed("gf_aim_right"),
-		"power_up": Input.is_action_pressed("gf_power_up"),
-		"power_down": Input.is_action_pressed("gf_power_down"),
-		"move_left": Input.is_action_pressed("gf_move_left"),
-		"move_right": Input.is_action_pressed("gf_move_right"),
-		"jump": Input.is_action_pressed("gf_jump"),
-		"shield": Input.is_action_pressed("gf_shield"),
-		"fire": Input.is_action_pressed("gf_fire"),
-		"weapon_next": Input.is_action_just_pressed("gf_weapon_next"),
-		"weapon_prev": Input.is_action_just_pressed("gf_weapon_prev"),
+		"aim_left": not typing_chat and Input.is_action_pressed("gf_aim_left"),
+		"aim_right": not typing_chat and Input.is_action_pressed("gf_aim_right"),
+		"power_up": not typing_chat and Input.is_action_pressed("gf_power_up"),
+		"power_down": not typing_chat and Input.is_action_pressed("gf_power_down"),
+		"move_left": not typing_chat and Input.is_action_pressed("gf_move_left"),
+		"move_right": not typing_chat and Input.is_action_pressed("gf_move_right"),
+		"jump": not typing_chat and Input.is_action_pressed("gf_jump"),
+		"shield": not typing_chat and Input.is_action_pressed("gf_shield"),
+		"fire": not typing_chat and phase not in ["lobby", "winner"] and Input.is_action_pressed("gf_fire"),
+		"ready": false,
+		"rematch": false,
+		"weapon_next": not typing_chat and Input.is_action_just_pressed("gf_weapon_next"),
+		"weapon_prev": not typing_chat and Input.is_action_just_pressed("gf_weapon_prev"),
 	}
 	var sequence: int = _websocket_client.send_input(command)
 	_pending_commands[sequence] = {
@@ -197,11 +256,19 @@ func _on_websocket_message_received(message: Dictionary) -> void:
 			_status = "Snapshot ignored before protocol hello."
 			return
 		_snapshot = Dictionary(message.get("state", {}))
+		_local_player_number = int(_snapshot.get("player_number", -1))
+		_spectating = str(_snapshot.get("role", "player")) == "spectator"
+		_resume_session_id = str(_snapshot.get("session_id", _resume_session_id))
+		_resume_token = str(_snapshot.get("resume_token", _resume_token))
+		_resume_player_number = _local_player_number
+		_resume_pending = false
+		_record_confirmed_connection_history()
 		_match_snapshot = Dictionary(_snapshot.get("match_snapshot", {}))
 		_last_snapshot_tick = int(_match_snapshot.get("simulation_tick", _last_snapshot_tick))
 		_last_terrain_revision = int(_match_snapshot.get("terrain_revision", _last_terrain_revision))
 		_snapshot_age = 0.0
 		_mark_session_healthy()
+		_capacity_retry_timer = 0.0
 		_ingest_acknowledgements()
 		_ingest_replicated_entities()
 		_ingest_events()
@@ -211,8 +278,19 @@ func _on_websocket_message_received(message: Dictionary) -> void:
 		_status = "Pong received: %d ms." % _last_latency_ms
 	elif message_type == NetworkAdapter.MESSAGE_ERROR:
 		var error_name := str(message.get("message", "unknown"))
+		if _resume_pending and error_name in ["resume_rejected", "session_expired"]:
+			_clear_resume_credentials()
+			_join_sent = false
+			_status = "Previous session expired. Joining a new slot."
+			_send_join_after_hello()
+			return
 		if not _server_protocol_ready and _is_protocol_error(error_name):
 			_fail_protocol_handshake("Protocol handshake failed: %s." % error_name, error_name)
+			return
+		if error_name == "server_full" and _auto_retry_when_full:
+			_join_sent = false
+			_capacity_retry_timer = 3.0
+			_status = "Server full. Joining automatically when a slot opens (retry in 3s)."
 			return
 		if NetworkAdapter.is_fatal_server_error(error_name):
 			_fail_server_error(NetworkAdapter.server_error_status_message(message), error_name)
@@ -221,6 +299,17 @@ func _on_websocket_message_received(message: Dictionary) -> void:
 	elif message_type == NetworkAdapter.MESSAGE_DISCONNECT:
 		_status = "Server disconnected: %s." % message.get("reason", "unknown")
 		_schedule_reconnect("server_disconnect")
+	elif message_type == NetworkAdapter.MESSAGE_SESSION_RESUMED:
+		_resume_session_id = str(message.get("session_id", _resume_session_id))
+		_resume_player_number = int(message.get("player_number", _resume_player_number))
+		_resume_token = str(message.get("resume_token", _resume_token))
+		_resume_pending = false
+		_status = "Session resumed. Synchronizing full state."
+	elif message_type == NetworkAdapter.MESSAGE_CHAT_EVENT:
+		_append_chat_message(str(message.get("player_name", "Player")), str(message.get("text", "")))
+	elif message_type == NetworkAdapter.MESSAGE_COMMAND_RESULT:
+		if not bool(message.get("accepted", false)):
+			_status = "%s rejected: %s." % [str(message.get("command", "Command")), str(message.get("reason", "unknown"))]
 	else:
 		_status = "Message: %s." % message_type
 
@@ -234,6 +323,22 @@ func _handle_protocol_hello(message: Dictionary) -> void:
 	_handshake_age = 0.0
 	_status = _server_protocol_status
 	_send_join_after_hello()
+
+
+func _record_confirmed_connection_history() -> void:
+	if _history_recorded or _endpoint.is_empty() or not bool(_snapshot.get("joined", false)):
+		return
+	var store := BrowserStore.load_store()
+	var favorites: Array[String] = []
+	for value in Array(store.get("favorites", [])):
+		favorites.append(str(value))
+	var history: Array[Dictionary] = []
+	for value in Array(store.get("history", [])):
+		if typeof(value) == TYPE_DICTIONARY:
+			history.append(Dictionary(value))
+	history = BrowserStore.remember_history(history, _entry)
+	BrowserStore.save_store(favorites, history, Dictionary(store.get("filters", {})))
+	_history_recorded = true
 
 
 func _is_protocol_error(error_name: String) -> bool:
@@ -265,16 +370,49 @@ func _send_join_after_hello() -> void:
 		return
 	if not _websocket_client.is_websocket_connected():
 		return
+	if _has_resume_credentials() and _websocket_client.has_method("resume_session") and _transport_supports_resume():
+		_join_sent = true
+		_resume_pending = true
+		_snapshot_age = 0.0
+		_websocket_client.resume_session(
+			_resume_session_id,
+			_resume_player_number,
+			_resume_token,
+			NetworkAdapter.PLAYER_NAME_DEFAULT
+		)
+		_websocket_client.ping()
+		_status = "%s Resuming player slot %d." % [_server_protocol_status, _resume_player_number]
+		return
+	if _has_resume_credentials() and not _transport_supports_resume():
+		_clear_resume_credentials()
 	if _needs_session_token():
 		_request_session_token()
 		return
 	_join_sent = true
+	_capacity_retry_timer = 0.0
 	_snapshot_age = 0.0
 	_input_tick = 0.0
 	_ping_tick = 0.0
-	_websocket_client.join(NetworkAdapter.PLAYER_NAME_DEFAULT, _password, _auth_token)
+	_websocket_client.join(_player_name, _password, _auth_token, _spectating)
 	_websocket_client.ping()
 	_status = "%s Join sent." % _server_protocol_status
+
+
+func _has_resume_credentials() -> bool:
+	return not _spectating and not _resume_session_id.is_empty() and not _resume_token.is_empty() and _resume_player_number >= 0
+
+
+func _transport_supports_resume() -> bool:
+	if not _websocket_client.has_method("supports_session_resume"):
+		return true
+	return bool(_websocket_client.call("supports_session_resume"))
+
+
+func _clear_resume_credentials() -> void:
+	_resume_session_id = ""
+	_resume_token = ""
+	_resume_player_number = -1
+	_resume_pending = false
 
 
 func _needs_session_token() -> bool:
@@ -363,6 +501,8 @@ func _connect_now(message: String) -> void:
 	_server_protocol_ready = false
 	_server_protocol_status = "Protocol handshake pending."
 	_join_sent = false
+	_resume_pending = false
+	_capacity_retry_timer = 0.0
 	_session_token_pending = false
 	_session_token_requested = false
 	_session_token_received = false
@@ -372,6 +512,10 @@ func _connect_now(message: String) -> void:
 	_status = message
 	_snapshot_age = 0.0
 	_pending_commands.clear()
+	_local_player_number = -1
+	_render_entities.clear()
+	_effects.clear()
+	_seen_effect_ids.clear()
 	_websocket_client.connect_to_endpoint(_endpoint)
 
 
@@ -416,15 +560,23 @@ func _update_reconnect(delta: float) -> void:
 func _force_reconnect(reason: String) -> void:
 	if _manual_disconnect or _endpoint.is_empty():
 		return
-	_websocket_client.disconnect_from_endpoint(reason)
+	if _websocket_client.has_method("abort_connection"):
+		_websocket_client.abort_connection()
+	else:
+		_websocket_client.disconnect_from_endpoint(reason)
 	_schedule_reconnect(reason)
 
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), GroundfireTheme.COLOR_BG)
 	_draw_header()
-	_draw_replicated_world()
-	_draw_snapshot_panel()
+	var world_rect := _draw_replicated_world()
+	_draw_local_player_hud(world_rect)
+	_draw_spectator_hud(world_rect)
+	_draw_match_phase_overlay(world_rect)
+	_draw_chat_overlay(world_rect)
+	if _show_diagnostics:
+		_draw_snapshot_panel()
 
 
 func _build_overlay_controls() -> void:
@@ -442,8 +594,52 @@ func _build_overlay_controls() -> void:
 	actions.add_child(_manual_reconnect_button)
 	_back_button = _header_button("Back", _return_to_main_menu)
 	actions.add_child(_back_button)
+	_chat_input = LineEdit.new()
+	_chat_input.placeholder_text = "Press T or click to chat"
+	_chat_input.max_length = 240
+	_chat_input.anchor_left = 0.0
+	_chat_input.anchor_top = 1.0
+	_chat_input.anchor_right = 0.58
+	_chat_input.anchor_bottom = 1.0
+	_chat_input.offset_left = 28.0
+	_chat_input.offset_top = -48.0
+	_chat_input.offset_right = -12.0
+	_chat_input.offset_bottom = -12.0
+	_chat_input.text_submitted.connect(_on_chat_submitted)
+	_chat_input.focus_mode = Control.FOCUS_ALL
+	_chat_input.add_theme_stylebox_override("normal", GroundfireTheme.field_style())
+	add_child(_chat_input)
 	_wire_overlay_focus()
 	_manual_reconnect_button.grab_focus.call_deferred()
+
+
+func _on_chat_submitted(text: String) -> void:
+	var normalized := " ".join(text.split())
+	_chat_input.clear()
+	_chat_input.release_focus()
+	if normalized.is_empty() or _websocket_client == null or not _websocket_client.has_method("send_chat"):
+		return
+	_websocket_client.send_chat(normalized)
+
+
+func _append_chat_message(player_name: String, text: String) -> void:
+	var normalized := " ".join(text.split())
+	if normalized.is_empty():
+		return
+	_chat_messages.append("%s: %s" % [player_name, normalized])
+	while _chat_messages.size() > 6:
+		_chat_messages.pop_front()
+	queue_redraw()
+
+
+func _draw_chat_overlay(world_rect: Rect2) -> void:
+	if _chat_messages.is_empty():
+		return
+	var panel := Rect2(world_rect.position + Vector2(12.0, 12.0), Vector2(min(520.0, world_rect.size.x * 0.55), 28.0 + 22.0 * _chat_messages.size()))
+	draw_rect(panel, Color("#000000aa"))
+	draw_rect(panel, GroundfireTheme.COLOR_LINE, false, 1.0)
+	for index in range(_chat_messages.size()):
+		draw_string(ThemeDB.fallback_font, panel.position + Vector2(12.0, 22.0 + 22.0 * index), _chat_messages[index], HORIZONTAL_ALIGNMENT_LEFT, panel.size.x - 24.0, 15, GroundfireTheme.COLOR_TEXT)
 
 
 func _wire_overlay_focus() -> void:
@@ -497,16 +693,164 @@ func _draw_header() -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(28.0, 104.0), _status, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, GroundfireTheme.COLOR_WARN)
 
 
-func _draw_replicated_world() -> void:
-	var world_rect := Rect2(28.0, 124.0, max(320.0, size.x - 56.0), max(260.0, size.y - 324.0))
+func _draw_replicated_world() -> Rect2:
+	var world_rect := Rect2(28.0, 124.0, max(320.0, size.x - 56.0), max(260.0, size.y - 224.0))
 	draw_rect(world_rect, Color("#07131ecc"))
 	draw_rect(world_rect, GroundfireTheme.COLOR_LINE, false, 2.0)
 	if _match_snapshot.is_empty():
 		draw_string(ThemeDB.fallback_font, world_rect.position + Vector2(18.0, 42.0), "No replicated match snapshot yet.", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GroundfireTheme.COLOR_MUTED)
-		return
+		return world_rect
 	_draw_terrain_profile(world_rect)
 	_draw_entities(world_rect)
 	_draw_players(world_rect)
+	return world_rect
+
+
+func _draw_local_player_hud(world_rect: Rect2) -> void:
+	if _local_player_number < 0 or _match_snapshot.is_empty():
+		return
+	var player := _player_snapshot(_local_player_number)
+	if player.is_empty():
+		return
+	var tank := _tank_snapshot(_local_player_number)
+	var payload := Dictionary(tank.get("payload", {}))
+	var hud := Rect2(world_rect.position.x, world_rect.end.y + 12.0, world_rect.size.x, 72.0)
+	draw_rect(hud, Color("#0b1722ee"))
+	draw_rect(hud, GroundfireTheme.COLOR_LINE, false, 2.0)
+	var weapon := str(player.get("selected_weapon", "shell")).to_upper()
+	var ammo := _weapon_ammo_for_player(player, str(player.get("selected_weapon", "shell")))
+	var ammo_text := "∞" if ammo < 0 else str(ammo)
+	var line := "%s   HP %d   Fuel %d%%   %s %s   Score %d   $%d" % [
+		str(player.get("name", "Player")),
+		int(round(float(payload.get("health", 100.0)))),
+		int(round(float(payload.get("fuel", 1.0)) * 100.0)),
+		weapon,
+		ammo_text,
+		int(player.get("score", 0)),
+		int(player.get("money", 0)),
+	]
+	draw_string(ThemeDB.fallback_font, hud.position + Vector2(18.0, 30.0), line, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, GroundfireTheme.COLOR_TEXT)
+	draw_string(ThemeDB.fallback_font, hud.position + Vector2(18.0, 55.0), "F1: network diagnostics", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, GroundfireTheme.COLOR_MUTED)
+
+
+func _draw_spectator_hud(world_rect: Rect2) -> void:
+	if not _spectating or _match_snapshot.is_empty():
+		return
+	var hud := Rect2(world_rect.position.x, world_rect.end.y + 12.0, world_rect.size.x, 72.0)
+	draw_rect(hud, Color("#0b1722ee"))
+	draw_rect(hud, GroundfireTheme.COLOR_LINE, false, 2.0)
+	draw_string(ThemeDB.fallback_font, hud.position + Vector2(18.0, 30.0), "SPECTATOR - read-only live view", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, GroundfireTheme.COLOR_WARN)
+	draw_string(ThemeDB.fallback_font, hud.position + Vector2(18.0, 55.0), "T: chat   F1: network diagnostics   Esc: leave", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, GroundfireTheme.COLOR_MUTED)
+
+
+func _draw_match_phase_overlay(world_rect: Rect2) -> void:
+	var phase := str(_match_snapshot.get("game_phase", ""))
+	if phase == "" or phase == "round_in_action":
+		return
+	var panel := Rect2(world_rect.get_center() - Vector2(260.0, 120.0), Vector2(520.0, 240.0))
+	draw_rect(panel, Color("#0b1722ee"))
+	draw_rect(panel, GroundfireTheme.COLOR_LINE, false, 2.0)
+	var title := phase.replace("_", " ").capitalize()
+	var detail := ""
+	if phase == "lobby":
+		title = "Online Lobby"
+		detail = _lobby_summary()
+	elif phase == "round_starting":
+		title = "Round %d" % int(_match_snapshot.get("current_round", 1))
+		detail = "Get Ready"
+	elif phase == "round_finishing":
+		title = _winner_phase_title(" wins the round", "Round Over")
+		detail = "Next phase in %.1fs" % _phase_seconds_remaining()
+	elif phase == "score":
+		title = "Round Score"
+		detail = _scoreboard_summary()
+	elif phase == "shop":
+		title = "Shop Phase"
+		var local_player := _player_snapshot(_local_player_number)
+		detail = "%s   $%d\nWeapon: %s\nUse weapon up/down and fire to buy" % [
+			str(local_player.get("name", "Player")),
+			int(local_player.get("money", 0)),
+			str(local_player.get("selected_weapon", "shell")).to_upper(),
+		]
+	elif phase == "winner":
+		title = "Final Result"
+		detail = "%s\n%s\nFire: request rematch" % [_winner_phase_title(" wins!", "It's a tie!"), _rematch_summary()]
+	draw_string(ThemeDB.fallback_font, panel.position + Vector2(24.0, 52.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, GroundfireTheme.COLOR_WARN)
+	var y := panel.position.y + 92.0
+	for detail_line in detail.split("\n"):
+		draw_string(ThemeDB.fallback_font, Vector2(panel.position.x + 24.0, y), detail_line, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GroundfireTheme.COLOR_TEXT)
+		y += 30.0
+
+
+func _phase_seconds_remaining() -> float:
+	return max(0.0, float(_match_snapshot.get("phase_ticks_remaining", 0)) / 60.0)
+
+
+func _lobby_summary() -> String:
+	var lines: Array[String] = []
+	for player_value in Array(_match_snapshot.get("players", [])):
+		var player := Dictionary(player_value)
+		var status := "READY" if bool(player.get("is_ready", false)) or bool(player.get("is_computer", false)) else "WAITING"
+		var leader := "  LEADER" if bool(player.get("is_leader", false)) else ""
+		lines.append("%s  %s%s" % [str(player.get("name", "Player")), status, leader])
+	if lines.is_empty():
+		lines.append("Waiting for players")
+	elif not _spectating:
+		lines.append("Fire: toggle ready")
+	else:
+		lines.append("Spectating lobby")
+	return "\n".join(lines)
+
+
+func _winner_phase_title(suffix: String, fallback: String) -> String:
+	var winner_number = _match_snapshot.get("round_winner_player_number", null)
+	if str(_match_snapshot.get("game_phase", "")) == "winner":
+		winner_number = _match_snapshot.get("winner_player_number", null)
+	if winner_number == null:
+		return fallback
+	var player := _player_snapshot(int(winner_number))
+	return "%s%s" % [str(player.get("name", "Player")), suffix]
+
+
+func _scoreboard_summary() -> String:
+	var lines := PackedStringArray()
+	for raw_player in Array(_match_snapshot.get("players", [])):
+		var player := Dictionary(raw_player)
+		lines.append("%s  score %d  $%d" % [str(player.get("name", "Player")), int(player.get("score", 0)), int(player.get("money", 0))])
+	return "\n".join(lines)
+
+
+func _rematch_summary() -> String:
+	var ready_count := 0
+	var players := Array(_match_snapshot.get("players", []))
+	for raw_player in players:
+		var player := Dictionary(raw_player)
+		if bool(player.get("rematch_ready", false)) or bool(player.get("is_computer", false)):
+			ready_count += 1
+	return "Rematch %d/%d ready" % [ready_count, players.size()]
+
+
+func _player_snapshot(player_number: int) -> Dictionary:
+	for raw_player in Array(_match_snapshot.get("players", [])):
+		var player := Dictionary(raw_player)
+		if int(player.get("player_number", -1)) == player_number:
+			return player
+	return {}
+
+
+func _tank_snapshot(player_number: int) -> Dictionary:
+	for entity_variant in _render_entities.values():
+		var entity := Dictionary(entity_variant)
+		if str(entity.get("entity_type", "")) == "tank" and int(entity.get("owner_player", -1)) == player_number:
+			return entity
+	return {}
+
+
+func _weapon_ammo_for_player(player: Dictionary, weapon_name: String) -> int:
+	for stock_variant in Array(player.get("weapon_stocks", [])):
+		if typeof(stock_variant) == TYPE_ARRAY and stock_variant.size() >= 2 and str(stock_variant[0]) == weapon_name:
+			return int(stock_variant[1])
+	return -1
 
 
 func _draw_terrain_profile(world_rect: Rect2) -> void:
@@ -532,7 +876,7 @@ func _draw_entities(world_rect: Rect2) -> void:
 		var entity_type := str(entity.get("entity_type", "entity"))
 		if entity_type == "tank":
 			_draw_replicated_tank(screen_position, entity)
-		elif entity_type == "projectile":
+		elif PROJECTILE_ENTITY_TYPES.has(entity_type):
 			_draw_replicated_projectile(screen_position, entity)
 		else:
 			draw_circle(screen_position, 5.0, GroundfireTheme.COLOR_WARN)
@@ -542,7 +886,21 @@ func _draw_entities(world_rect: Rect2) -> void:
 
 
 func _draw_replicated_projectile(screen_position: Vector2, entity: Dictionary) -> void:
-	draw_circle(screen_position, 5.0, GroundfireTheme.COLOR_WARN)
+	var entity_type := str(entity.get("entity_type", "shell"))
+	var projectile_color := GroundfireTheme.COLOR_WARN
+	var radius := 5.0
+	if entity_type == "missile":
+		projectile_color = GroundfireTheme.COLOR_CYAN
+		radius = 6.0
+	elif entity_type == "machinegun":
+		projectile_color = Color.WHITE
+		radius = 2.5
+	elif entity_type == "mirv":
+		projectile_color = Color("#c77dff")
+	elif entity_type == "nuke":
+		projectile_color = Color("#ff5d73")
+		radius = 9.0
+	draw_circle(screen_position, radius, projectile_color)
 	var velocity := _entity_velocity(entity)
 	if velocity.length_squared() > 0.0:
 		var tail := screen_position - velocity.normalized() * 18.0
@@ -550,8 +908,8 @@ func _draw_replicated_projectile(screen_position: Vector2, entity: Dictionary) -
 
 
 func _draw_replicated_tank(screen_position: Vector2, entity: Dictionary) -> void:
-	var owner := int(entity.get("owner_player", 0))
-	var color := GroundfireTheme.COLOR_ACCENT_HOT if owner == 1 else Color("#4d95ff")
+	var owner := int(entity.get("owner_player", -1))
+	var color := GroundfireTheme.COLOR_ACCENT_HOT if owner == _local_player_number else Color("#4d95ff")
 	draw_rect(Rect2(screen_position.x - 22.0, screen_position.y - 18.0, 44.0, 20.0), color)
 	draw_circle(screen_position + Vector2(-13.0, 3.0), 6.0, Color("#111f2b"))
 	draw_circle(screen_position + Vector2(13.0, 3.0), 6.0, Color("#111f2b"))
@@ -656,7 +1014,7 @@ func _ingest_replicated_entities() -> void:
 		live_ids.append(entity_id)
 		if _render_entities.has(entity_id):
 			var current := Dictionary(_render_entities[entity_id])
-			if int(current.get("owner_player", 0)) == 1 and str(current.get("entity_type", "")) == "tank":
+			if int(current.get("owner_player", -1)) == _local_player_number and str(current.get("entity_type", "")) == "tank":
 				_last_prediction_error = Vector2(current.get("render_position", target_position)).distance_to(target_position)
 			current["target_position"] = target_position
 			current["velocity"] = _entity_velocity(entity)
@@ -683,7 +1041,7 @@ func _ingest_acknowledgements() -> void:
 		if typeof(raw_player) != TYPE_DICTIONARY:
 			continue
 		var player := Dictionary(raw_player)
-		if int(player.get("player_number", -1)) == 1 or str(player.get("name", "")) == NetworkAdapter.PLAYER_NAME_DEFAULT:
+		if int(player.get("player_number", -1)) == _local_player_number:
 			acknowledged = max(acknowledged, int(player.get("acknowledged_command_sequence", acknowledged)))
 	_last_ack_sequence = acknowledged
 	for sequence in _pending_commands.keys():
@@ -710,9 +1068,11 @@ func _stale_pending_count() -> int:
 
 
 func _apply_local_prediction(command: Dictionary) -> void:
+	if _local_player_number < 0:
+		return
 	for entity_id in _render_entities.keys():
 		var entity := Dictionary(_render_entities[entity_id])
-		if str(entity.get("entity_type", "")) != "tank" or int(entity.get("owner_player", 0)) != 1:
+		if str(entity.get("entity_type", "")) != "tank" or int(entity.get("owner_player", -1)) != _local_player_number:
 			continue
 		var render_position := Vector2(entity.get("render_position", _entity_position(entity)))
 		if bool(command.get("move_left", false)):
@@ -735,7 +1095,7 @@ func _update_interpolation(delta: float) -> void:
 		var entity := Dictionary(_render_entities[entity_id])
 		var current_position := Vector2(entity.get("render_position", Vector2.ZERO))
 		var target_position := Vector2(entity.get("target_position", current_position))
-		if str(entity.get("entity_type", "entity")) == "projectile":
+		if PROJECTILE_ENTITY_TYPES.has(str(entity.get("entity_type", "entity"))):
 			target_position += Vector2(entity.get("velocity", Vector2.ZERO)) * PROJECTILE_EXTRAPOLATION_SECONDS
 		var rate := LOCAL_RECONCILE_RATE if bool(entity.get("predicted", false)) else INTERPOLATION_RATE
 		entity["render_position"] = current_position.lerp(target_position, min(1.0, delta * rate))
@@ -743,6 +1103,24 @@ func _update_interpolation(delta: float) -> void:
 
 
 func _ingest_events() -> void:
+	for raw_patch in Array(_snapshot.get("terrain_patches", [])):
+		if typeof(raw_patch) != TYPE_DICTIONARY:
+			continue
+		var patch := Dictionary(raw_patch)
+		if str(patch.get("operation", "")) != "explosion":
+			continue
+		var patch_id := "patch:%d" % int(patch.get("patch_id", -1))
+		if _seen_effect_ids.has(patch_id):
+			continue
+		_seen_effect_ids[patch_id] = true
+		var payload := Dictionary(patch.get("payload", {}))
+		var centre: Variant = payload.get("centre", [0.0, 0.0])
+		if typeof(centre) == TYPE_ARRAY and centre.size() >= 2:
+			_effects.append({
+				"position": Vector2(float(centre[0]), float(centre[1])),
+				"radius": max(8.0, float(payload.get("radius", 0.1)) * 16.0),
+				"life": 0.45,
+			})
 	for raw_event in Array(_snapshot.get("events", [])):
 		if typeof(raw_event) != TYPE_DICTIONARY:
 			continue
@@ -750,6 +1128,10 @@ func _ingest_events() -> void:
 		if str(event.get("event_type", "")) != "terrain_explosion":
 			continue
 		var payload := Dictionary(event.get("payload", {}))
+		var effect_id := "event:%s:%s" % [str(event.get("event_type", "")), JSON.stringify(payload)]
+		if _seen_effect_ids.has(effect_id):
+			continue
+		_seen_effect_ids[effect_id] = true
 		var raw_position: Variant = payload.get("position", [0.0, 0.0])
 		var position := Vector2.ZERO
 		if typeof(raw_position) == TYPE_ARRAY and raw_position.size() >= 2:

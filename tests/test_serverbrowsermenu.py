@@ -99,6 +99,23 @@ class ServerBrowserMenuTests(unittest.TestCase):
             ],
         )
 
+    def test_spectate_tab_connects_read_only_without_using_ai_mode(self):
+        entry = ServerListEntry(name="Live", host="127.0.0.1", port=27015, latency_ms=12)
+        scanner = ScannerStub(entry)
+        game = GameStub()
+        menu = ServerBrowserMenu.__new__(ServerBrowserMenu)
+        menu._state = _BrowserState(entries=(entry,), tab="spectate")
+        menu._scanner = scanner
+        menu._game = game
+
+        menu._connect_selected()
+        self.assertTrue(menu._state.join_as_spectator)
+        menu._finish_connect_selected()
+
+        self.assertTrue(scanner.closed)
+        self.assertTrue(game.requests[0]["spectator"])
+        self.assertFalse(game.requests[0]["is_computer"])
+
     def test_join_dialog_uses_radio_selection_before_connecting(self):
         entry = ServerListEntry(name="Live", host="127.0.0.1", port=27015, latency_ms=12)
         scanner = ScannerStub(entry)
@@ -137,6 +154,35 @@ class ServerBrowserMenuTests(unittest.TestCase):
         menu._handle_join_click(rects, -3.0, -0.4)
 
         self.assertFalse(menu._state.join_as_computer)
+
+    def test_random_server_selects_lowest_latency_open_passwordless_server(self):
+        full = ServerListEntry(
+            name="Full",
+            host="127.0.0.1",
+            port=27015,
+            player_count=8,
+            max_players=8,
+            latency_ms=5,
+        )
+        passworded = ServerListEntry(
+            name="Passworded",
+            host="127.0.0.1",
+            port=27016,
+            requires_password=True,
+            latency_ms=8,
+        )
+        best = ServerListEntry(name="Best", host="127.0.0.1", port=27017, player_count=3, latency_ms=20)
+        slower = ServerListEntry(name="Slower", host="127.0.0.1", port=27018, latency_ms=40)
+        scanner = ScannerStub(best)
+        menu = ServerBrowserMenu.__new__(ServerBrowserMenu)
+        menu._state = _BrowserState(entries=(full, passworded, best, slower))
+        menu._scanner = scanner
+
+        menu._connect_random_server()
+
+        self.assertEqual(menu._state.selected_index, 2)
+        self.assertEqual(menu._state.pending_endpoint, best.endpoint)
+        self.assertEqual(menu._state.dialog, "join")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4 @@
+# userdata/ — dados portateis da edicao (ST05).
+# Preferencias, favoritos, historico, logs e saves locais ficam aqui.
+# O launcher indica erro claro se esta pasta nao for gravavel.
+# Migracao unica de preferencias/favoritos existentes: ver README.md.

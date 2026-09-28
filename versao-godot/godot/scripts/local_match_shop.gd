@@ -170,11 +170,12 @@ func _rebuild_weapon_rows() -> void:
 		shop_position += 1
 	_add_disabled_catalog_rows()
 
-	var participants: Array = _state.get("participants", [])
+	var participants: Array = _state.get("shop_participants", _state.get("participants", []))
 	for p_data in participants:
 		var p: Dictionary = p_data
 		var money_label := Label.new()
-		money_label.text = "%s: $%d" % [str(p.get("name", "Player")), int(p.get("credits", 0))]
+		var shop_status := "Done!" if bool(p.get("done", false)) else "row %d" % (int(p.get("selected_position", 0)) + 1)
+		money_label.text = "%s: $%d  %s" % [str(p.get("name", "Player")), int(p.get("credits", 0)), shop_status]
 		GroundfireTheme.apply_label(money_label, 14, p.get("color", Color.WHITE))
 		_roster_money_container.add_child(money_label)
 

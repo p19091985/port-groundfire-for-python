@@ -1,4 +1,5 @@
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -11,6 +12,10 @@ from tempfile import TemporaryDirectory
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+@unittest.skipUnless(
+    os.name == "posix" and shutil.which("bash") is not None and hasattr(os, "setsid"),
+    "LAN shell launchers require a POSIX environment with Bash",
+)
 class LanLaunchScriptTests(unittest.TestCase):
     def test_all_script_can_start_real_server_and_six_headless_ai_tanks_for_ci(self):
         with TemporaryDirectory() as temp_dir:

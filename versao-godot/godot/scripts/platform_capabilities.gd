@@ -33,7 +33,7 @@ func visible_server_browser_tabs() -> PackedStringArray:
 
 
 static func visible_server_browser_tabs_for(web_build: bool) -> PackedStringArray:
-	var tabs := PackedStringArray(["Internet", "Favorites", "History"])
+	var tabs := PackedStringArray(["Internet", "Favorites", "Spectate", "Unique", "History"])
 	if supports_for_platform(FEATURE_LAN_DISCOVERY, web_build):
 		tabs.append("LAN")
 	return tabs

@@ -7,8 +7,11 @@ set -Eeuo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SCRIPT_PATH="$SCRIPT_DIR/$(basename -- "${BASH_SOURCE[0]}")"
-PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
-PYTHONPATH_PREFIX="$PROJECT_DIR/versao-python:$PROJECT_DIR"
+PROJECT_DIR="$SCRIPT_DIR"
+EDITION_DIR="$SCRIPT_DIR"
+EDITION_DIR="$SCRIPT_DIR"
+PROJECT_DIR="$EDITION_DIR"
+PYTHONPATH_PREFIX="$EDITION_DIR:$EDITION_DIR/src"
 LOG_DIR="${GROUNDFIRE_LAUNCHER_LOG_DIR:-$PROJECT_DIR/logs}"
 RUN_ID=$(date '+%Y%m%d-%H%M%S')
 LOG_FILE="${GROUNDFIRE_SERVER_LOG_FILE:-$LOG_DIR/server_debug.log}"
@@ -488,9 +491,14 @@ start_server() {
         return 1
     }
 
+    local runtime_server=""
+    runtime_server=$(edition_runtime_binary "groundfire-server") || runtime_server=""
+    local server_front=("$python_bin" -m groundfire.server)
+    if [[ -n "$runtime_server" ]]; then
+        server_front=("$runtime_server")
+    fi
     local cmd=(
-        "$python_bin"
-        -m groundfire.server
+        "${server_front[@]}"
         --host "$host"
         --port "$port"
         --discovery-port "$discovery_port"
@@ -528,9 +536,14 @@ start_server() {
         cmd+=("${extra_args[@]}")
     fi
 
+    local runtime_client=""
+    runtime_client=$(edition_runtime_binary "Groundfire") || runtime_client=""
+    local client_front=("$python_bin" -m groundfire.client)
+    if [[ -n "$runtime_client" ]]; then
+        client_front=("$runtime_client")
+    fi
     local client_cmd=(
-        "$python_bin"
-        -m groundfire.client
+        "${client_front[@]}"
         --connect "$client_host:$port"
         --player-name "$client_name"
         --computer-player

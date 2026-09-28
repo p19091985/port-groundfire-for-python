@@ -169,6 +169,17 @@ func _run() -> void:
 		"gf_aim_right",
 		"gf_power_up",
 		"gf_power_down",
+		"gf_p2_fire",
+		"gf_p2_weapon_next",
+		"gf_p2_weapon_prev",
+		"gf_p2_jump",
+		"gf_p2_shield",
+		"gf_p2_move_left",
+		"gf_p2_move_right",
+		"gf_p2_aim_left",
+		"gf_p2_aim_right",
+		"gf_p2_power_up",
+		"gf_p2_power_down",
 	]
 	for action_name in classic_action_display_names:
 		assert(ControlSettings.display_name(action_name) == classic_action_display_names[action_name])
@@ -588,7 +599,9 @@ func _run() -> void:
 	cooldown_inventory.call("update_current_cooldown", WeaponInventory.SHELL_COOLDOWN)
 	assert(bool(cooldown_inventory.call("is_current_ready")))
 	local_match.call("_fire_player")
-	assert(str(local_match.get("_phase")) == "projectile")
+	# Classic combat stays active while projectiles are in flight so other
+	# participants can move and fire in the same simulation step.
+	assert(str(local_match.get("_phase")) == "aim")
 	assert(Array(local_match.get("_projectiles")).size() == 1)
 	_clear_projectiles(local_match)
 	local_match.set("_phase", "aim")
@@ -925,7 +938,7 @@ func _run() -> void:
 	local_match.call("_update_projectiles", 0.1)
 	assert(Array(local_match.get("_projectiles")).is_empty())
 	assert(Array(local_match.get("_explosions")).is_empty())
-	assert(str(local_match.get("_phase")) == "round_over")
+	assert(str(local_match.get("_phase")) == "aim")
 	assert(int(local_match.get("_score")) == 0)
 	assert(int(local_match.get("_credits")) == 0)
 	assert(not shell_death_audio.playing)
@@ -1014,13 +1027,16 @@ func _run() -> void:
 	assert(Array(local_match.get("_projectiles")).size() == 2)
 	local_match.call("_apply_machine_gun_damage", lethal_machine_gun_projectile, "Enemy")
 	assert(enemy_tank.state == TankState.STATE_DEAD)
-	assert(not bool(local_match.get("_machine_gun_fire_held")))
-	assert(int(local_match.get("_machine_gun_ai_burst_remaining")) == 0)
-	assert(not lethal_machine_gun_audio.playing)
+	# Python MachineGunWeapon.update keeps an independently held stream active;
+	# the round that killed a tank expires normally without cancelling every
+	# concurrent Machine Gun round in the world.
+	assert(bool(local_match.get("_machine_gun_fire_held")))
+	assert(int(local_match.get("_machine_gun_ai_burst_remaining")) == 4)
+	assert(lethal_machine_gun_audio.playing)
 	var expired_machine_gun_projectiles: Array = local_match.get("_projectiles")
-	assert(bool(Dictionary(expired_machine_gun_projectiles[0]).get("expired", false)))
-	assert(bool(Dictionary(expired_machine_gun_projectiles[1]).get("expired", false)))
-	assert(str(local_match.get("_message")).contains("destroyed"))
+	assert(not bool(Dictionary(expired_machine_gun_projectiles[0]).get("expired", false)))
+	assert(not bool(Dictionary(expired_machine_gun_projectiles[1]).get("expired", false)))
+	assert(str(local_match.get("_message")).contains("dealt"))
 	_clear_projectiles(local_match)
 	local_match.call("_reset_machine_gun_fire")
 	enemy_tank.health = TankState.TANK_MAX_HEALTH
@@ -1420,11 +1436,11 @@ func _run() -> void:
 
 	local_match.set("_wind", 4.0)
 	local_match.set("_wind_gust", 0.0)
-	assert(float(local_match.call("_wind_acceleration", 0.0)) == 4.0)
+	assert(float(local_match.call("_wind_acceleration", 0.0)) == 0.0)
 	local_match.set("_wind", 8.8)
 	local_match.call("_shift_wind_for_turn")
 	var shifted_wind = float(local_match.get("_wind"))
-	assert(shifted_wind >= -9.0 and shifted_wind <= 9.0)
+	assert(shifted_wind == 0.0)
 
 	var hud = LocalMatchHud.new()
 	assert(int(hud.call("_weapon_icon_index", "Shell")) == 0)
@@ -3002,7 +3018,7 @@ func _run() -> void:
 	var detached_cap: Dictionary = Array(support_cut_chunks[0])[0]
 	var detached_base: Dictionary = Array(support_cut_chunks[0])[1]
 	assert(bool(detached_cap.get("falling", false)))
-	assert(abs(float(detached_cap.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(detached_cap.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(not bool(detached_cap.get("linked_to_next", true)))
 	assert(not bool(detached_base.get("falling", true)))
 
@@ -3459,7 +3475,7 @@ func _run() -> void:
 	assert(abs(float(one_sided_result_cap.get("bottom_right", 0.0)) - 60.0) < 0.01)
 	assert(not bool(one_sided_result_cap.get("linked_to_next", true)))
 	assert(bool(one_sided_result_cap.get("falling", false)))
-	assert(abs(float(one_sided_result_cap.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(one_sided_result_cap.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(one_sided_result_cap.get("speed", -1.0))) < 0.01)
 	assert(not bool(one_sided_result_base.get("falling", true)))
 	assert(abs(float(one_sided_result_base.get("wait", -1.0))) < 0.01)
@@ -3501,7 +3517,7 @@ func _run() -> void:
 	assert(abs(float(two_sided_result_cap.get("bottom_right", 0.0)) - expected_two_sided_bottom) < 0.01)
 	assert(not bool(two_sided_result_cap.get("linked_to_next", true)))
 	assert(bool(two_sided_result_cap.get("falling", false)))
-	assert(abs(float(two_sided_result_cap.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(two_sided_result_cap.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(two_sided_result_cap.get("speed", -1.0))) < 0.01)
 	assert(not bool(two_sided_result_base.get("falling", true)))
 	assert(abs(float(two_sided_result_base.get("wait", -1.0))) < 0.01)
@@ -3533,7 +3549,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_bc15_result.get("bottom_right", 0.0)) - expected_unlinked_bc15_bottom) < 0.01)
 	assert(not bool(unlinked_bc15_result.get("linked_to_next", true)))
 	assert(bool(unlinked_bc15_result.get("falling", false)))
-	assert(abs(float(unlinked_bc15_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(unlinked_bc15_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(unlinked_bc15_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 322-340 (Python), the
@@ -3559,7 +3575,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_bc7_result.get("bottom_right", 0.0)) - (-sqrt(9900.0))) < 0.01)
 	assert(not bool(unlinked_bc7_result.get("linked_to_next", true)))
 	assert(bool(unlinked_bc7_result.get("falling", false)))
-	assert(abs(float(unlinked_bc7_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(unlinked_bc7_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(unlinked_bc7_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 322-340 (Python), the
@@ -3586,7 +3602,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_bc13_result.get("bottom_right", 0.0)) - (-sqrt(9900.0))) < 0.01)
 	assert(not bool(unlinked_bc13_result.get("linked_to_next", true)))
 	assert(bool(unlinked_bc13_result.get("falling", false)))
-	assert(abs(float(unlinked_bc13_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(unlinked_bc13_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(unlinked_bc13_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
@@ -3613,7 +3629,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_right_bottom_result.get("bottom_right", 0.0)) - 55.0) < 0.01)
 	assert(not bool(unlinked_right_bottom_result.get("linked_to_next", true)))
 	assert(bool(unlinked_right_bottom_result.get("falling", false)))
-	assert(abs(float(unlinked_right_bottom_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(unlinked_right_bottom_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(unlinked_right_bottom_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 342-359 (Python), the
@@ -3640,7 +3656,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_left_bottom_result.get("bottom_right", 0.0)) - 60.0) < 0.01)
 	assert(not bool(unlinked_left_bottom_result.get("linked_to_next", true)))
 	assert(bool(unlinked_left_bottom_result.get("falling", false)))
-	assert(abs(float(unlinked_left_bottom_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(unlinked_left_bottom_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(unlinked_left_bottom_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
@@ -3702,7 +3718,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_bc6_result.get("bottom_right", 0.0)) - (-sqrt(9900.0))) < 0.01)
 	assert(not bool(unlinked_bc6_result.get("linked_to_next", true)))
 	assert(bool(unlinked_bc6_result.get("falling", false)))
-	assert(abs(float(unlinked_bc6_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(unlinked_bc6_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(unlinked_bc6_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 342-359 (Python), the
@@ -3730,7 +3746,7 @@ func _run() -> void:
 	assert(abs(float(bc3_result.get("bottom_right", 0.0)) - 60.0) < 0.01)
 	assert(not bool(bc3_result.get("linked_to_next", true)))
 	assert(bool(bc3_result.get("falling", false)))
-	assert(abs(float(bc3_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(bc3_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(bc3_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 303-321 (Python), the
@@ -3782,7 +3798,7 @@ func _run() -> void:
 	assert(abs(float(bc14_result.get("bottom_right", 0.0)) - 45.0) < 0.01)
 	assert(not bool(bc14_result.get("linked_to_next", true)))
 	assert(bool(bc14_result.get("falling", false)))
-	assert(abs(float(bc14_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(bc14_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(bc14_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 342-359 (Python), the
@@ -3810,7 +3826,7 @@ func _run() -> void:
 	assert(abs(float(bc11_result.get("bottom_right", 0.0)) - 48.0) < 0.01)
 	assert(not bool(bc11_result.get("linked_to_next", true)))
 	assert(bool(bc11_result.get("falling", false)))
-	assert(abs(float(bc11_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(bc11_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(bc11_result.get("speed", -1.0))) < 0.01)
 
 	# Fidelity target: Landscape.clip_slice() lines 280-410 (Python). A thin
@@ -4103,7 +4119,7 @@ func _run() -> void:
 	assert(abs(float(unlinked_bc9_result.get("bottom_right", 0.0)) - (-105.0)) < 0.01)
 	assert(not bool(unlinked_bc9_result.get("linked_to_next", true)))
 	assert(bool(unlinked_bc9_result.get("falling", false)))
-	assert(abs(float(unlinked_bc9_result.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(unlinked_bc9_result.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(unlinked_bc9_result.get("speed", -1.0))) < 0.01)
 
 	var skipped_linked_terrain: RefCounted = TerrainModel.new()
@@ -4353,7 +4369,7 @@ func _run() -> void:
 	var falling_split_top: Dictionary = Array(falling_split_chunks[0])[0]
 	var falling_split_bottom: Dictionary = Array(falling_split_chunks[0])[1]
 	assert(bool(falling_split_top.get("falling", false)))
-	assert(abs(float(falling_split_top.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(falling_split_top.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(falling_split_top.get("speed", -1.0))) < 0.01)
 	assert(bool(falling_split_bottom.get("falling", false)))
 	assert(abs(float(falling_split_bottom.get("wait", 0.0)) - 0.25) < 0.01)
@@ -4397,7 +4413,7 @@ func _run() -> void:
 	assert(abs(float(linked_split_upper.get("bottom_left", 0.0)) - expected_linked_split_top_cut) < 0.01)
 	assert(not bool(linked_split_upper.get("linked_to_next", true)))
 	assert(bool(linked_split_upper.get("falling", false)))
-	assert(abs(float(linked_split_upper.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(linked_split_upper.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(linked_split_upper.get("speed", -1.0))) < 0.01)
 	assert(abs(float(linked_split_lower.get("top_left", 0.0)) - expected_linked_split_bottom_cut) < 0.01)
 	assert(abs(float(linked_split_lower.get("bottom_left", 0.0)) - 30.0) < 0.01)
@@ -4446,7 +4462,7 @@ func _run() -> void:
 	assert(abs(float(linked_support_split_result_cap.get("bottom_left", 0.0)) - 40.0) < 0.01)
 	assert(bool(linked_support_split_result_cap.get("linked_to_next", false)))
 	assert(bool(linked_support_split_result_cap.get("falling", false)))
-	assert(abs(float(linked_support_split_result_cap.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(linked_support_split_result_cap.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(linked_support_split_result_cap.get("speed", -1.0))) < 0.01)
 	assert(abs(float(linked_support_split_upper.get("top_left", 0.0)) - 40.0) < 0.01)
 	assert(abs(float(linked_support_split_upper.get("bottom_left", 0.0)) - expected_linked_support_split_top_cut) < 0.01)
@@ -4612,7 +4628,7 @@ func _run() -> void:
 	assert(abs(float(falling_linked_split_upper.get("bottom_left", 0.0)) - expected_linked_split_top_cut) < 0.01)
 	assert(not bool(falling_linked_split_upper.get("linked_to_next", true)))
 	assert(bool(falling_linked_split_upper.get("falling", false)))
-	assert(abs(float(falling_linked_split_upper.get("wait", 0.0)) - 0.1) < 0.01)
+	assert(abs(float(falling_linked_split_upper.get("wait", 0.0)) - 0.2) < 0.01)
 	assert(abs(float(falling_linked_split_upper.get("speed", -1.0))) < 0.01)
 	assert(abs(float(falling_linked_split_lower.get("top_left", 0.0)) - expected_linked_split_bottom_cut) < 0.01)
 	assert(bool(falling_linked_split_lower.get("linked_to_next", false)))
@@ -5444,27 +5460,17 @@ func _run() -> void:
 	player_tank.corbomite_active = false
 	player_tank.shield_active = false
 
-	# --- Fidelity assertions: Wind model invariants ---
-	# Fidelity target: local_match.gd _wind_acceleration()
-	# The wind acceleration at age=0 must equal the base _wind value (gust sin
-	# term is 0 when _wind_gust=0, which may not hold for all seeds, so we just
-	# check the value is clamped to [WIND_MIN, WIND_MAX]).
+	# --- Fidelity assertions: the Python classic mode has no wind ---
 	var wind_accel_at_zero: float = float(local_match.call("_wind_acceleration", 0.0))
-	assert(wind_accel_at_zero >= -9.0 and wind_accel_at_zero <= 9.0,
-		"Wind acceleration must stay within [WIND_MIN, WIND_MAX]")
-	# Wind with a zero gust should equal base wind at age 0:
+	assert(abs(wind_accel_at_zero) < 0.001, "Classic projectile acceleration must not include wind")
 	local_match.set("_wind", 3.0)
 	local_match.set("_wind_gust", 0.0)
 	var wind_age0_no_gust: float = float(local_match.call("_wind_acceleration", 0.0))
-	assert(abs(wind_age0_no_gust - 3.0) < 0.01,
-		"Wind acceleration at age=0 must equal base wind when gust is 0")
-
-	# Wind with a nonzero gust should differ over time:
+	assert(abs(wind_age0_no_gust) < 0.001, "Stored legacy wind must not affect classic projectiles")
 	local_match.set("_wind_gust", 1.5)
 	var wind_age0: float = float(local_match.call("_wind_acceleration", 0.0))
 	var wind_age1: float = float(local_match.call("_wind_acceleration", 1.0))
-	assert(abs(wind_age1 - wind_age0) > 0.001,
-		"Wind acceleration must include time-varying gust modulation")
+	assert(abs(wind_age1 - wind_age0) < 0.001, "Legacy gust state must not alter classic projectiles")
 
 	# --- Fidelity assertions: AI trajectory simulation ---
 	# Fidelity target: local_match.gd _simulate_ai_shell_miss()

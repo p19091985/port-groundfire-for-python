@@ -844,9 +844,9 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "SHOP_INITIAL_INPUT_DELAY := 0.4" in local_match
     assert "SHOP_ACTION_INPUT_DELAY := 0.2" in local_match
     assert "var _shop_finish_pending := false" in local_match
-    assert "velocity.y += PROJECTILE_GRAVITY * step" in local_match
-    assert "velocity.y += PROJECTILE_GRAVITY * delta" in local_match
-    assert "split_age = max(MIRV_MIN_SPLIT_AGE, -velocity.y / PROJECTILE_GRAVITY)" in local_match
+    assert "velocity.y += _projectile_gravity * step" in local_match
+    assert "velocity.y += _projectile_gravity * delta" in local_match
+    assert "split_age = max(MIRV_MIN_SPLIT_AGE, -velocity.y / _projectile_gravity)" in local_match
     assert '"split_age": split_age' in local_match
     assert "func _mirv_split_velocity" in local_match
     assert "var projectiles_this_step := _projectiles.duplicate()" in local_match
@@ -1653,7 +1653,9 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'TRANSPORT_WEBSOCKET := "websocket"' in network
     assert 'MESSAGE_HELLO := "hello"' in network
     assert 'MESSAGE_PING := "ping"' in network
-    assert "PROTOCOL_VERSION := 1" in network
+    assert "PROTOCOL_VERSION := 2" in network
+    assert "MIN_SUPPORTED_PROTOCOL := 1" in network
+    assert "MESSAGE_SESSION_RESUME" in network
     assert "MIN_SUPPORTED_PROTOCOL := 1" in network
     assert "MAX_SUPPORTED_PROTOCOL := PROTOCOL_VERSION" in network
     assert "SERVER_ERROR_CATEGORY_CREDENTIALS" in network
@@ -1701,7 +1703,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "WebSocketPeer.new()" in websocket
     assert "func connect_to_endpoint" in websocket
     assert "func send_input" in websocket
-    assert "NetworkAdapter.join_message(player_name, password, auth_token)" in websocket
+    assert "NetworkAdapter.join_message(player_name, password, auth_token, spectator)" in websocket
     assert "func is_websocket_connected" in websocket
     assert "func last_sequence" in websocket
     assert "_closed_reported" in websocket
@@ -1949,10 +1951,11 @@ def test_migration_strategy_declares_compatibility_contract():
     fidelity_script = (PROJECT_ROOT / "scripts" / "validate_godot_fidelity.sh").read_text(encoding="utf-8")
 
     assert "## Migration Compatibility Contract" in doc
-    assert "This is now an evolution-first migration." in doc
+    assert "This is now a fidelity-first migration." in doc
     assert "`versao-python/` and `versao-godot/godot/` are the canonical editions" in doc
-    assert "historical fidelity is comparison material rather than a hard product rule" in doc
-    assert "Prefer modern, testable architecture over exact historical coupling" in doc
+    assert "Python behavior is the acceptance reference for the corresponding local or connected mode." in doc
+    assert "First close the audited fidelity gaps; then evolve online UX in both editions" in doc
+    assert "Prefer modern, testable architecture without changing the Python user-visible behavior" in doc
     assert "use SQLite for mutable runtime state where practical" in doc
     assert "Every migration implementation batch must name its reference material" in doc
     assert "### Compatibility Annotation Template" in doc
@@ -1961,6 +1964,15 @@ def test_migration_strategy_declares_compatibility_contract():
     assert "REQUIRED_GLOBAL_PHRASES" in contract_script
     assert "`versao-python/` and `versao-godot/godot/` are the canonical editions" in contract_script
     assert "PENDING_SECTION_HEADERS" in contract_script
+
+    from scripts.validate_godot_migration_contract import validate_migration_contract
+
+    assert validate_migration_contract(doc) == []
+    changed_policy = doc.replace(
+        "This is now a fidelity-first migration.",
+        "This is now an evolution-first migration.",
+    )
+    assert validate_migration_contract(changed_policy)
 
     section_headers = (
         "### 1. Main Menu Visual Parity",
@@ -2124,6 +2136,11 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "server_directory.json%3Fphase%3D$phase" in qa_script
     assert "Run scripts/validate_godot_visuals.sh --update-goldens first" in visual_check
     assert "not FileAccess.file_exists(golden_path)" in visual_check
+    assert 'GOLDEN_DIR := "res://../../docs/references/godot_visual"' in visual_check
+    assert 'node.call("_on_find_servers")' in visual_check
+    assert 'node.call("_update_round_starting", 3.0)' in visual_check
+    for case_name in ("main_menu", "options", "server_browser", "local_match"):
+        assert (PROJECT_ROOT / "docs" / "references" / "godot_visual" / f"{case_name}.png").is_file()
     assert "scripts/export_godot.sh all" in migration_doc
     assert "scripts/package_godot_release.sh" in migration_doc
     assert "scripts/validate_godot_visuals.sh --check" in migration_doc

@@ -227,3 +227,16 @@ versao-godot/godot/.godot/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ST06: portable binaries ship as ZIPs, never committed (keep .gitkeep)
+versao-python/runtime/windows/*
+versao-python/runtime/linux/*
+versao-godot/runtime/windows/*
+versao-godot/runtime/linux/*
+versao-godot/runtime/web/*
+!versao-python/runtime/windows/.gitkeep
+!versao-python/runtime/linux/.gitkeep
+!versao-godot/runtime/windows/.gitkeep
+!versao-godot/runtime/linux/.gitkeep
+!versao-godot/runtime/web/.gitkeep
+

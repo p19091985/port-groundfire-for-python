@@ -41,14 +41,28 @@ class PortabilityFilesTests(unittest.TestCase):
         self.assertIn('"groundfire_net*"', pyproject)
         self.assertNotIn("mpgameserver", pyproject)
         self.assertNotIn("msgpack", pyproject)
+        self.assertIn('requires-python = ">=3.10,<3.15"', pyproject)
+        self.assertIn('"pygame-ce>=2.5.8,<3; python_version >= \'3.14\'"', pyproject)
+
+    def test_launchers_accept_python_314(self):
+        launchers = (
+            PYTHON_VERSION_DIR / "run_game.bat",
+            PYTHON_VERSION_DIR / "run_game.ps1",
+            PYTHON_VERSION_DIR / "run_game.sh",
+            PYTHON_VERSION_DIR / "scripts" / "launcher_common.sh",
+        )
+
+        for launcher in launchers:
+            with self.subTest(launcher=launcher.name):
+                self.assertIn("3.14", launcher.read_text(encoding="utf-8"))
 
     def test_shell_launcher_installs_package_into_virtual_environment(self):
         sh = (PYTHON_VERSION_DIR / "run_game.sh").read_text(encoding="utf-8")
 
         self.assertIn('version("groundfire")', sh)
-        self.assertIn('pip install --only-binary=pygame -e "$PROJECT_DIR"', sh)
-        self.assertIn('pip install -e "$PROJECT_DIR"', sh)
-        self.assertIn('exec "$VENV_GROUNDFIRE" "$@"', sh)
+        self.assertIn('pip install --only-binary=pygame -e "$EDITION_DIR"', sh)
+        self.assertIn('pip install -e "$EDITION_DIR"', sh)
+        self.assertIn("$EDITION_DIR", sh)
 
     def test_ci_matrix_covers_main_desktop_operating_systems(self):
         workflow = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

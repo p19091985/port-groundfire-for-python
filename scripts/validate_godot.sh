@@ -17,9 +17,17 @@ fi
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/groundfire_theme.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/classic_selector.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/control_settings.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/classic_fixed_step.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/classic_config.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/online/service_client.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/online/online_hub.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/python_random.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/player_input_router.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/browser_store.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/network_adapter.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/websocket_client.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/udp_client.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/lan_discovery.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/server_directory.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/terrain_model.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/tank_state.gd
@@ -30,6 +38,9 @@ fi
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/main.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/server_browser.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/browser_store_check.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/classic_runtime_contract_check.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/ai_memory_contract_check.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/simultaneous_local_contract_check.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/network_adapter_protocol_check.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/server_directory_check.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/terrain_collision_check.gd

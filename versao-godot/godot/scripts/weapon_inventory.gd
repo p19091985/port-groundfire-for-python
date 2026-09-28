@@ -59,6 +59,7 @@ var _selected_index := 0
 var _ammo: Dictionary = {}
 var _stock: Dictionary = {}
 var _cooldowns: Dictionary = {}
+var _weapons: Array = WEAPONS.duplicate(true)
 
 
 func _init() -> void:
@@ -67,22 +68,53 @@ func _init() -> void:
 	reset_round_ammo()
 
 
+func configure_classic(settings: Dictionary) -> void:
+	_weapons = WEAPONS.duplicate(true)
+	var configured := Dictionary(settings.get("weapons", {}))
+	var gravity_scale := float(Dictionary(settings.get("tank", {})).get("gravity", 5.0)) / 5.0
+	for index in range(_weapons.size()):
+		var weapon: Dictionary = _weapons[index]
+		var name := str(weapon["name"])
+		if not configured.has(name):
+			continue
+		var values := Dictionary(configured[name])
+		weapon["damage"] = int(round(float(values.get("damage", weapon["damage"]))))
+		weapon["cooldown"] = float(values.get("cooldown", weapon.get("cooldown", 0.0)))
+		weapon["cost"] = int(values.get("cost", weapon.get("cost", 0)))
+		if values.has("fuel"):
+			weapon["fuel"] = float(values["fuel"])
+		if values.has("steer_sensitivity"):
+			weapon["steer_sensitivity"] = float(values["steer_sensitivity"])
+		if values.has("speed") and name == MISSILE:
+			weapon["powered_speed"] = float(values["speed"])
+		if values.has("fragments"):
+			weapon["fragments"] = int(values["fragments"])
+		if values.has("spread"):
+			weapon["spread"] = float(values["spread"])
+		if name == MACHINE_GUN:
+			weapon["tracer_gravity"] = MACHINE_GUN_TRACER_GRAVITY * gravity_scale
+		_weapons[index] = weapon
+	_reset_initial_stock()
+	_reset_initial_cooldowns()
+	reset_round_ammo()
+
+
 func _reset_initial_stock() -> void:
 	_stock.clear()
-	for weapon in WEAPONS:
+	for weapon in _weapons:
 		var weapon_name := str(weapon["name"])
 		_stock[weapon_name] = int(weapon["ammo"])
 
 
 func _reset_initial_cooldowns() -> void:
 	_cooldowns.clear()
-	for weapon in WEAPONS:
+	for weapon in _weapons:
 		_cooldowns[str(weapon["name"])] = 0.0
 
 
 func reset_round_ammo() -> void:
 	_ammo.clear()
-	for weapon in WEAPONS:
+	for weapon in _weapons:
 		var weapon_name := str(weapon["name"])
 		_ammo[weapon_name] = int(_stock.get(weapon_name, weapon["ammo"]))
 	_selected_index = 0
@@ -90,7 +122,7 @@ func reset_round_ammo() -> void:
 
 
 func current() -> Dictionary:
-	return WEAPONS[_selected_index]
+	return _weapons[_selected_index]
 
 
 func current_name() -> String:
@@ -142,15 +174,15 @@ func stock_for(weapon_name: String) -> int:
 
 
 func weapon_by_name(weapon_name: String) -> Dictionary:
-	for weapon in WEAPONS:
+	for weapon in _weapons:
 		if str(weapon["name"]) == weapon_name:
 			return weapon
-	return WEAPONS[0]
+	return _weapons[0]
 
 
 func select_by_name(weapon_name: String, arm_cooldown := true) -> bool:
-	for index in range(WEAPONS.size()):
-		if str(WEAPONS[index]["name"]) == weapon_name and int(_ammo.get(weapon_name, 0)) != 0:
+	for index in range(_weapons.size()):
+		if str(_weapons[index]["name"]) == weapon_name and int(_ammo.get(weapon_name, 0)) != 0:
 			_selected_index = index
 			if arm_cooldown:
 				_arm_current_cooldown()
@@ -163,8 +195,8 @@ func has_ammo(weapon_name: String) -> bool:
 
 
 func cycle(direction := 1) -> String:
-	for _attempt in range(WEAPONS.size()):
-		_selected_index = wrapi(_selected_index + direction, 0, WEAPONS.size())
+	for _attempt in range(_weapons.size()):
+		_selected_index = wrapi(_selected_index + direction, 0, _weapons.size())
 		if current_ammo() != 0:
 			_arm_current_cooldown()
 			return current_name()
@@ -213,14 +245,14 @@ func _arm_current_cooldown(offset := 0.0) -> void:
 
 
 func weapon_cost(weapon_name: String) -> int:
-	for weapon in WEAPONS:
+	for weapon in _weapons:
 		if str(weapon["name"]) == weapon_name:
 			return int(weapon.get("cost", 0))
 	return 0
 
 
 func ammo_pack_size(weapon_name: String) -> int:
-	for weapon in WEAPONS:
+	for weapon in _weapons:
 		if str(weapon["name"]) == weapon_name:
 			return max(0, int(weapon.get("shop_pack", weapon.get("ammo", 0))))
 	return 0
@@ -241,8 +273,8 @@ func add_ammo(weapon_name: String, amount := -1) -> int:
 
 func inventory_snapshot() -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
-	for index in range(WEAPONS.size()):
-		var weapon: Dictionary = WEAPONS[index].duplicate()
+	for index in range(_weapons.size()):
+		var weapon: Dictionary = _weapons[index].duplicate()
 		var weapon_name := str(weapon["name"])
 		weapon["ammo"] = int(_ammo.get(weapon_name, -1))
 		weapon["stock"] = int(_stock.get(weapon_name, weapon["ammo"]))

@@ -5,11 +5,604 @@ The repository now keeps both implementations side by side: the Godot client liv
 
 This is the single Markdown source of truth for the Godot migration. Keep strategy, current status, validation, build/runtime notes, release walkthroughs, WebSocket protocol details, and server-directory schema updates here instead of creating new migration Markdown files under `docs/`. The image folders under `docs/references/` are fidelity assets used by tests and review, not separate narrative migration documents.
 
+**Mapa de leitura:** o [projeto de fidelidade e experiência on-line](#projeto-2026-09) define o comportamento desejado; o [plano P00–P08](#projeto-encerramento-pendencias) organiza as entregas; o [registro de implementação](#registro-implementacao-2026-09-26) é o retrato mais recente do que foi comprovado e do que ainda falta; o [projeto de autonomia das edições](#projeto-edicoes-standalone) especifica como copiar e executar cada pasta sem o restante do repositório. Trechos antigos deste documento preservam decisões e resultados da fase em que foram escritos. Para instalar e operar o serviço, use o [README próprio](../servico-externo/README.md).
+
+<a id="projeto-2026-09"></a>
+
+## Projeto de alteração — fidelidade Python/Godot e evolução on-line
+
+**Data:** 2026-09-26. **Base auditada:** commit `2add50e`, seguido pela implementação registrada nesta árvore de trabalho. **Entrega desta etapa:** o projeto técnico abaixo entrou em execução. Os primeiros lotes de fidelidade local, conexão desktop e fluxo on-line já estão implementados e cobertos por testes; os itens ainda abertos permanecem declarados neste documento.
+
+**Diretriz vigente:** primeiro tornar a edição Godot fiel à experiência existente da edição Python; depois evoluir a experiência on-line nas duas edições, preservando a identidade visual Groundfire. Este projeto e o `Migration Compatibility Contract` atualizado prevalecem sobre recomendações anteriores deste documento que autorizavam divergência de gameplay ou classificavam a migração completa como simples polimento. Os registros de testes e releases anteriores continuam sendo evidência histórica apenas do recorte que testaram.
+
+**Estado após a implementação de 2026-09-26:** as diferenças estruturais de combate por turnos, entrada global, loja sequencial, RNG/quantidade de fatias do terreno, identidade fixa do jogador on-line e conexão UDP apenas simulada foram removidas. O Godot agora executa combate e loja simultâneos por participante, passo fixo de 60 Hz, configuração clássica, memória de IA, identidade on-line atribuída pelo servidor, transporte UDP e descoberta LAN reais. A interface conectada ganhou fases, HUD, pronto/liderança, revanche, chat e navegador ampliado. O protocolo WebSocket 2, compatível com o protocolo 1, acrescenta comandos idempotentes e retomada real de sessão com snapshot completo. A auditoria direta da instalação local do Counter-Strike 1.6 acrescentou espectador real, `Random Server`, entrada automática quando surgir vaga e ensaios multicliente completos, inclusive Godot↔Python. Ainda não há evidência suficiente para declarar fidelidade total: a auditoria diferencial completa das cinco armas, a comparação visual/sonora pareada, convite/grupo, criação/alocação de salas, reserva atômica para grupos e os ensaios de distribuição continuam abertos.
+
+Navegação: [escopo e referências](#projeto-escopo) · [diagnóstico e tarefas de fidelidade](#projeto-fidelidade) · [projeto on-line](#projeto-online) · [arquitetura e contratos](#projeto-arquitetura) · [etapas](#projeto-etapas) · [aceite e validação](#projeto-aceite) · [projeto de encerramento das pendências](#projeto-encerramento-pendencias).
+
+<a id="projeto-escopo"></a>
+
+### Escopo, precedência e referência de produto
+
+1. A referência de **partida local** é o caminho clássico realmente executado em `versao-python/src/`: `game.py`, `gamesimulation.py`, `tank.py`, `aiplayer.py`, entidades, menus e `conf/options.ini`. Congelar esse comportamento antes de alterar o Godot; não modificar o Python para fazer a comparação passar.
+2. A referência de **partida conectada** é o cliente Python e seu servidor: `src/groundfire/app/`, `gameplay/match_controller.py`, `render/scene.py` e `ui/menus.py`. O servidor atual tem regras diferentes do modo local; por exemplo, Shell usa dano de explosão `90` em `gameplay/constants.py`, enquanto a configuração local define `40`. Comparar cada modo com seu correspondente, sem misturar essas bases. Unificação futura de regras exige uma alteração explícita nas duas edições, fora da simples troca de menus.
+3. No ponto 1, nomes, fluxos, cores, controles, sons, ritmos, regras e informações visíveis devem corresponder ao Python. Reorganização interna é permitida quando não altera o resultado percebido pelo jogador. Funcionalidades experimentais exclusivas do Godot não podem alterar o modo fiel por padrão.
+4. No ponto 2, a evolução dos menus on-line torna-se uma alteração deliberada e compartilhada de produto. As telas novas devem oferecer os mesmos recursos e estados nas duas edições. A referência anterior continua preservada pelos testes do ponto 1 e pelo histórico de código.
+5. **Counter-Strike adotado como referência de trabalho:** a instalação realmente auditada está em `D:\Games\Counter-Strike 1.6` e usa os recursos clássicos GoldSrc/VGUI descritos abaixo. O núcleo implementável é descoberta → seleção → conexão/espectador → lobby → partida → resultado → jogar novamente. A extensão social fica em uma etapa própria porque a aba Friends depende de identidade e presença, serviços que não existem nessa instalação isolada nem no backend Groundfire atual.
+6. **Plataformas:** Godot desktop deve alcançar a cobertura funcional desktop do Python, inclusive descoberta LAN e conexão nativa. Web deve reproduzir a experiência compatível por HTTP/WebSocket; descoberta UDP e criação de processos não se tornam possíveis por desenhar seus botões. Essas limitações devem constar na matriz de aceite, e a edição web não pode ser anunciada como equivalente às ferramentas nativas.
+7. Não incluir armas, combate FPS, regras 5v5, skins, ranking competitivo, integração Steam ou voz apenas pela referência a Counter-Strike. O projeto solicitado trata da experiência de acesso e organização do jogo on-line Groundfire.
+
+**Requisitos antigos revistos:** a antiga prioridade `evolution-first` e a permissão de tratar fidelidade apenas como material comparativo contrariavam este pedido. Foram substituídas no contrato e no validador. Continuam válidas as regras de coexistência das pastas, preservação dos launchers, contratos de rede versionados, restrições web e centralização documental. Nenhum outro requisito precisa ser ignorado nesta etapa.
+
+### Método e limites da auditoria
+
+- Inspeção dos caminhos de execução e contratos nas duas edições e em `groundfire_net/`, incluindo testes existentes. Módulos de compatibilidade em `src/groundfire/` não devem ser confundidos com funcionalidades novas apenas por haver arquivos duplicados ou reexportações.
+- Revisão visual das oito capturas já versionadas: Main Menu, Options, Server Browser e Local Match, em Python e Godot. Não são capturas novas desta execução. As partidas não foram capturadas com o mesmo estado/instante; diferenças de posição, combustível e cor nessas imagens isoladamente não provam um defeito.
+- Comparação SHA256 dos 22 arquivos de `versao-python/data/` com os correspondentes em Godot: **20 idênticos**, `damage.png` ausente, `nuke.wav` convertido. O WAV Python é mono, 8 bits/11025 Hz/41547 amostras; o Godot é mono, 16 bits/22050 Hz/83094 amostras. A duração é igual; a diferença de hash não prova diferença audível.
+- Inspeção estática confirma os deltas F01–F16 abaixo. As tarefas também incluem verificações que ainda precisam de execução e comparação: nenhum registro de teste local substitui essa validação.
+- Ambiente desta auditoria: Windows/PowerShell, Python `3.14.6` em ambiente isolado (o pacote declara `>=3.10,<3.14`) e Godot `4.6.2`. A suíte Python, os contratos headless Godot, a integração UDP Godot↔Python e a comparação visual OpenGL foram executados localmente. Exportação de distribuição e ensaio hospedado continuam etapas próprias de aceite.
+
+<a id="projeto-fidelidade"></a>
+
+### Ponto 1 — diagnóstico e projeto de fidelidade
+
+Legenda: **P0** muda regras, comando do jogador ou viabilidade de jogar; **P1** impede a experiência completa; **P2** afeta acabamento e consistência. A matriz continua sendo o contrato de aceite, mesmo quando um primeiro lote já foi implementado. Os caminhos Godot abreviados como `scripts/` nesta seção pertencem a `versao-godot/godot/`; os caminhos Python abreviados como `src/` pertencem a `versao-python/`.
+
+**Situação executável em 2026-09-26:**
+
+- Implementados e cobertos por contratos headless: F01, F02, F03, F06, F07 e o caminho desktop real de F10.
+- Implementados em primeiro lote, com auditoria adicional ainda necessária para aceite total: F04, F05, F08, F09, F11, F12, F13, F15 e F16.
+- F14 continua aberto para comparação visual pareada completa nas resoluções da matriz.
+- No lote on-line, O02/O03/O05/O06/O10/O11/O13 receberam implementação funcional. O01/O04/O08/O09/O12 são parciais. O07/O14 continuam dependentes dos serviços e ensaios de distribuição descritos adiante.
+
+| ID / prioridade | Evidência Python → Godot | Alteração necessária | Critério de aceite observável |
+|---|---|---|---|
+| F01 / P0 — combate simultâneo | `src/gamesimulation.py::update_round` atualiza todas as entidades; `src/tank.py::update` consulta seu jogador. `scripts/local_match.gd::_process`, `_fire_player` e `_start_next_turn_or_round` usam `_turn_index`, `PHASE_AIM` e bloqueio por projéteis ativos. | Substituir o ciclo de turnos por rodada contínua com todos os participantes ativos. Cooldown, arma e comando pertencem a cada jogador. Manter fases de início/fim, score, loja e vencedor. | Dois humanos movem e disparam no mesmo tick, inclusive com tiros já em voo; IA continua ativa durante ações humanas. Nenhum texto ou bloqueio de “sua vez” no modo fiel. |
+| F02 / P0 — controles por participante | `src/humanplayer.py` usa `_controller`; `src/playermenu.py` oferece Keyboard1/2 e Joystick1–8. Godot guarda `controller` no roster, mas `_handle_player_input` lê as ações globais `gf_*` para o tanque do turno. | Criar roteamento de comandos por slot/dispositivo, com perfis de dois teclados e joysticks independentes; usar o mesmo roteamento em combate e loja. | Jogador 2 não controla jogador 1; dois teclados e dois controles físicos funcionam simultaneamente, inclusive após rebinding e desconexão/reconexão do dispositivo. |
+| F03 / P0 — passo de simulação | `src/game.py` usa `ROUND_FIXED_STEP=1/60`, máximo de oito subpassos, em `FixedStepRunner`. Godot integra tanque, projétil, terreno e cooldown diretamente no `_process(delta)`. | Extrair passo fixo de simulação, reproduzir ordem de atualização e política de acúmulo da referência; renderizar separadamente. | Um roteiro de comandos em 30, 60 e 144 FPS produz a mesma sequência de eventos, compras e resultado; valores físicos respeitam tolerâncias explícitas, incluindo frames lentos. |
+| F04 / P0 — mundo e terreno | `src/landscape.py` usa 500 fatias, largura 11, `FallPause=0.2` por INI e gerador Python. `scripts/terrain_model.gd` deriva fatias da largura da tela (`_step=10`), usa outro RNG, intervalos aleatórios diferentes e `_fall_pause=0.10`. | Separar unidades de mundo de pixels; portar parâmetros e algoritmo, incluindo intervalos exclusivos/inclusivos e queda. Reproduzir a sequência aleatória Python ou consumir amostras equivalentes, sem depender de RNG Godot com a mesma seed. | Mesmo estado inicial serializado gera as mesmas camadas, colisões, crateras e quedas. Redimensionar a janela não altera a geometria física nem a dificuldade. |
+| F05 / P0 — física e vento | `src/shell.py::update` usa `x=x0+vx*t`, `y=y0+vy*t-5*t²`; o Godot aplica `_wind_acceleration` aos projéteis e usa `PROJECTILE_GRAVITY=190` em pixels. | Remover o vento extra do modo fiel e derivar gravidade, velocidades, tamanho e raio de explosão por uma conversão única das unidades Python. Auditar as cinco armas com trajetória e colisão completas. | Para cada arma: trajetória, instante de impacto, ordem terreno/tanque, dano direto/área, custo, munição, cooldown e efeitos iguais sob os mesmos dados; comparar grandezas normalizadas, não números em unidades diferentes. |
+| F06 / P0 — loja simultânea | `src/shopmenu.py::update` mantém seleção, delay e conclusão para oito jogadores ao mesmo tempo. Godot usa `_shop_participant_cursor` e `_advance_shop_participant`; `local_match_shop.gd` mostra um comprador principal. | Portar a loja compartilhada com seletores e conclusão independentes; preservar catálogo, itens inativos, pacotes e economia. | Dois humanos navegam/compram simultaneamente sem bloquear o outro; “Done!” encerra só sua participação; a rodada seguinte começa quando todos terminam, respeitando o passo de transição Python. |
+| F07 / P0 — identidade local on-line | O cliente Python passa `local_player_number` a `render/scene.py`. Em `scripts/online_match.gd::_apply_local_prediction` e `_ingest_replicated_entities`, o tanque local é identificado por `owner_player == 1`. | Usar a identidade atribuída no join/snapshot em previsão, reconciliação, HUD, câmera e controles. Limpar estado ao trocar sessão. | Clientes nos slots 2 e 8 predizem somente seus tanques; ordem de entrada e reuso de slot não alteram a identidade. |
+| F08 / P1 — apresentação on-line | `src/groundfire/render/scene.py` e `ui/menus.py` desenham HUD, lobby, score, shop e winner. `online_match.gd::_draw` sempre exibe cabeçalho e painel de snapshots; mundo e tanques são simplificados. | Criar apresentação de partida compartilhada entre local e on-line Godot, alimentada por estado; reproduzir as telas correspondentes do Python conectado. Levar diagnóstico de protocolo/ticks/ack para painel opcional de depuração. | O jogador vê arena, sua arma/munição/HP/fuel e telas da fase correta; consegue comprar, ver resultado e continuar sem interpretar campos de snapshot. |
+| F09 / P1 — entidades e efeitos on-line | `gameplay/constants.py` publica tipos `shell`, `missile`, `machinegun`, `mirv`, `nuke`. Godot trata somente `tank` e `projectile` especificamente; outros tipos viram círculos genéricos. `_ingest_events` trata somente `terrain_explosion`. | Mapear todos os tipos efetivamente emitidos e os efeitos/sounds disponíveis. Acrescentar eventos faltantes ao contrato quando necessários, com IDs/sequência para deduplicação. | Cada arma é reconhecível e mostra seus efeitos corretos; áudio não repete por snapshot/reconexão; tipo desconhecido é diagnosticado sem quebrar a partida. |
+| F10 / P1 — LAN e conexão desktop | Python tem `GroundfireServerScanner`, discovery e conexão real. Godot anuncia LAN/UDP em `platform_capabilities.gd`, mas `_stage_connect` só abre partida para WebSocket; UDP apenas produz “Connect target staged”. | Implementar descoberta e transporte desktop compatíveis com o protocolo UDP Python existente, ou ponte local transparente que cubra exatamente esse fluxo. Testar o caminho real. | Um servidor Python em outra máquina da LAN aparece, pode ser atualizado e recebe um cliente Godot jogável. Um texto de conexão preparada não conta como conexão. Web mantém apenas capacidades implementáveis. |
+| F11 / P1 — recursos do navegador | `src/serverbrowsermenu.py` oferece Unique, adicionar endereço, Quick refresh, filtros de região, ping máximo, vazios, cheios, senha e transporte seguro; ordena por cabeçalho. Godot tem texto, sem senha, vagas, seletor de ordenação e favoritos/histórico, sem equivalência de todos esses fluxos. | Completar a matriz funcional Python no Godot antes do redesenho comum O01–O05; implementar semântica real da aba Unique e filtro por origem LAN. | Mesmo conjunto de servidores produz os mesmos subconjuntos/ordem, aceita conexão direta e atualiza só a seleção; filtro ativo nunca desaparece ao voltar de uma tentativa. |
+| F12 / P1 — IA | `src/aiplayer.py` guarda resultado dos disparos e ajusta mira; no Godot `_choose_ai_shot` pesquisa trajetórias, escolhe dificuldade e opera no turno. | Portar a decisão e memória da IA clássica por participante, seus tempos de ação e comportamento de loja. Dificuldades extras não substituem a referência. | Mesmas entradas aleatórias e histórico de tiros geram decisões equivalentes; bots agem ao mesmo tempo que humanos e respeitam a configuração da modalidade. |
+| F13 / P1 — câmera, escala e resize | Godot implementa zoom, acompanhamento de projéteis, shake extra e `_rebuild_terrain_if_needed`, que reconstrói terreno e reseta tanques ao mudar o tamanho. Python usa projeção e offset clássicos, com tremor de quake. | Portar enquadramento e escala da referência; tornar resize uma operação de apresentação, preservando a partida. Remover alterações de câmera exclusivas do caminho fiel. | Alternar resolução durante voo ou após dano preserva terreno, HP, munição, posições e fase. HUD, corpo e seta têm as proporções Python. |
+| F14 / P1 — menus e fluxo visual | Capturas versionadas mostram diferenças de posição do logo, espaçamento/fonte, navegador e Options; Godot mistura blocos clássicos com seções extras. Setup, controles, score/shop/winner precisam de pares completos de referência. | Reproduzir composição e navegação das telas clássicas em 1024×768; separar opções técnicas adicionais em tela secundária. Capturar estados normais, foco, desabilitado, modal e retorno. | Todos os caminhos do menu Python têm equivalência funcional e visual, sem recortes em 640×480, 1024×768 e 1920×1080; exceções web descritas individualmente. |
+| F15 / P1 — configuração | Python lê gameplay e cores de `conf/options.ini` e controles de `controls.ini`. Godot replica várias constantes e lê opções próprias em `user://groundfire_options.cfg`. | Definir importação/mapeamento dos parâmetros e valores padrão; extrair catálogo verificável das configurações Python. Não sobrescrever a configuração original. | Alterar preço, duração do quake, gravidade/combustível, cor ou binding na configuração de referência tem equivalente documentado e testado em Godot. Salvar/carregar não muda valores. |
+| F16 / P2 — integridade dos assets e áudio | Vinte assets são idênticos; `damage.png` está no manifesto Python e ausente no Godot; `nuke.wav` foi reamostrado. A referência Python ainda tem comentário de placeholder para textura de dano em `tank.py`. | Completar inventário e uso por tela/efeito, incluir o asset necessário e verificar equivalência audível do WAV convertido; não inventar efeito que o Python não exibe. Conferir canais e limpeza de sons por jogador. | Manifesto distingue arquivo preservado, convertido e sem uso; sons mantêm duração, volume percebido, disparo/loop/interrupção e simultaneidade. |
+
+**O que já existe e deve ser reaproveitado:** tema com cores Groundfire, atlas de fonte e ícones, menus básicos, roster de oito participantes, cinco armas principais, estoque/munição, score/shop/winner iniciais, terreno em camadas com numerosos casos de clipping, efeitos e sons locais, bindings persistidos, favoritos/histórico, diretório HTTP/ETag, gateway WS↔UDP, tratamento de falha/retry e scripts de QA/exportação. A presença desses componentes evita começar do zero, mas não fecha os deltas acima.
+
+**Auditorias adicionais obrigatórias, sem presumir falha:** dano exatamente zero e morte; autoderrota e bônus de líder; empate final; eliminação simultânea; dinheiro entre rodadas; reserva de combustível; seleção da última munição; prioridades de comandos opostos; teleguiado enquanto outro jogador atira; áudio concorrente; pausa/saída; oito jogadores e somente bots; clipping em camadas suspensas. Os testes atuais de `test_port_fidelity.py` e `test_landscape_fidelity.py` são a base, e precisam ser ligados ao comportamento Godot correspondente.
+
+**Anotações do lote de fidelidade:**
+
+- `Reference material:` caminhos e funções da matriz F01–F16; configuração Python e capturas em `references/pygame_visual/`.
+- `User-visible contract:` mesmas ações, regras, resultados, ritmo, informações e apresentação da modalidade Python correspondente.
+- `Allowed adaptation:` organização interna; persistência adequada à plataforma; transformações de renderização sem alteração do mundo; indisponibilidades nativas no navegador explicitamente registradas. Mudança de gameplay não é adaptação de engine.
+- `Required validation:` cenários diferenciais por tick e por fase, revisão visual Python↔Godot, entradas simultâneas e sessão multicliente real, conforme a matriz de aceite adiante.
+
+<a id="projeto-online"></a>
+
+### Ponto 2 — projeto da experiência on-line nas duas edições
+
+**Objetivo de uso:** entrar em uma partida, encontrar um servidor conhecido, jogar com convidados e voltar a jogar sem terminal nem entendimento de protocolos. A interface deve deixar claros seleção, disponibilidade, progresso, motivo de falha e ação seguinte. As mudanças devem ser entregues como uma mesma especificação e duas implementações de UI.
+
+**Referências externas consultadas em 2026-09-25:** o [FAQ de lobbies da Valve](https://blog.counter-strike.net/nearby-lobby-faq/) descreve líder, escolha de modalidade/mapas e entrada em grupo; as [notas oficiais de 21/09/2021](https://blog.counter-strike.net/2021/09/35436/) documentam convites por código de fila privada. A documentação de [Steam Matchmaking & Lobbies](https://partner.steamgames.com/doc/features/multiplayer/matchmaking) e [ISteamMatchmakingServers](https://partner.steamgames.com/doc/api/ISteamMatchmakingServers) serve de referência conceitual para sala, descoberta, favoritos, histórico e atualização. São referências de interação da família Counter-Strike/Steam, não uma inspeção pixel a pixel do CS2 atual nem uma decisão de integrar o Steamworks.
+
+#### Auditoria direta do Counter-Strike 1.6 instalado
+
+Auditoria feita em 2026-09-26, sem copiar assets ou código do jogo. Os arquivos locais usados como evidência foram `cstrike/resource/GameMenu.res`, `platform/servers/DialogServerBrowser.res`, `InternetGamesPage.res`, `InternetGamesPage_Filters.res`, `DialogGameInfo.res`, `DialogAddServer.res`, `cstrike/resource/CreateMultiplayerGameServerPage.res`, `CreateMultiplayerGameGameplayPage.res`, `CreateMultiplayerGameBotPage.res` e `platform/config/ServerBrowser.vdf`.
+
+| Experiência observada no CS 1.6 | Estado Groundfire depois desta etapa |
+|---|---|
+| Menu com Resume Game, Disconnect, Player List, New Game, Find Servers e Options | Continuar/sair/opções e roster já existem durante a partida; navegador e criação dedicada estão acessíveis no desktop. |
+| Abas Internet, Favorites, Spectate, LAN, Friends e History | Internet, Favoritos, Espectador, Histórico e LAN são funcionais nas duas edições aplicáveis; `Unique` foi preservada por compatibilidade Python. Friends continua dependente do serviço de identidade/presença O12. |
+| Lista com servidor, jogo, jogadores, mapa e latência; ordenação e duplo clique | Implementado em Python e Godot, mantendo cores Groundfire. |
+| Filtros de jogo/mapa/localização/ping/segurança, servidor não cheio, com jogadores e sem senha | Busca, mapa/nome/endereço, região, ping máximo, segurança, cheio, vazio e senha estão implementados e persistidos. |
+| Add Server, Add Current Server, Quick refresh, Refresh all, Connect e senha | Conexão direta, favoritos, histórico, atualização rápida/geral, validação do endpoint e senha estão implementados. |
+| Game Info com jogadores, mapa, ping, segurança, Join Game e Auto-Retry/Join when slot opens | A seleção mostra endpoint/mapa/ocupação/ping/segurança; o roster aparece na partida. “Join when a slot opens” agora repete a tentativa uma vez por segundo no Python e a cada três segundos no Godot sem congelar a interface. |
+| Random Server | `Random Server` funciona nas duas edições: ignora servidores cheios, protegidos ou sem latência conhecida; escolhe menor ping e, no empate, maior ocupação; depois abre a confirmação normal de conexão. |
+| Aba Spectate e menus de câmera do espectador | O novo papel `spectator` é autenticado, não ocupa vaga, recebe snapshots completos/deltas, placar e chat, rejeita input/pronto/revanche e funciona em UDP e WebSocket. |
+| Create Multiplayer Game com mapa, bots/dificuldade e opções da partida | O Groundfire mantém suas próprias regras/armas. O Python oferece nome, mapa/seed, rede, capacidade, região, senha, rodadas, segurança e administração; o Godot desktop mantém as ferramentas de gateway. A criação/alocação unificada da sala permanece O07. |
+
+Não foram transplantadas mecânicas FPS, times terrorista/contraterrorista, armas do CS, VAC ou regras 5v5. A referência é o fluxo on-line; regras, cores e identidade continuam sendo do Groundfire.
+
+**Prova automatizada nova:** `tests/test_online_match_simulation.py` abre sockets UDP reais para dois jogadores, um espectador e um cliente excedente; valida lotação, chat do espectador, leitura sem controle, lobby/pronto, duas rodadas, score/loja/resultado, queda após cinco segundos simulados, retomada com snapshot completo e revanche. `tests/test_server_browser_real_network_paths.py` libera uma vaga e comprova a entrada automática. `scripts/validate_godot_udp_integration.py` executa Godot real contra o servidor Python e cobre jogador, descoberta LAN, delta, queda/retomada, espectador e chat. O ensaio revelou e corrigiu `WinError 10054`: no Windows, o ICMP de um cliente UDP encerrado agora descarta somente o datagrama e não derruba o servidor compartilhado.
+
+**Validação local desta entrega:** `python -m pytest -q` concluiu com **452 aprovados, 33 ignorados e 7 subtestes aprovados**. Os 11 contratos Godot headless passaram; `scripts/validate_godot_udp_integration.py` passou nos cenários de jogador/retomada/descoberta e espectador/chat; `visual_golden_check.gd` passou com OpenGL em 1024×768. A inspeção da captura do navegador revelou botões inferiores cortados, corrigidos com grade responsiva e protegidos por asserções de limites no smoke test.
+
+#### Fluxo proposto e telas
+
+```mermaid
+flowchart TD
+    A[Menu principal] --> B[Jogar on-line]
+    B --> C[Servidores: Internet / Favoritos / Histórico / LAN]
+    B --> D[Jogar agora]
+    B --> E[Criar sala / Entrar por código]
+    C --> F[Detalhes e conexão]
+    D --> F
+    E --> G[Lobby: participantes, regras, pronto]
+    F --> G
+    F --> H[Erro com ação de recuperação]
+    H --> C
+    G --> I[Carregamento e sincronização]
+    I --> J[Partida Groundfire]
+    J --> K[Placar / Loja / Próxima rodada]
+    K --> J
+    J --> L[Resultado final]
+    L --> G
+    L --> C
+    J --> M[Reconectando]
+    M --> J
+    M --> H
+```
+
+O primeiro acesso mantém o caminho familiar “Find Servers”; no lote on-line, ele passa a abrir a área “Jogar on-line”, com Servidores acessível em uma ação. Não alterar silenciosamente os menus locais por causa dessa evolução.
+
+| Tela | Organização e comportamento final | Estados obrigatórios |
+|---|---|---|
+| Jogar on-line | Servidores, Jogar agora, Criar sala e Entrar por código; apelido e região preferida; última sessão recuperável quando houver. Só mostrar ações suportadas pelo serviço. | Sem conexão, serviço disponível, sessão recuperável, atualização necessária. |
+| Servidores | Abas Internet/Favoritos/Espectador/Histórico/LAN no desktop; preservar Unique enquanto existir sua semântica Python. Colunas: favorito, senha, nome, modalidade, mapa, jogadores/capacidade e ping. Ordenação por cabeçalho, seleção estável por ID e duplo clique. | Carregando, lista, vazia, sem resultado do filtro, cache antigo, erro recuperável e servidor indisponível. |
+| Filtros | Texto, modalidade, mapa, região, ping máximo; esconder cheios/vazios/com senha; indicador de quantos filtros ativos e “Limpar filtros”. Conservar filtro de transporte seguro nativo quando existir metadado verificável. | Aplicados, padrão, sem resultado, valor inválido. “Seguro” não significa anticheat. |
+| Detalhes/conectar | Nome e regras, participantes, mapa/seed quando pública, região, ping, vagas, favorito, endereço copiável e senha se exigida. Conectar é a ação principal. | Verificando disponibilidade, solicitando senha, conectando, autenticando, sincronizando, cancelado, erro. |
+| Criar sala | Nome, pública/privada, capacidade de 2–8, rodadas 5–50, cenário/seed, bots permitidos e senha opcional. Desktop pode usar host local; web depende de capacidade hospedada. | Editando, criando, capacidade indisponível, sala pronta, erro com edição preservada. |
+| Lobby | Cabeçalho da sala/regras; lista de jogadores com cor, estado, ping e líder; vagas; convite; chat de texto; botão “Pronto”. Líder escolhe regras e inicia quando válidas. | Aguardando jogadores, pronto, regras alteradas, jogador reconectando, líder saiu, contagem regressiva, sala encerrada. |
+| Carregamento | Fases reais “Conectando”, “Recebendo partida”, “Preparando terreno”; dica de controle e cancelar. | Progresso indeterminado quando não mensurável, timeout, incompatibilidade e sucesso. Não inventar porcentagens. |
+| Durante a partida | HUD Groundfire; placar sobreposto por Tab/ação configurável; menu de pausa on-line com continuar, opções e sair. Chat não dispara armas enquanto recebe texto. | Rodada ativa, eliminado/espectando, score, loja, perda de conexão. Pausar a UI não pausa o servidor. |
+| Resultado e retorno | Resultado, placar, rodada final e ações Jogar novamente, Voltar ao lobby e Servidores. Favoritos, filtro, seleção e rolagem são preservados. | Aguardando demais jogadores, nova partida iniciada, servidor encerrou, retorno voluntário. |
+
+Esboço estrutural do navegador — cores e assets continuam sendo os do Groundfire:
+
+```text
+[Groundfire]  Jogar on-line                          [Apelido] [Voltar]
+[Internet] [Favoritos] [Histórico] [LAN*] [Unique*]
+[Pesquisar servidores........................] [Filtros: 2] [Limpar]
+ ☆  🔒  Nome                 Modalidade  Mapa       Jogadores  Ping ↓
+ ★      Sala Brasil          Clássico    Colinas        3/8     32 ms
+    🔒  Amigos               Clássico    Mesa           2/8     48 ms
+[Detalhes da seleção: regras, região, participantes e disponibilidade]
+[Adicionar endereço] [Favoritar] [Atualizar seleção] [Atualizar] [Conectar]
+Status: 2 servidores encontrados                    * conforme plataforma
+```
+
+#### Preservação da identidade visual
+
+| Elemento | Referência a preservar |
+|---|---|
+| Fundo e marca | `menuback.png`, `logo.png`, fundo `#365e79` e tint `#66b3e6` definidos em `groundfire_theme.gd`. |
+| Painéis e controles | Preto translúcido; marrom/laranja `#994c00`; realce `#be5f00`. Conservar alfa por estado, não apenas RGB. |
+| Texto e informação | Branco `#ffffff`, ciano `#00ffff`, amarelo `#ffff00`; desabilitado `#4c4c4c`. Usar rótulos/ícones além de cor. |
+| Jogadores | Cores do roster/servidor, nunca duas cores fixas para todos os jogadores. Para paridade local exata, respeitar `int(canal*255)` do Python: `0.5` produz `127`, não `128`. |
+| Tipografia | Atlas clássico nas telas de fidelidade. Nas telas novas, mesma hierarquia nas duas edições, com fallback legível e medido para nomes/acento; preservar a marca e os destaques clássicos. |
+| Comportamento | Foco visível; Enter/duplo clique conecta; Esc fecha o modal antes de sair da tela; Tab navega; gamepad alcança todas as ações habilitadas. |
+
+**Backlog compartilhado on-line:**
+
+| ID | Entrega nas duas edições | Backend/contrato e dependências | Aceite |
+|---|---|---|---|
+| O01 | Área Jogar on-line e modelo de navegação | Modelo de estado de UI independente da renderização; depende de F11/F14 estabilizados. | Mesmas telas e ações em Python/Godot; voltar preserva contexto. |
+| O02 | Navegador, filtros e ordenação completos | Normalizar diretório HTTP e descoberta UDP; ID estável de servidor; valores numéricos de ocupação/latência. | Fixture comum produz mesmos resultados e ordenação nas duas edições. |
+| O03 | Detalhes, conexão direta e favorito | Resolver endereço conforme plataforma; validação assíncrona da seleção. | Adicionar servidor fora da lista, testar disponibilidade e conectar realmente; mensagens claras para endereço inválido. |
+| O04 | Atualização geral e individual, cancelar e retorno | Pedidos canceláveis; descartar resposta obsoleta por geração da requisição; cache com origem/idade. | Lista continua utilizável enquanto atualiza; seleção não muda para outro servidor; cancelamento tardio não abre partida. |
+| O05 | Fluxo de conexão e erros | Estado único de tentativa, handshake, credenciais, timeout e disconnect. | Senha incorreta mantém servidor selecionado; cheio/incompatível oferecem ação apropriada; histórico registra entrada confirmada, não tentativa. |
+| O06 | Lobby real com regras, líder e pronto | Estado autoritativo de sala e comandos de lobby; depende de F07–F09 e contrato v2. | Dois clientes de edições diferentes veem o mesmo roster/regras; início validado pelo servidor; mudar regras limpa prontidão. |
+| O07 | Criar sala e convite por código/link | Registro de salas e alocação de instância, capacidade publicada; código limitado à sala e com expiração. | Convite abre a sala correta; link inválido/expirado explica a falha; web não tenta iniciar processo local. |
+| O08 | Jogar agora e busca cancelável | Seleção de sala compatível por região/ping e vagas; reserva autoritativa quando necessária. | Nunca entra em servidor cheio/incompatível ou exige senha inesperada; não divide o grupo; falta de sala oferece criar/voltar. |
+| O09 | HUD/placar/chat/menu durante partida | Estados de fase do servidor, comandos com permissões e eventos deduplicados. | Chat recebe texto sem gameplay involuntário; placar mostra os jogadores reais; loja e resultado respeitam o servidor. |
+| O10 | Retomar sessão e recuperação | Identidade de sessão e token de retomada, janela de reserva, full snapshot após retomada. | Queda curta mantém slot, score e dinheiro; sessão expirada informa retorno; nenhum jogador duplicado. Reabrir socket sozinho não comprova retomada. |
+| O11 | Pós-partida e revanche | Reset autoritativo de partida mantendo sala; confirmação/regras consistentes. | Resultado igual para todos; revanche não duplica créditos nem mantém projéteis da sessão anterior. |
+| O12 | Chat de lobby, convite e grupo | Sessões identificadas pelo serviço; presença efêmera, líder, limite de mensagens, mute local. | Convite/grupo funciona entre Python e Godot; liderança é transferida se o líder sair; não confundir apelido com identidade. |
+| O13 | Persistência e opções equivalentes | Migradores para favoritos/histórico/filtros/apelido e contratos de versão. | Reiniciar cada cliente preserva preferências; senhas e tokens não aparecem em listas públicas nem no histórico. |
+| O14 | Validação integrada e distribuição | Testes mistos UDP/WS, desktop/web, empacotamento Windows/Linux/Web e ensaio hospedado. | Fluxo inteiro jogável nas plataformas anunciadas; pacote instalado funciona fora do diretório do desenvolvedor. |
+
+O12 entrega convite e grupo por sessão; lista de amizades persistente entre dispositivos exige identidade de conta e serviço adicional. Isso deve ser planejado como extensão explícita após o núcleo, sem mostrar amigos fictícios ou depender de contas Steam inexistentes. Ranking, voz e equipes de FPS não são requisitos implícitos deste projeto.
+
+<a id="projeto-arquitetura"></a>
+
+### Arquitetura proposta e mapa de alterações
+
+**Decisão:** manter o servidor Python autoritativo compartilhado; ambos os clientes consomem os mesmos contratos de sessão, sala e partida. Godot não executa outra simulação autoritativa para o on-line. A simulação local Godot deve ser fiel à local Python e continuar executável sem servidor. UI, simulação, transporte e renderização devem ter limites claros, evitando ampliar ainda mais `main.gd` e `local_match.gd`.
+
+| Área | Arquivos existentes a alterar | Separação proposta, ainda não criada |
+|---|---|---|
+| Regras/configuração | `versao-python/conf/options.ini`, `versao-python/src/groundfire/gameplay/constants.py`, `versao-godot/godot/scripts/weapon_inventory.gd`, `tank_state.gd`, `terrain_model.gd` | Contratos versionados em `contracts/`: regras locais e regras conectadas explicitamente identificadas; snapshots e fixtures comuns. Python local continua sendo a referência inicial. |
+| Simulação Godot | `versao-godot/godot/scripts/local_match.gd` | `scripts/simulation/classic_match.gd`, `classic_ai.gd`, `classic_rules.gd`: passo fixo, entidades/participantes, transições e IA. Migrar por comportamento testado. |
+| Entrada Godot | `control_settings.gd`, `main.gd`, `local_match.gd`, `online_match.gd` sob `versao-godot/godot/scripts/` | `scripts/input/player_input_router.gd`: ações por jogador; um adaptador produz comandos de rede para a identidade local. |
+| Apresentação Godot | `local_match_hud.gd`, `local_match_shop.gd`, `online_match.gd`, `groundfire_theme.gd` | `scripts/presentation/`: arena, HUD, score, shop e winner recebem estado somente de leitura; layout clássico reaproveitado entre local/on-line quando o contrato da modalidade permitir. |
+| UI Python | `versao-python/src/serverbrowsermenu.py`, `mainmenu.py`, `groundfire/app/front.py`, `groundfire/ui/menus.py` | `groundfire/ui/online/`: estado, browser, detalhes, lobby e pós-partida; manter adapters para chamadas atuais. |
+| UI Godot | `versao-godot/godot/scripts/server_browser.gd`, `main.gd`, cenas existentes | `scripts/online/` e cenas específicas de hub, detalhes/lobby e conexão; tema comum, sem regras do servidor embutidas em widgets. |
+| Descoberta/persistência | `groundfire_net/browser.py`, `discovery.py`, `master.py`, `directory_service.py`; `versao-python/src/groundfire/network/browser.py`; Godot `browser_store.gd`, `server_directory.gd` | Modelo normalizado de servidor, adaptação para formato legado, store versionado e testes com a mesma fixture. |
+| Transporte e sessão | `groundfire_net/websocket_gateway.py`; Python `groundfire/network/messages.py`, `app/client.py`, `app/server.py`; Godot `network_adapter.gd`, `websocket_client.gd` | Transporte UDP Godot e serviços compartilhados de lobby/sessão; ponte traduz envelopes, sem decidir regras de compra/prontidão. |
+| Autoridade de partida | `versao-python/src/groundfire/gameplay/match_controller.py`, `sim/match.py`, `sim/world.py` | Estado de lobby e sessão fora da física; comandos de sala validados antes de chamar início/retomada/revanche. |
+| Qualidade e entrega | `tests/`, `versao-godot/godot/tests/`, `scripts/validate_godot*.sh`, `capture_pygame_references.py`, `qa_godot_web.sh`, export presets/CI | Harness diferencial, fixtures por modalidade, captures pareadas e matriz de integração Python+Godot. |
+
+Os nomes propostos podem ser refinados na implementação; nenhum módulo novo acima deve ser descrito como existente. Não mover `groundfire_net/` para dentro de uma edição nem remover os launchers de compatibilidade.
+
+#### Contratos on-line a especificar antes da UI dependente
+
+**Servidor normalizado:** `server_id`, nome, modalidade, mapa, região, `players_current`, `players_max`, `latency_ms` anulável, `password_required`, versão/ruleset, capacidades, `last_seen_at`, endpoints nomeados por transporte. Manter `schema=1` e campos de exibição atuais durante a transição; acrescentar campos opcionais via adaptador ou publicar schema 2 se os tipos existentes forem substituídos. Ping não medido aparece como “—”, nunca como 0; latência de cache não é medição atual. Favoritos sobrevivem à indisponibilidade.
+
+**Sala:** `lobby_id`, revisão monotônica, líder, visibilidade, capacidade, regras, membros `{member_id, player_number, name, colour, ready, connection_state}`, estado e partida associada. Líder só controla regras/permissões de sala; não passa a ser autoridade da física. Em saída do líder, transferir liderança ao membro conectado há mais tempo; sala vazia expira. Alteração de regras ou ingresso de jogador durante a preparação invalida prontidão/contagem regressiva conforme política publicada.
+
+**Mensagens do protocolo 2 implementadas:** `lobby_set_ready`, `chat_send`, `chat_event`, `session_resume`, `session_resumed`, `match_rematch` e `command_result`. Elas usam identidade/token de sessão e `request_id`; o servidor deduplica comandos mutáveis. O protocolo 1 permanece aceito para `hello`, `join`, `input`, `ping` e `disconnect`. `lobby_create`, `lobby_join`, `lobby_leave`, `lobby_snapshot`, `lobby_update_rules`, `lobby_start` e os serviços de convite/grupo continuam planejados e não devem ser anunciados como disponíveis.
+
+**Compatibilidade:** anunciar versões/capacidades no hello; manter protocolo 1 para o caminho legado enquanto clientes 2 são introduzidos. Não enviar comandos de lobby a servidores 1 nem mudar silenciosamente o significado de `input`. Alterações obrigatórias em snapshots/eventos têm seu próprio schema. Python UDP e Godot WS devem alcançar a mesma máquina de estados por adapters; a sintaxe do envelope UDP não precisa virar JSON WS.
+
+**Validações de autoridade:** prontidão pertence ao autor autenticado; líder não pode comprar por outro jogador; preço/saldo e capacidade são verificados no servidor. `request_id` repetido não duplica compra, início ou revanche. Sessão retomada recebe snapshot completo e sequências coerentes; o cliente descarta comandos anteriores ao contexto restaurado. Tokens de acesso/retomada têm escopo e validade, não são inferidos pelo nome do jogador.
+
+**Jogar agora:** começa como seleção automática de uma sala disponível, não como ranking competitivo. Filtrar versão, capacidade, modalidade e região; ordenar por ping conhecido e ocupação; reservar vagas de todo o grupo atomicamente. Busca pode ser cancelada e tem timeout; se o serviço não oferecer reserva, não anunciar entrada em grupo como garantida.
+
+**Operação mínima:** diretório com TTL e heartbeat real, remoção/marcação de servidor vencido, gateway e backend associados ao mesmo servidor anunciado, endpoints HTTPS/WSS na web publicada e logs de correlação sem credenciais. Deploy, DNS e serviços externos só contam como concluídos após ensaio no endereço real; URLs já presentes no código não comprovam disponibilidade.
+
+#### Máquina de estados de conexão
+
+| Estado | Sucesso | Falha/cancelamento |
+|---|---|---|
+| `browsing` | Seleção → `checking` | Lista indisponível mantém cache marcado e ação Atualizar. |
+| `checking` | Compatível → `credentials` ou `connecting` | Cheio/versão inválida → seleção preservada. |
+| `credentials` | Enviar → `connecting` | Cancelar → detalhes; senha nunca armazenada no histórico. |
+| `connecting` | Socket/hello aceito → `joining` | Timeout/cancelar → detalhes; invalidar callbacks da tentativa anterior. |
+| `joining` | Identidade aceita → `lobby`/`syncing` | Senha rejeitada → credenciais; ban/fechado → erro sem loop automático. |
+| `lobby` | Servidor autoriza início → `syncing` | Sair remove só o membro; encerramento volta a detalhes. |
+| `syncing` | Estado completo pronto → `playing` | Snapshot inválido pede ressincronização limitada ou falha explicada. |
+| `playing` | Fim → `results`; queda → `reconnecting` | Saída voluntária invalida retry pendente. |
+| `reconnecting` | Retomada aceita + snapshot → fase atual | Expiração → resultado de desconexão e retorno ao navegador. |
+| `results` | Revanche → `lobby`; sair → `browsing` | Servidor fechado mantém resultado local já recebido. |
+
+**Anotações do lote on-line:**
+
+- `Reference material:` browser e cliente conectado Python existentes, gateway/diretório, referências de interação Valve citadas e matrizes O01–O14.
+- `User-visible contract:` mesmos recursos, disponibilidade, regras de interação e recuperação nas duas edições; cores e assets Groundfire preservados.
+- `Allowed adaptation:` nova organização de menus on-line autorizada pelo pedido; layout responsivo; protocolos adequados a cada plataforma. Não alterar regras de combate implicitamente.
+- `Required validation:` fixture compartilhada de UI, testes de máquina de estados/contratos, sessão mista Python/Godot e jornada completa incluindo falhas, loja, resultado e revanche.
+
+<a id="projeto-etapas"></a>
+
+### Etapas de execução, dependências e marcos
+
+Ordem obrigatória: concluir a fidelidade do ponto 1 antes de substituir a experiência on-line pelo ponto 2. É possível preparar contratos/cenários do ponto 2 antes, mas isso não encerra nem reduz as lacunas de fidelidade.
+
+| Marco | Trabalho | Dependência | Saída verificável |
+|---|---|---|---|
+| M0 — referência congelada | Exportar cenários locais/conectados, comandos por tick, regras e estados; ampliar capturas para setup/controles/loja/score/winner. | Auditoria presente. | Fixtures reproduzíveis, manifesto de assets e catálogo completo de fluxos; falhas existentes identificadas. |
+| M1 — núcleo fiel | F01–F05: simulação contínua, input por participante, passo fixo, mundo e armas. | M0. | Dois humanos e bots atuam simultaneamente; resize não muda a física; replay diferencial aprovado. |
+| M2 — partida local completa | F06, F12–F16 e auditorias de economia/fim de rodada. | M1. | Partidas de 5 e 50 rodadas, 2–8 participantes, loja simultânea, IA e apresentação clássica aprovadas. |
+| M3 — paridade conectada | F07–F11: identidade, render/fases, entidades, browser e LAN/transporte. | M0 e componentes visuais de M2. | Python e Godot no mesmo servidor, slots variados, lobby→rodada→loja→resultado; desktop LAN real. |
+| M4 — aceite do ponto 1 | Comparador, revisão visual e sonora, controles físicos, exportação e regressões. | M2 e M3. | Todos os F fechados com evidência; limitações web registradas; nenhuma declaração de 100% com item aberto. |
+| M5 — entrada on-line comum | O01–O05, O13: navegação, browser completo, detalhes/conexão, estados de erro e persistência. | M4. | Duas UIs equivalentes com mesma fixture; validação de usabilidade de busca/entrada/retorno. |
+| M6 — salas e sessão | O06, O07, O10, O12; contrato 2, lobby, convite, chat, retomada e liderança. | M5 e backend correspondente. | Sala mista funcional, convite real e retomada de identidade; cliente legado continua compatível. |
+| M7 — jogar e repetir | O08, O09, O11: jogar agora, placar/chat em jogo, resultado e revanche. | M6. | Jornada sem terminal: encontrar/criar→jogar→comprar→terminar→jogar novamente. |
+| M8 — aceite do ponto 2 | O14: sessões prolongadas, falhas de rede, acessibilidade/foco e pacotes suportados. | M7. | Evidência por plataforma e edição; ensaio hospedado separado da certificação local. |
+
+**Tamanho relativo:** M1 e M3 são grandes por envolverem semântica de jogo e transporte; M2 e M6 também exigem vários lotes. M0, M5 e M7 são médios; M4/M8 dependem da quantidade de defeitos encontrada. Estimativa de calendário deve ser feita após M0 e um primeiro lote de M1, com equipe e ritmo conhecidos; não tratar todo o projeto como ajuste cosmético de poucos dias.
+
+**Primeiros lotes concretos de implementação:**
+
+1. M0: cenário de dois humanos com comandos simultâneos, usando `GameSimulationController`/`Tank` como referência; outro cenário de duas seleções de loja; snapshot on-line com jogador local no slot 2. Guardar entradas e saídas esperadas.
+2. M1: extrair entrada e atualização por participante de `local_match.gd`; substituir bloqueios de turno; migrar os testes que hoje pressupõem turnos para o contrato clássico. Manter os cenários antigos apenas se houver modo alternativo explicitamente separado.
+3. M1: separar relógio/mundo do tamanho da janela, introduzir passo fixo e medir trajetórias normalizadas; só então ajustar câmera/terreno/arte.
+4. M3: corrigir identificação local e tipos de entidades do cliente conectado; exercitar dois clientes mistos antes de expandir lobby.
+
+**Riscos concretos e tratamento:** testes Godot atuais podem validar o comportamento de turnos que será removido (trocar a expectativa com evidência Python); duplicação local/servidor pode misturar balanceamentos (ruleset explícito); RNG/floats diferentes podem esconder divergência (fixtures em unidades canônicas); callbacks tardios podem conectar após cancelamento (ID da tentativa); recursos sociais podem virar só botões (entregar backend e UI no mesmo marco); scripts Linux e binários no PATH não comprovam pacote Windows (ensaio instalado na plataforma alvo).
+
+**Entrega e reversão:** cada lote registra referência, alteração, cenários e resultado; tags internas separam M4 de M8. Alterações de contrato entram de forma aditiva/versionada antes de remover compatibilidade. Migração de preferências mantém cópia do formato anterior. Reverter uma UI nova não pode requerer apagar favoritos nem invalidar clientes legados. Não atualizar goldens para esconder um desvio conhecido.
+
+<a id="projeto-aceite"></a>
+
+### Critérios de aceite e estratégia de prova
+
+“100% fiel” significa concluir o inventário de requisitos da edição Python de referência e comprovar cada contrato aplicável. Não significa estimar porcentagem por linhas de código ou exigir hashes iguais de renderizadores diferentes. **Nenhum F01–F16 nem cenário obrigatório pode permanecer aberto no aceite do ponto 1.** Deltas de plataforma ficam registrados explicitamente; bugs conhecidos não são reclassificados como adaptações para declarar conclusão.
+
+| Grupo de cenários | Execução mínima | Evidência esperada |
+|---|---|---|
+| Entrada e combate | 2 humanos; humano+IA; 8 participantes; somente IA; teclados distintos e dois controles; tiro/movimento/boost simultâneos. | Comandos por jogador, ticks, resultado e observação de dispositivo real. |
+| Física/terreno | Cinco armas; todas as bordas; terreno suspenso; queda/quake; morte simultânea; trajetórias em 30/60/144 FPS. | Fixture de terreno completa, replay e diferenças por campo normalizado. |
+| Ciclo completo | 5 e 50 rodadas, empate, líder derrotado, autoderrota, combustível/munição/saldo, compras concorrentes. | Mesma sequência de fases e totais Python/Godot; estoque não duplicado. |
+| Visual e áudio | Menu, setup, opções, controles, browser, modais, HUD, pause/quit, score, loja, winner; foco/disabled/hover. | Capturas pareadas do mesmo estado/instante, relatório de diferença e revisão; eventos de áudio e escuta A/B. |
+| Resize e configuração | 640×480, 1024×768, 1920×1080, janela/fullscreen; alterações de INI equivalentes. | Nenhum reset de mundo; valores persistidos e controles acessíveis. |
+| Rede entre edições | Python↔Python, Godot↔Godot e Python↔Godot no mesmo backend; slots 1, 2 e 8; desktop UDP/WS e web WS. | Join, ação, score, loja e fim coerentes; snapshots e identidade corretos. |
+| Falhas e retomada | Senha/token inválido, cheio, servidor fechado, protocolo incompatível, queda, reconexão e expiração. | Erro recuperável correto, contexto preservado, nenhuma duplicação de slot/efeito/compra. |
+| On-line evoluído | Filtros/favoritos/direto, criar sala, convite, pronto, início, chat, revanche; líder sai; regras mudam; cancelar busca. | Mesma máquina de estados e resultado nas duas UIs; servidor rejeita comando fora de permissão/fase. |
+| Distribuição | Pacote Windows e Linux; export web servida por HTTP; depois ambiente hospedado HTTPS/WSS real. | Inicialização fora do checkout, assets presentes, persistência e ciclo jogável na plataforma anunciada. |
+
+**Harness diferencial a construir em M0:** exportar JSON de estados, comandos, relógio e aleatoriedade da modalidade Python; reproduzir no Godot headless e comparar por tick. Usar inteiros/enums/ordem de eventos exatamente; começar com erro absoluto máximo `1e-5` em coordenadas/velocidades em unidades de mundo e HP/fuel contínuos. Ajustar tolerância somente com análise numérica documentada; jamais tolerar mudança de vítima, vencedor, colisão, fase ou dinheiro. Comparar o tick exato das transições após alinhar o passo de simulação. PNGs usam estado fixo, resolução e tempo iguais, não seeds iguais em RNGs diferentes.
+
+**Prova visual:** começar em 1024×768. Texto, alinhamento, dimensão, visibilidade, ordem e cor são requisitos por elemento; comparar regiões e imagens de diferença. Separar variação conhecida de rasterização da mudança real de layout, registrar sua máscara/tolerância e revisar cada diferença não mascarada. As capturas atuais de combate têm estados diferentes e não podem ser usadas como teste automático direto. Godot-versus-Godot continua útil para regressão, mas não certifica Godot-versus-Python.
+
+**Prova on-line:** inicialmente aplicar atraso/jitter/perda ao caminho de transporte controlado; testar RTTs de 0, 100 e 250 ms, jitter de até 50 ms e interrupções de 1, 5 e 30 segundos. Para UDP, acrescentar perda de 1% e 5%; para WS/TCP, exercitar atraso, fechamento e retomada em vez de presumir datagramas independentes. Registrar convergência, tempos de recuperação e falhas; não definir um selo de produção só porque o socket conectou. Alvo inicial de desempenho: apresentação a 60 FPS no equipamento de referência a registrar em M0, oito jogadores e partida prolongada, sem crescimento contínuo de memória; medir antes de afirmar atendimento.
+
+#### Validação executada nesta entrega de projeto
+
+Execução mais recente em Windows, em 2026-09-26:
+
+- Fixture clássica exportada com hashes dos 22 assets, configurações, RNG CPython, terreno e traços de passo fixo; `export_classic_reference_fixture.py --check` passou.
+- Compilação headless dos 22 scripts Godot alterados, 11 contratos de runtime e smoke das cenas `main`, `local_match` e `online_match` passaram em Godot 4.6.2.
+- Integração real iniciou o servidor autoritativo Python, descobriu seu anúncio LAN, completou hello/join UDP no Godot, recebeu/reconstruiu snapshots full/delta, interrompeu o socket sem saída voluntária, retomou o mesmo jogador por token e recebeu novo snapshot full.
+- O renderizador OpenGL Compatibility do Godot gerou e revalidou goldens nativos de 1024×768 para menu principal, opções, navegador e partida local em `docs/references/godot_visual/`. A captura do navegador agora usa o fluxo real do menu (com fundo Groundfire), e a captura da partida usa a fase ativa e as cores clássicas magenta/laranja. O backend headless dummy continua sem framebuffer; comparação pareada completa com todos os estados Python permanece no F14.
+- A suíte direcionada de controlador conectado, codec, transporte, cena replicada, fidelidade clássica, terreno, fixture e scaffold passou. A suíte Python completa passou com **446 testes**, **7 subtestes**, e marcou **33 testes** dos launchers Bash/Linux como ignorados corretamente no Windows.
+- O contrato de migração e `git diff --check` passaram. O importador Godot ainda informa a advertência histórica de tamanho de um byte em um WAV legado; os scripts, cenas e contratos continuam carregando.
+
+Os registros abaixo descrevem a auditoria de 2026-09-25 antes do provisionamento local de Godot e das dependências. Foram preservados como histórico e não representam o estado atual da execução.
+
+- SHA256 e metadados WAV conferidos conforme o inventário acima; oito imagens existentes inspecionadas.
+- `python -m unittest tests.test_gamesimulation tests.test_landscape_fidelity tests.test_serverbrowsermenu tests.test_match_controller`, com `PYTHONPATH` incluindo `versao-python`, `scripts` e raiz: **92 testes passaram**. Esse é um recorte da referência Python, não uma prova de equivalência Godot.
+- A primeira tentativa sem `PYTHONPATH` não importou `src`; isso foi corrigido para a execução acima. A tentativa adicional de `tests.test_port_fidelity` não importou por falta de `pygame`; ela não está incluída nos 92 aprovados.
+- `python scripts/validate_godot_migration_contract.py`: **aprovado**. Duas funções de regressão documental (`test_migration_strategy_declares_compatibility_contract` e `test_migration_strategy_documents_web_feature_rule`) foram chamadas diretamente e **passaram**, sem alegar execução via pytest. A primeira também verifica que restaurar a diretriz antiga faz o validador rejeitar o documento. `py_compile` dos dois arquivos Python alterados e `git diff --check`: **aprovados**.
+- `CI=1` com `python scripts/run_quality_checks.py`: `compileall` **aprovado**; `unittest` tentou **443 testes e terminou com 35 erros** nos testes de launchers: 34 por executáveis `bash`/`sh` ausentes e um pelo uso de `os.setsid`, indisponível no Windows. `ruff` e `mypy` foram pulados pelo script por indisponibilidade. Log local, não versionado: `.tmp/projeto_quality_checks.log`. O resultado global desse check é **falha**, não aprovação parcial do gate.
+- Gate completo Godot, gameplay visual, browser/exportação e qualidade completa: **não certificados neste ambiente** pelos pré-requisitos ausentes e pela versão Python fora da faixa declarada. Contagens de julho presentes no histórico não são execuções de setembro. Links internos do projeto e os 16 IDs F/14 IDs O foram conferidos.
+
+Comandos para repetir o recorte disponível no PowerShell, na raiz:
+
+```powershell
+$env:PYTHONPATH = "$PWD\versao-python;$PWD\scripts;$PWD"
+python scripts/validate_godot_migration_contract.py
+python -m unittest tests.test_gamesimulation tests.test_landscape_fidelity tests.test_serverbrowsermenu tests.test_match_controller
+```
+
+Gates de implementação, em ambiente provisionado com Python suportado, dependências e Godot (Bash/WSL para os scripts `.sh`): `scripts/validate_godot_fidelity.sh`, `scripts/qa_godot_web.sh --check`, `CI=1 .venv/bin/python scripts/run_quality_checks.py` e `scripts/validate_godot_release.sh --browser-qa --package`. Acrescentar o harness diferencial e as jornadas novas, pois os gates atuais não cobrem sozinhos os novos requisitos. Executar também o runtime nativo Windows quando ele for parte da entrega.
+
+**Estado para continuação:** M0 e os primeiros lotes de M1/M2/M3/M5/M6/M7 estão implementados. O protocolo 2 já cobre retomada, pronto, revanche, chat e resultados idempotentes. O próximo trabalho de aceite é concluir o comparador diferencial das cinco armas e a captura visual/sonora pareada, seguido por criação/alocação de salas, convite/grupo, reserva conjunta e ensaios hospedados e de distribuição. Nenhum item aberto deve ser ocultado por contagem de testes ou tratado como concluído apenas porque a conexão básica funciona.
+
+<a id="projeto-encerramento-pendencias"></a>
+
+### Projeto de encerramento das pendências — fidelidade, on-line e distribuição
+
+**Data e versão:** 2026-09-26, versão 1.1. **Estado desta entrega:** implementação em andamento. P00/P01 têm referência Python e comparador iniciais; P03–P06 têm backend executável, adapters e jornada de partida real; P07 permanece parcial; P02/P08 ainda exigem a matriz completa de evidências e homologação nas plataformas indicadas. Os estados detalhados e as provas executadas estão no registro após P08.
+
+Este plano transforma as pendências F/O em trabalho verificável, sem substituir seus requisitos. Centraliza aqui o encerramento da migração; o sistema independente tem sua especificação em [servico-externo/PROJETO.md](../servico-externo/PROJETO.md), suas interfaces em [CONTRATOS.md](../servico-externo/CONTRATOS.md) e seus lotes E01–E09 em [IMPLEMENTACAO-E-TESTES.md](../servico-externo/IMPLEMENTACAO-E-TESTES.md). Não criar um segundo backend de salas dentro dos jogos.
+
+#### 1. Resultado esperado e limites
+
+Ao concluir o plano, a modalidade local Godot deverá passar na comparação com a referência local Python. A modalidade conectada deverá representar corretamente o estado do servidor Python. As duas interfaces deverão permitir encontrar/criar sala, convidar, formar grupo, buscar/cancelar, jogar, observar, retomar e pedir revanche com o mesmo resultado funcional. Cores, assets e regras Groundfire serão preservados.
+
+O serviço será distribuído inteiramente em `servico-externo/` e iniciado, dentro dessa pasta, por **`sh servico-externo.sh`**, sem importar código de pastas irmãs. O host LAN existente continuará utilizável sem esse serviço. Godot web consumirá HTTPS/WSS e recursos hospedados; não receberá botões que dependam de descoberta UDP ou criação de processos locais.
+
+Contas e amizades persistentes pertencem à extensão social já especificada no serviço; não serão fingidas pela reutilização de apelidos. Não incluir Steam, voz, ranking, regras FPS ou alteração de balanceamento como consequência deste plano.
+
+**Regra de fechamento:** distinguir `implementado`, `validado no ambiente de desenvolvimento`, `validado no pacote` e `validado na implantação pública`. Um estado não implica os seguintes. Pendência de evidência não prova defeito, mas impede declarar aceite total. Um backend pronto sem jornada nos dois clientes não fecha o item O correspondente.
+
+Anotações de compatibilidade aplicáveis aos lotes:
+
+- `Reference material:` Python clássico para fidelidade local; servidor/cliente Python conectado para rede; matrizes F01–F16/O01–O14; auditoria CS 1.6 já registrada; contratos do serviço externo.
+- `User-visible contract:` mesmos controles, regras, informações, estados de erro e resultados aplicáveis à plataforma; preservação dos dados locais e identidade Groundfire.
+- `Allowed adaptation:` refatoração interna, adapters por transporte, layouts responsivos e organização comum dos novos menus on-line; nenhuma mudança implícita na física/economia Python de referência.
+- `Required validation:` replays comparados, capturas do mesmo estado, áudio, controles físicos, sessões Python/Godot reais, falhas reproduzíveis e pacotes fora do checkout.
+
+#### 2. Rastreabilidade e ordem de execução
+
+| Lote | Pendência atendida | Trabalho principal | Dependência para aceite |
+|---|---|---|---|
+| P00 — Referência completa | M0 e base de F04/F05/F12/F15 | Replays, estados canônicos, inventário de cenários e fixture comum de interface. | Nenhuma; aproveitar fixture atual como base parcial. |
+| P01 — Comparação e correção de gameplay | F04/F05/F12/F13/F15, regressões F01–F07 | Comparador por tick das cinco armas, terreno, IA, economia e ciclo completo. | P00. |
+| P02 — Apresentação e aceite de fidelidade | F08/F09/F11/F14/F16 e demais F ainda parciais | Comparação visual/sonora, estados conectados, dispositivos e fechamento integral da matriz F. | P01 e cenários conectados existentes. |
+| P03 — Serviço e adapters básicos | Dependência de O01/O07/O08/O12; E01–E04 | Pacote independente, contratos, identidade, diretório, social de base e clientes HTTP/WS. | Aceite de fidelidade P02 para iniciar evolução funcional; projeto dos contratos já está disponível. |
+| P04 — Salas reais | O07 e complemento O06; E05/E06/E07 | Criar/alocar, convidar por código, regras/pronto, admissão, falhas e UI nas duas edições. | P03. |
+| P05 — Jornada social | O12; integração de E03/E07 | Presença, grupos, convites, amizade, chat/mute e recuperação de eventos nos clientes. | P03/P04. |
+| P06 — Busca e reserva conjunta | O08; E05/E06/E07 | Busca cancelável, reserva indivisível, consentimento, preparação e commit da partida. | P04/P05. |
+| P07 — Equivalência da experiência on-line | O01/O04/O09 e regressões O02/O03/O05/O10/O11/O13; E07 | Navegação, concorrência de pedidos, HUD/placar/chat/pausa e retorno preservando contexto. | P04–P06; cada recurso já terá sua UI mínima no lote que o entrega. |
+| P08 — Pacotes e homologação | O14; E08/E09 | Instalação isolada, Windows/Linux/web, serviço via sh, falhas/carga e implantação pública. | P00–P07 aprovados. |
+
+Sequência de execução: `P00 → P01 → P02 → P03 → P04 → P05 → P06 → P07 → P08`. A ordem preserva a prioridade de fidelidade antes da evolução dos menus. O planejamento E existente orienta P03–P08; não exige implementar o serviço duas vezes. E07 é entregue por jornadas nos lotes P03–P07 e concluído na integração final.
+
+#### 3. P00/P01 — Comparador completo e correções de fidelidade
+
+**Diagnóstico que determina o trabalho:** `scripts/export_classic_reference_fixture.py` já exporta assets, opções, controles, RNG, terreno e traços do passo fixo. Seu cenário de atualização usa entidades instrumentadas de teste, e a função de terreno reproduz o algoritmo no próprio exportador. Isso é útil como contrato parcial, mas não comprova que os objetos reais do jogo Python e Godot produzem a mesma partida. Os novos replays devem executar os objetos da referência; duas cópias de uma fórmula não serão aceitas como prova diferencial.
+
+Entregas previstas e estado atual:
+
+| Artefato | Responsabilidade |
+|---|---|
+| `tests/fixtures/classic_replays/` | Manifesto de cenários e entradas determinísticas; hashes da fonte/configuração e resultados Python esperados. |
+| `scripts/export_classic_replay.py` | Executar o Python clássico real, capturar estado inicial, comandos por tick, decisões aleatórias e saídas. |
+| `versao-godot/godot/tests/classic_replay_check.gd` | Ainda pendente: carregar os mesmos cenários e executar a simulação Godot por passos fixos; exportar estado normalizado. |
+| `scripts/compare_classic_replay.py` | Validar schemas e comparar por campo/evento/tick, relatando a primeira divergência e seu contexto. |
+| `tests/test_classic_replay_contract.py` | Verificar o comparador com defeitos injetados: troca de vítima, colisão atrasada, saldo errado e evento ausente devem falhar. |
+
+`scripts/export_classic_replay.py`, `scripts/compare_classic_replay.py`, a fixture de projéteis reais e seus testes de defeito injetado estão disponíveis. O exportador executa as classes Python reais das cinco armas, incluindo a divisão MIRV. Ainda falta o executor Godot equivalente e a ampliação para terreno, IA, economia e partidas completas. As fontes seguintes continuam sendo o escopo de instrumentação: `versao-python/src/game.py`, `gamesimulation.py`, `tank.py`, `aiplayer.py`, `landscape.py` e entidades de armas; Godot usa `local_match.gd`, `terrain_model.gd`, `tank_state.gd`, `weapon_inventory.gd`, `classic_fixed_step.gd` e `python_random.gd`. Instrumentação será observadora: não corrige a saída Python nem substitui suas regras para coincidir com Godot.
+
+Contrato mínimo do replay:
+
+1. Manifesto com schema, `scenario_id`, modalidade/ruleset, versões/hashes, seed, configurações, dimensão canônica de mundo e passos de tempo.
+2. Estado inicial completo: camadas/fatias do terreno, participantes/dispositivos, tanques, HP/fuel, inventário/saldo, fase/rodada, cooldowns e estado de IA.
+3. Comandos por tick e por participante; aleatoriedade reproduzida por estado/fluxo registrado, preservando ordem de consumo. Chamada aleatória extra deve ser detectada.
+4. Saída por tick: posição/velocidade, projéteis/fragmentos, colisões, dano, terreno alterado, compras, recursos, fases, placar e eventos de áudio. IDs são associados pela origem/criação sem apagar a ordem causal.
+5. Conversão documentada Python ↔ unidades canônicas ↔ Godot. Comparar coordenadas/velocidades contínuas inicialmente com erro absoluto máximo `1e-5`; enums, dinheiro, munição discreta, vítima, resultado e tick de transição são exatos. Campo derivado para renderização fica identificado separadamente.
+6. Relatório com cenário, primeiro tick/campo divergente, esperado/obtido e entradas anteriores; saída de processo diferente de zero em falha. Mudar tolerância exige justificativa numérica por campo e registro no manifesto.
+
+Matriz mínima de armas:
+
+| Arma | Casos obrigatórios além do disparo simples |
+|---|---|
+| Shell | Impacto direto, explosão no chão, borda/limite, queda após cratera, colisão com terreno/tanque no mesmo passo. |
+| Missile | Direção/comando válido, gasto/fim de combustível, trajetória, colisão e início/interrupção dos sons de voo/morte. |
+| MachineGun | Cadência, sequência de disparos, estoque/munição, vários impactos e encerramento da rajada. |
+| MIRV | Ápice, instante de divisão, quantidade/velocidade/ordem de fragmentos, impactos múltiplos e dano acumulado. |
+| Nuke | Explosão, alcance/dano, alteração do terreno, quake/efeitos, duração do som e morte simultânea. |
+
+Cada cenário será executado com 30/60/144 FPS de apresentação pelo mesmo tempo de simulação, comandos no mesmo tick, incluindo frames lentos e o limite de subpassos da referência. Repetir em 640×480, 1024×768 e 1920×1080 e fazer resize durante voo/queda para provar que só a apresentação mudou. Cobrir 2 e 8 participantes, dois humanos simultâneos, humano+IA e somente IA; memória/decisões de IA devem seguir o histórico e a aleatoriedade da referência.
+
+Economia/ciclo: partidas completas de 5 e 50 rodadas, compras simultâneas, falta de saldo/munição, empate, autoderrota, bônus e vencedor. Scripts automáticos emitem comandos legais; não chamam funções para fabricar vitória/fase. Cenários unitários podem preparar estado para isolar uma regra, mas não substituem a jornada completa.
+
+**Separação local/conectado:** replays locais comparam Godot com Python clássico. No on-line, o servidor autoritativo é a referência e o teste compara os comandos aceitos, snapshots e representação nos clientes. Não copiar o dano local de Shell para o servidor conectado apenas para igualar os dois modos.
+
+**Saída P01:** corrigir cada divergência real no destino apropriado, acrescentar regressão e repetir os cenários afetados. Não fechar F05 apenas porque o comparador foi escrito. Demais F permanecem abertos até seu aceite específico em P02.
+
+#### 4. P02 — Visual, áudio e fechamento dos itens F
+
+Ampliar `scripts/capture_pygame_references.py`, `versao-godot/godot/tests/visual_golden_check.gd` e os validadores existentes. Um manifesto comum carregará tela, estado, tick, resolução, roster, seleção/foco e textos. Capturar Python e Godot nesse mesmo estado; o renderizador Godot precisa de framebuffer real. Captura vazia/dummy falha, não é imagem de referência.
+
+| Pendência | Trabalho e evidência exigidos |
+|---|---|
+| F14 — Menus/fluxo | Pares de menu principal, setup, opções, controles, browser, filtros, detalhes, senha/erro, lobby, HUD, pausa/quit, score, loja e vencedor; normal, foco, desabilitado, modal e retorno. |
+| F08/F09 — Apresentação conectada | Servidor real produz lobby/rodada/score/shop/winner e as cinco armas; capturar identidade nos slots 1/2/8, HUD correto, projéteis/efeitos e eventos de áudio sem repetição após snapshot/retomada. |
+| F11 — Navegador | Mesma fixture de servidores gera os mesmos filtros, abas aplicáveis, seleção e ordenação; direto, refresh individual, favorito/histórico e retorno funcionam. |
+| F16 — Assets/áudio | Manifesto de usado/preservado/convertido/sem uso; validar duração, início/fim, loop, canais, volume percebido e sobreposição com dois jogadores; escuta A/B registrada para WAV convertido. |
+| F12/F13/F15 — IA, resize, configuração | Replays fecham decisões/física; capturas fecham projeção; catálogo completo de INI/bindings mapeia valor, conversão, persistência e teste por opção aplicável. |
+| F01/F02/F03/F06/F07 — Regressão | Reexecutar contratos e jornadas com dois teclados/dois controles físicos, desconexão/rebinding, loja simultânea e identidade atribuída pelo servidor. Não depender somente de eventos sintéticos. |
+
+Todas as telas aplicáveis serão verificadas nas três resoluções da matriz. Validar posição/tamanho/ordem/cores/texto por região, com imagens de diferença e máscara restrita à rasterização conhecida. Máscara não pode ocultar controle ausente, recorte, informação errada ou mudança de layout. Manter goldens Godot↔Godot como regressão adicional, sem chamá-los de prova Python↔Godot.
+
+Áudio tem duas evidências: sequência de eventos por participante/tick e captura/escuta do resultado. Igualdade de duração ou hash do arquivo não comprova volume/mixagem/interrupção equivalentes; conversão de amostragem será registrada com o par A/B. Reprodução simultânea deve preservar os canais esperados. Sons de rede são deduplicados por ID/seq, inclusive após reconexão.
+
+**Saída P02 / aceite de fidelidade:** matriz F01–F16 com cada critério ligado a teste/artefato e revisão. Item sem evidência permanece aberto. M4 só é concluído quando todos os critérios aplicáveis passarem; adaptações web serão declaradas individualmente. Este plano não estima “100%” por quantidade de testes.
+
+#### 5. P03 — Serviço independente e acesso das duas edições
+
+Implementar E01–E04 usando o projeto do serviço como contrato. O pacote conterá API, SQLite/migrações, identidade, diretório vivo, eventos sociais, código headless e codecs próprios com versão/proveniência. Não dependerá de `../versao-python`, `../versao-godot`, import externo `src.groundfire`, editor Godot ou Pygame na máquina do servidor.
+
+Fronteiras de implementação:
+
+| Componente | Destino e comportamento |
+|---|---|
+| Backend | `servico-externo/src/gf_service/` e testes/migrations/contracts locais, conforme E01–E09. |
+| Python | Adapter de serviço sob `versao-python/src/groundfire/`, HTTP fora do loop gráfico, WS social próprio, transporte WSS de jogo gerenciado e entrega de eventos à UI por fila. |
+| Godot | Adapter sob `versao-godot/godot/scripts/online/`, `HTTPRequest` e socket social separados do socket da partida; configuração de URL base e negociação de capabilities. |
+| Protocolos existentes | Preservar UDP 1 e WS 1/2 para LAN/legado; funções atuais de pronto/chat/retomada/revanche continuam compatíveis. |
+| Protocolos gerenciados | REST v1/social WS 1, jogo WS 3/UDP 2, conforme o contrato proposto; codecs/schemas e negociação precisam existir antes de anunciar suporte. |
+
+As mensagens de lobby antes listadas como futuras no protocolo 2 descrevem capacidades ainda não entregues. Para o modo gerenciado, essas operações serão concretizadas pela API REST/sessão do serviço e adapters versionados, conforme `CONTRATOS.md`; não inventar handlers WS 2 incompatíveis nem manter dois estados de sala. A escolha atual de contrato substitui apenas a proposta de transporte dessas operações, preservando seu efeito funcional.
+
+Sessão de conta/convidado, ticket de admissão e token de retomada são distintos. Nome não autentica jogador. `capabilities` limita os botões e transports disponíveis; cache público não contém segredos. Falha do serviço deixa local/LAN acessíveis. URL configurada não prova disponibilidade.
+
+**Saída P03:** cópia somente da pasta inicia os componentes disponíveis, clientes reais autenticam e listam servidores pelo mesmo contrato, lease vence corretamente, eventos são autorizados e logout revoga acesso. Funcionalidades ainda não entregues permanecem não anunciadas. O launcher final e seus testes de distribuição são fechados em P08.
+
+#### 6. P04 — Criar sala, código e alocação: O07
+
+Fluxo comum: `Jogar on-line → Criar sala → editar → criar → lobby → pronto → iniciar → partida`. Formulário preserva os dados em falha; inclui nome, visibilidade, senha opcional, 2–8 vagas, 5–50 rodadas, mapa/seed e bots. Backend valida permissões/regras; web usa somente alocação hospedada. Host LAN desktop é caminho próprio, identificado na interface.
+
+Tarefas de backend e UI:
+
+1. Criar sala persistida com ID/revisão/líder, roster e estado; operações de leitura/edição/saída com autorização e idempotência.
+2. Código de convite aleatório e limitado à sala, expiração padrão 10 min, destinatário/limite de uso quando aplicável, revogação e proteção contra tentativa em massa. Senha, bloqueio e capacidade continuam sendo verificados no aceite.
+3. Entrada por código nas duas UIs. Convite compartilhável copia instrução/código; endereço web opcional só quando houver domínio e rota configurados. Não pressupor registro de protocolo de URL no desktop para a jornada básica funcionar.
+4. Revisão de regras/roster invalida pronto; líder sai e liderança é transferida de forma determinística; sala vazia expira. Repetir start não cria outro worker.
+5. Supervisor reserva recursos, sobe worker, verifica readiness/protocolo, prepara roster, entrega tickets individuais e confirma início. Estado `criando` não vira sucesso só porque existe um PID.
+6. Falha de processo/porta/timeout/senha/capacidade devolve motivo, compensa reserva/worker e mantém formulário ou sala coerente nos dois clientes. Ticket antigo não entra em nova geração.
+
+**Aceite O07:** usuário Python cria, usuário Godot entra pelo código, ambos confirmam pronto e jogam; repetir invertendo o líder e usando Godot web. Testar código errado/expirado/revogado, sala privada/cheia, senha incorreta, cancelamento e falha de worker. Provar que nenhum cenário duplicou sala/processo/vaga. Link web, quando anunciado, também deve abrir a sala correta e tratar convite expirado sem expor segredo em logs.
+
+#### 7. P05 — Grupo, presença e convites: O12
+
+Entregar a jornada nos clientes sobre identidade/eventos E03. Grupo é entidade social com líder/revisão; sala é destino de jogo; partida é uma execução. Não inferir os três por apelido ou por socket conectado.
+
+- Criar/entrar/sair de grupo, aceitar/recusar/revogar convite e transferir liderança. Entrada/saída muda revisão e cancela busca anterior.
+- Presença por dispositivo com heartbeat e expiração; estado em partida confirmado pelo serviço/worker. Invisível/bloqueado não revela sala ou endpoint.
+- Amizade persistente usa conta e aceite; convidado tem ID próprio e pode converter em conta. Não associar histórico por nome repetido.
+- Chat de grupo/sala autorizado e limitado; histórico/deduplicação, mute local e bloqueio. Identificar visualmente destino do chat para não enviar mensagem à sala errada.
+- Reconectar eventos por cursor; gap exige sync. Replay não restitui presença/convite de quem bloqueou o usuário nem mensagens de sala à qual ele perdeu acesso.
+
+**Aceite O12:** grupo misto de três participantes forma-se por convites reais, troca líder, conversa e entra na sala pretendida; um sai/reconecta e todos convergem. Testar convite duplicado/expirado, usuário bloqueado, presença fantasma, consumidor lento e canais privados. Mute local não é banimento e não é anunciado como permissão administrativa.
+
+#### 8. P06 — Busca cancelável e reserva indivisível: O08
+
+Manter `Random Server` como seleção legada sem promessa de reserva. A nova ação `Jogar agora` usa fila do serviço, critérios/consentimento e o grupo completo. Usuário vê procurando, destino encontrado, confirmação, preparando, conectado ou falha/expiração; cancelar fica acessível até o limite real do protocolo.
+
+1. Congelar roster/revisão; filtrar versão, ruleset, plataforma/transporte, região, mapa e capacidade. Ping desconhecido é desconhecido; idade do anúncio não vira ping.
+2. Criar ticket idempotente de busca. Timeout de busca 300 s e reinício explícito; membro que sai/entra invalida a busca.
+3. Reservar todas as vagas na mesma decisão autoritativa, considerando bots, ingressos pendentes e slots em janela de retomada. Espectadores usam quota distinta.
+4. Após destino/worker ready, reserva dura 30 s: cada membro aceita e recebe seu ticket; todos conectam em preparação; somente então commit autoriza a partida nova.
+5. Cancelamento versus commit tem resultado único persistido. Se alguém não aceitar/entrar antes do prazo, desfazer a preparação inteira; não mandar metade do grupo para outro servidor. Depois do início, falha de conexão segue retomada, não rollback fictício da partida.
+6. Retentativa de pedido/resposta perdida não duplica vaga ou start. Mensagens de geração antiga são rejeitadas; interface consulta o estado antes de declarar falha de uma escrita sem resposta.
+
+**Aceite O08:** grupos de tamanhos 1/2/3/8 disputam as últimas vagas com barreiras de concorrência em banco/sockets reais; provar `conectados + bots + reservas válidas <= capacidade` sem contagem dupla. Grupo cabe inteiro ou nenhum entra. Testar cancelamento nos limites, worker perdido, confirmação parcial, reserva expirada e reconexão de UI durante busca. Não usar mock de repositório como única prova de atomicidade.
+
+#### 9. P07 — Navegação, cancelamento e interface da partida
+
+Consolidar comportamento nos pontos existentes: Python `serverbrowsermenu.py`, `groundfire/ui/menus.py`, `groundfire/app/client.py` e `groundfire/render/scene.py`; Godot `main.gd`, `server_browser.gd`, `online_match.gd`, `browser_store.gd` e adapters. Extrair componentes de estado quando necessário, sem exigir que as duas linguagens compartilhem código fonte de UI.
+
+| ID | Mudança verificável | Cenário de aceite |
+|---|---|---|
+| O01 | Área Jogar on-line com Servidores, Jogar agora, Criar sala, Entrar por código e social conforme capabilities; identidade/região e sessão recuperável visíveis. | Mesma sequência de ações/contexto nas duas edições; offline/serviço indisponível têm retorno utilizável e LAN desktop disponível. |
+| O04 | Estado de pedido por geração para refresh geral, seleção e conexão; cancelamento invalida callbacks antigos; I/O não bloqueia renderização. | Disparar A, depois B; entregar resposta A por último; a lista/seleção/conexão continuam em B. Cancelar join antes do ACK impede abertura tardia da partida e limpa o ingresso já aceito pelo backend. |
+| O04 | Preservar aba, filtro, ordenação, ID selecionado, scroll e favorito na atualização/erro/retorno. | Trocar ordem da lista, expirar selecionado, receber 304 e voltar de senha errada sem selecionar outro servidor silenciosamente. |
+| O09 | HUD por identidade/fase, placar pela ação Tab/configurada, chat com foco exclusivo, pausa local com continuar/opções/sair e espectador identificado. | Digitar chat não dispara/move; fechar chat devolve foco; pausar menu não para servidor; espectador não envia input de jogador. |
+| O09/O11 | Resultado, Voltar ao lobby, Jogar novamente e Servidores com estado autoritativo. | Todos recebem mesmo resultado; revanche cria contexto válido sem créditos/projéteis antigos; retorno restaura seleção e filtros. |
+
+Uma fixture de UI compartilhada em JSON definirá servidores, latências desconhecidas/medidas, versões, ocupação, salas e sequência de eventos. Os testes em cada linguagem devem produzir o mesmo modelo de apresentação/ações permitidas; layouts respeitam cores Groundfire e resoluções/foco. Não usar screenshot como substituto de teste de cancelamento.
+
+Contrato de cancelamento: separar intenção local de confirmação remota. Se o backend já aceitou um join cancelado localmente, emitir saída/revogação idempotente e ignorar seu callback; se start já foi confirmado, informar o estado real e oferecer sair, sem fingir que a partida não existe. Cada operação tem timeout, causa pública de erro e estado recuperável.
+
+**Saída P07:** executar a mesma jornada com teclado, mouse e controle aplicável em Python/Godot, incluindo nome com acento, janela menor, modal, resposta atrasada, serviço desligado, queda e resultado. Revalidar O02/O03/O05/O10/O11/O13 para impedir regressão das funções já existentes.
+
+#### 10. P08 — Distribuição, simulação de jogo e operação: O14
+
+Reaproveitar `scripts/validate_godot_fidelity.sh`, `validate_godot_release.sh`, `qa_godot_web.sh` e `verify_godot_hosted_deployment.py`, ampliando o aceite às novas APIs/protocolos. Scripts existentes sozinhos não certificam o serviço novo. Um orquestrador proposto `scripts/validate_online_journey.py` executará clientes/processos reais e agregará resultados; ainda não existe nesta entrega.
+
+| Alvo | Ensaio mínimo fora do checkout |
+|---|---|
+| Python Windows/Linux | Pacote instalado com Python suportado pelo projeto, assets/configurações próprios; local/LAN e serviço gerenciado; persistência após restart. |
+| Godot Windows/Linux | Executável exportado em diretório limpo; local, LAN/UDP e WSS; controles, áudio, resize e gravação de preferências. |
+| Godot web | Export servido por HTTP no ensaio local e HTTPS/WSS no público; navegador real, MIME/cache/ETag, origins, tickets, reconnect e ausência de opções desktop inviáveis. |
+| Serviço Linux/WSL | Copiar somente `servico-externo/`, instalação offline conforme distribuição, executar `sh servico-externo.sh`, readiness, partida, backup/restore e encerramento. |
+| Serviço Windows/Git Bash | Mesmo comando com Python Windows, caminho com espaços/acentos, sinais/processos/lock/portas testados nativamente; WSL não substitui esse ensaio. |
+
+Python 3.14 usado em validação histórica não substitui o teste na faixa declarada `>=3.10,<3.14`; usar Python 3.13 como ambiente comum de homologação inicial, com dependências travadas. Godot/export templates precisam corresponder à versão registrada no manifesto. Prerequisito ausente significa cenário não certificado, não aprovação com skip silencioso.
+
+Simulação end-to-end obrigatória:
+
+| Cenário | Prova exigida |
+|---|---|
+| Partida completa mista | Criar contas/grupo/sala por API, Python e Godot reais conectarem, executar ações/tiros/compras legais, terminar e pedir revanche; conferir estado/resultado e limpeza de recursos. |
+| Transportes e plataformas | Python↔Python, Godot↔Godot, Python↔Godot; WSS gerenciado, UDP habilitado e web WSS; slots 1/2/8, espectador e limites de capacidade. |
+| Rede degradada | RTT 0/100/250 ms, jitter até 50 ms, quedas 1/5/30 s; UDP perde 1%/5%, acrescentando os perfis 3%/10% do serviço; WS sofre atraso/backpressure/fechamento, sem presumir reordenação de frames TCP. |
+| Retomada/replay | Queda após comando aceito e antes da resposta; mesmo slot, inventário e placar; comando não duplica efeito; snapshot completo; conexão antiga invalidada. |
+| Concorrência/falha | Últimas vagas, cancelamento/commit, worker que não inicia, crash durante rodada, resultado reenviado, controle reiniciado e geração antiga; sem vencedor inventado. |
+| Operação | Sobrecarga retorna capacidade indisponível sem derrubar contas/diretório; drain avisa e encerra corretamente; restore não ressuscita tokens/reservas; nenhum processo de terceiro é encerrado. |
+| Sem serviço | Ambas as edições desktop ainda criam/descobrem/jogam LAN e executam local; web informa indisponibilidade sem oferecer host de processo. |
+
+Cada partida simulada usa seed e log reproduzíveis. Não forçar score/winner por chamada interna para acelerar o aceite; testes unitários preparados não substituem jogo completo. Harness tem deadlines, bancos/pastas temporários e limpeza dos próprios processos. Nenhum teste usa banco/credenciais de produção.
+
+Carga inicial conforme E09: 100 sessões sociais e até 8 partidas de 8 jogadores durante 30 min, com ciclos de ingresso/saída/reconexão. Registrar hardware, CPU/RAM, atraso de tick, latências, filas e recursos liberados. É um perfil proposto de teste; não é capacidade já medida. Metas numéricas de desempenho ficam fixadas por hardware de referência antes da certificação; não reduzir silenciosamente a carga para obter aprovação.
+
+Implantação pública é aceite separado: exige endereço real, DNS/certificado/origins configurados e jogadores fora da rede do servidor. Verificar diretório, acesso privado, WSS, arquivos web, retorno e revanche nos endpoints publicados. Sem ambiente público, registrar pacote local/LAN aprovado e implantação pública pendente; não chamar isso de falha do pacote nem de Internet concluída. URLs de exemplo não são evidência.
+
+<a id="registro-implementacao-2026-09-26"></a>
+
+##### Registro de implementação de 2026-09-26
+
+| Lote | Estado | Implementação e evidência desta execução | Pendência que impede conclusão |
+|---|---|---|---|
+| P00 | Em validação | `scripts/export_classic_replay.py` executa Shell, Nuke, MachineGunRound, MIRV e Missile reais; fixture inclui hashes e estados por tick. | Executor Godot equivalente, manifesto de todos os cenários e estados completos. |
+| P01 | Em implementação | `scripts/compare_classic_replay.py` faz comparação recursiva com primeira divergência e tolerância; testes detectam campo/tick adulterado e validam divisão MIRV. | Comparação Python↔Godot e matrizes de terreno, IA, economia, ciclo, FPS e resoluções. |
+| P02 | Em implementação | Gate existente executado com Godot 4.6.2 e 285 testes; assets, áudio, menus e runtime têm regressões automatizadas. | Capturas pareadas completas Python↔Godot, escuta A/B, controles físicos e fechamento revisado de F01–F16. |
+| P03 | Validado no desenvolvimento | Serviço FastAPI/SQLite independente, launcher sh, contas/convidados/sessões, presença, amigos, grupo, sala, eventos REST/WS, adapters Python/Godot e manifesto do runtime headless. | Homologação Linux/WSL e pacote offline com wheels. |
+| P04 | Validado no desenvolvimento | Sala com senha/código/TTL, pronto/revisão, liderança, reserva, start idempotente, supervisor, bot, ticket assinado e worker UDP + gateway WS. Godot permite criar, convidar, entrar, ficar pronto e iniciar. | Tela equivalente no cliente clássico Python e ensaio misto com dois executáveis empacotados. |
+| P05 | Em implementação | Presença, amizade/bloqueio, grupos, convites, eventos retomáveis e chat persistente/idempotente de grupo/sala com autorização. | Fluxo social completo nas duas UIs, recusa/revogação, mute e ensaios de consumidor lento/gap. |
+| P06 | Validado no backend | Busca cancelável e reserva indivisível em transação SQLite; concorrência pelas últimas vagas e expiração têm testes; aceite do último membro aloca worker real. | Consentimento e estados completos nas duas UIs, perfis 1/2/3/8 e falhas de commit/worker em sockets reais. |
+| P07 | Em implementação | Hub Godot, cancelamento por geração no adapter, ingresso autenticado no `online_match.gd`; adapter Python é assíncrono e expõe salas/busca/admissão/chat. | UI gerenciada Python, social Godot completo, retorno/revanche e matriz de teclado/mouse/controle. |
+| P08 | Em validação | Cópia isolada do serviço em caminho Windows com espaço e acento inicia, aloca partida real e encerra; `check`, `status`, `stop`, backup/restore e `sh servico-externo.sh` foram ensaiados. Teste de partida envia pronto/input e recebe snapshots/pong. | Linux/WSL, exports Windows/Linux/web, carga de 30 min, rede degradada e implantação HTTPS/WSS pública. |
+
+O runtime autoritativo usado pelo serviço está versionado dentro de `servico-externo/src/groundfire*`; `runtime-manifest.json` fixa SHA-256 de cada arquivo. `scripts/vendor_runtime.py` é uma operação explícita de desenvolvimento e nunca é executado pelo launcher. Assim, a cópia instalada não importa `../versao-python`, não precisa de Pygame/Godot e falha no `check` se o núcleo empacotado estiver ausente ou adulterado.
+
+Validações executadas neste ambiente Windows/Python 3.14.6/Godot 4.6.2: 11 testes do serviço aprovados; 6 testes focados de replay/contrato/simulação aprovados; gate de fidelidade aprovado com 285 testes; scripts Godot novos e `main.gd` aprovados em `--check-only`; `git diff --check` aprovado. O importador Godot registrou avisos de tamanho/seek em um stream WAV durante a primeira varredura, sem falha do gate; isso não substitui a revisão auditiva P02.
+
+#### 11. Evidências, acompanhamento e conclusão
+
+Durante a implementação, cada lote terá registro neste documento com: status, arquivos alterados, requisito F/O/E, cenários executados, plataforma/versões, resultado, defeitos restantes e links para os artefatos. Usar estados `planejado → em implementação → em validação → concluído`; `bloqueado` identifica dependência concreta, nunca oculta uma falha.
+
+Destinos previstos de evidência: entradas/fixtures pequenas versionadas em `tests/fixtures/`; capturas de referência aprovadas em `docs/references/`; saídas de execução em `artifacts/migration-closure/<run_id>/` com manifesto JSON, relatório HTML/JSON, diffs de imagem, traços de áudio/replay e logs sem segredos. Não adicionar novo documento narrativo de migração fora deste arquivo. Gerar artefato não significa aprová-lo; todo defeito terá cenário/primeira divergência reproduzível.
+
+| Marco de fechamento | Condições cumulativas | Situação nesta entrega |
+|---|---|---|
+| Fidelidade / M4 | P00–P02; todos F01–F16 aplicáveis fechados, física/ciclo/visual/áudio/dispositivos comprovados. | Em implementação; referência real das armas e gate atual aprovados, comparação Godot integral pendente. |
+| On-line funcional / M6–M7 | P03–P07; O07/O08/O12 completos e O01/O04/O09 fechados em ambos os clientes, com regressão dos O já implementados. | Backend e jornada Godot principais implementados; UI Python/social completo e aceite cruzado pendentes. |
+| Serviço independente | E01–E09 aplicáveis/P08; pasta isolada inicia por sh e sustenta partida real sem diretórios dos jogos. | Validado no desenvolvimento Windows, inclusive cópia isolada e partida real; demais plataformas/carga pendentes. |
+| Distribuição / M8 e O14 | P08; evidência por pacote/plataforma, partidas completas, falhas e operação. | Em validação; serviço isolado aprovado, exports e implantação pública pendentes. |
+| Publicação Internet | Jornada real no domínio/HTTPS/WSS publicado, com acesso de outra rede. | Pendente de implantação e ensaio. |
+
+O próximo lote de implementação é fechar o executor diferencial Godot de P00/P01 e, em paralelo somente após essa base, completar a UI gerenciada Python de P04–P07. P02 e P08 continuam abertos até existirem as evidências físicas, os pacotes das plataformas e a implantação pública descritos acima.
+
+**Validação realizada nesta entrega:** `python scripts/validate_godot_migration_contract.py`, suíte do serviço, testes focados on-line/replay, gate de fidelidade Godot/Python e `git diff --check` aprovados. O registro acima limita cada conclusão ao ambiente realmente executado.
+
 ## Document Map
 
 - `Decision` and `Web Feature Rule`: platform direction and browser safety boundaries.
 - `Repository Coexistence Strategy`: monorepo layout, shared-root policy, path helpers, validation, and the completed Godot/Python split.
-- `Migration Compatibility Contract`: evolution-first rule for agents implementing Godot work.
+- `Projeto de alteração — fidelidade Python/Godot e evolução on-line`: current audited requirements, implementation stages, and acceptance criteria for both user requests (2026-09-25).
+- `Migration Compatibility Contract`: fidelity-first rule, followed by shared online UX evolution.
 - `Agent Migration Loop`: mandatory repeatable workflow for agents continuing the migration.
 - `First Migration Slice`: chronological migration log for implemented Godot work.
 - `Current Status`: implemented/started behavior and remaining migration work by area.
@@ -173,18 +766,18 @@ GROUNDFIRE_LAUNCHER_PYTHON=.tmp/codex-py314-venv/bin/python bats tests/shell/tes
 
 ## Migration Compatibility Contract
 
-This is now an evolution-first migration. `versao-python/` and `versao-godot/godot/` are the canonical editions of this repository, and historical fidelity is comparison material rather than a hard product rule. User experience can improve when quality, maintainability, desktop/web delivery, accessibility, observability, or gameplay clarity justify the change.
+This is now a fidelity-first migration. `versao-python/` and `versao-godot/godot/` are the canonical editions of this repository. Python behavior is the acceptance reference for the corresponding local or connected mode. First close the audited fidelity gaps; then evolve online UX in both editions while preserving Groundfire colors and assets.
 
-The Python/Pygame client remains the most useful behavioral reference for classic systems, but it is not the sole source of truth. Godot may adapt or improve behavior for browser/platform constraints and modern UX, provided the change is intentional, documented, tested, and does not surprise players or admins.
+The Python/Pygame client is the authoritative behavioral reference for fidelity work. The local classic simulation and the connected Python server are distinct reference paths; do not silently replace one with the other. Browser/platform constraints must be documented individually. Shared online UX evolution is authorized by the current user request and specified in the September 2026 project above; it does not authorize unrelated gameplay changes.
 
 When an agent consults this file to implement Godot work, every task inherits this contract:
 
 - Keep both canonical folders: `versao-python/` and `versao-godot/godot/`.
 - Start from the existing Python/Godot behavior, original assets, and captured references before changing player-facing behavior.
 - Treat `docs/references/pygame_visual/` and the Python/Pygame code under `versao-python/src/` as compatibility references. Godot browser goldens are regression captures, not proof of classic fidelity by themselves.
-- Prefer modern, testable architecture over exact historical coupling when those goals conflict.
+- Prefer modern, testable architecture without changing the Python user-visible behavior during fidelity work.
 - Use `.ini` and `.json` for configuration, manifests, and public contracts; use SQLite for mutable runtime state where practical.
-- Document intentional platform or UX adaptations under `Allowed Godot adaptation:` or `Allowed adaptation:` and back them with validation.
+- Document necessary platform adaptations and the explicitly planned shared online UX changes under `Allowed Godot adaptation:` or `Allowed adaptation:` and back them with validation. A known fidelity defect is not an allowed adaptation.
 - Every migration implementation batch must name its reference material, user-visible contract, allowed adaptation, and required validation before code is treated as complete.
 - Run `scripts/validate_godot_migration_contract.py` and the relevant compatibility/visual checks before marking migration work done.
 
@@ -194,18 +787,18 @@ Use these labels in every pending migration area and in new migration notes:
 
 - `Reference material:` Pygame/Godot code, original asset, captured reference, protocol, or behavior being considered.
 - `User-visible contract:` What the player/admin must still understand, rely on, or experience consistently after migration.
-- `Allowed adaptation:` Browser/platform/engine/product constraint or improvement that may change behavior intentionally.
+- `Allowed adaptation:` Necessary platform constraint or explicitly planned shared online UX change; internal engine differences must preserve behavior.
 - `Required validation:` Automated test, screenshot comparison, manual reference pass, or command that proves the invariant.
 
 ## Agent Migration Loop
 
-Any agent continuing the Godot migration must work in this loop until the user stops the work, the current task is genuinely blocked, or every named remaining migration item has been closed with validation:
+For implementation tasks, use the following loop within the user's requested scope. A request for a technical project is complete when the audited project and its acceptance criteria are delivered; it does not implicitly require implementing every future milestone in the same task:
 
-1. Re-read this file, especially `Migration Compatibility Contract`, `What Still Needs To Be Done`, `Recommended Next Large Batch`, and `Next Agent Handoff`.
+1. Read the September 2026 project and `Migration Compatibility Contract` first. Its F/O backlog and milestones supersede older remaining-work and handoff priorities below.
 2. Inspect `git status --short` before editing and preserve unrelated user/agent changes.
 3. Pick one narrow compatibility target from this document. Name the reference material, user-visible contract, allowed adaptation, and required validation before treating the patch as complete.
 4. Inspect the Python/Pygame source, original assets, and `docs/references/pygame_visual/` before changing Godot behavior.
-5. Implement only that narrow migration step in the Godot/Python bridge needed for compatibility or an intentional improvement.
+5. Implement that narrow fidelity step, or the planned shared online UX step in both editions. Do not change the Python reference to hide a Godot mismatch.
 6. Add or extend the closest regression test. Prefer executable fidelity coverage over prose; use manual visual review only when automation cannot yet observe the behavior.
 7. Run the required validation for the touched surface: always include `scripts/validate_godot_migration_contract.py`; use `scripts/validate_godot_fidelity.sh` for gameplay/client parity; use `CI=1 .venv/bin/python scripts/run_quality_checks.py` when shared Python, gateway, launcher, release, or CI code changes; use browser visual QA when pixels, browser runtime, or web export behavior change.
 8. If validation fails, fix the implementation or document a precise blocker in this file before stopping. Do not hand off a vague "needs testing" state.
@@ -296,7 +889,7 @@ The `versao-godot/godot/` project is a standalone Godot client scaffold. It star
 - Server Browser connect path now instantiates `WebSocketClient`, opens `ws://`/`wss://` endpoints, sends join, pings, and reports incoming message status.
 - Initial `OnlineMatch` scene that connects through `WebSocketClient`, sends local input commands, receives snapshots, and renders snapshot key/value state.
 - `groundfire-web-gateway` Python entrypoint with a standard-library WebSocket gateway for Godot hello, join, input, ping, disconnect, and snapshot messages.
-- Gateway transport now proxies browser-safe WebSocket clients into the authoritative Python UDP server runtime, including `HelloRequest`, `JoinRequest`, `ClientCommandEnvelope`, `JoinAccept`/`JoinReject`, `DisconnectNotice`, and `ServerSnapshotEnvelope` translation.
+- Gateway transport now proxies browser-safe WebSocket clients into the authoritative Python UDP server runtime, including join/input, protocol-2 session resume, ready/rematch/chat commands, command results, events, snapshots, and voluntary `DisconnectNotice` translation.
 - Online Match replicated rendering for terrain profiles, replicated entities/tanks, player panel, round, and simulation tick.
 - Online Match interpolation layer for replicated entities plus projectile drawing and terrain explosion effects.
 - Local Match terrain chunk scaffold with slice clipping, crater interval subtraction, falling chunk pause/acceleration, and chunk polygon rendering.
@@ -572,6 +1165,8 @@ The `versao-godot/godot/` project is a standalone Godot client scaffold. It star
 
 ## Current Status
 
+> **Current audit, 2026-09-25:** the release-slice observations below are historical and do not certify full Python fidelity. The [current project](#projeto-2026-09) identifies confirmed structural gaps F01–F16 and defines the new acceptance criteria. Gameplay implementation is pending; the old gates did not test simultaneous local play or all connected presentation paths.
+
 The validated Godot release slice is no longer blocked by broad, generic categories such as gameplay, HUD/input, visual style, classic flow, browser runtime, or release packaging. It now covers playable local and online slices, export automation, packaging, browser runtime QA, browser visual regression QA, and the 248-test fidelity gate described below.
 
 The Python/Pygame client remains the source of truth for any future audit. Remaining work should be stated as named follow-up targets, such as a specific `Landscape.clip_slice` branch, one exact score/shop timing path, a hosted production directory policy, or a concrete multiplayer edge case. Do not reopen the migration as incomplete based only on broad labels unless a new Pygame reference regression identifies the failing behavior.
@@ -808,6 +1403,8 @@ Implemented or started:
 
 ## What Still Needs To Be Done
 
+> **Current backlog:** implement the [September 2026 project](#projeto-2026-09), starting at M0/F01/F02/F03. The older summaries below describe the previously accepted release slice only. Claims that all remaining work is polish are superseded by the concrete deltas in that audit.
+
 > [!IMPORTANT]
 > **Resumo de Pendências e Estado de Fidelidade**
 > 
@@ -857,7 +1454,7 @@ The current post-local-release state is:
   - `staging` environment queries the directory server at `https://staging.groundfire.net/directory/servers.json`.
   - `production` environment queries the public directory server at `https://play.groundfire.net/directory/servers.json`.
   - Current working tree note: `versao-godot/godot/project.godot` is set to `dev`, not `production`. Production selection is a manual release/deploy decision and may be injected by the deployment environment instead of committed as the local default.
-- **Manual Online Production Gateway**: The intended production gateway route is `wss://play.groundfire.net/gateway`, and the signed `/session-token.json` flow is implemented for local/directory-service use. `groundfire_net.directory_service` now has an opt-in GitHub OAuth verification path that calls `https://api.github.com/user` and compares the returned login against `player_name`. The WebSocket gateway now proxies browser WebSocket clients to the Python UDP server runtime, forwards snapshots, records acknowledged snapshot sequence, and sends `DisconnectNotice` on WebSocket close. Hosted deployment and account/session policy proof against the real public domain are manual operational steps.
+- **Manual Online Production Gateway**: The intended production gateway route is `wss://play.groundfire.net/gateway`, and the signed `/session-token.json` flow is implemented for local/directory-service use. `groundfire_net.directory_service` now has an opt-in GitHub OAuth verification path that calls `https://api.github.com/user` and compares the returned login against `player_name`. The WebSocket gateway proxies browser clients to the Python UDP runtime, forwards snapshots/events, records acknowledged sequence, preserves an abruptly closed backend session for protocol-2 resume, and sends `DisconnectNotice` only for voluntary exit. Hosted deployment and account/session policy proof against the real public domain are manual operational steps.
 - **CI / Release / Signing Policy**:
   - GitHub Actions has a Linux `godot-release-gate` job and manual `workflow_dispatch` options for browser QA, packaging, and GPG signing in `.github/workflows/ci.yml`.
   - Automatic tag publishing to GitHub Releases is implemented in `.github/workflows/release.yml`: pushing a `v*` tag runs the fidelity gate, packages artifacts, optionally signs the checksums, and publishes them to a GitHub Release.
@@ -1012,6 +1609,8 @@ Fidelity annotations:
 
 ## Recommended Next Large Batch
 
+**Current recommendation (2026-09-25):** M0 reference fixtures, then F01/F02/F03 for simultaneous gameplay, per-player input and fixed-step simulation. Use the [current milestones](#projeto-etapas). The previous recommendation retained below is historical context, not the active priority.
+
 Every recommended batch inherits the `Migration Compatibility Contract`. Do not use these batches as accidental redesign opportunities; each implementation step should name the relevant reference material, document any intentional adaptation, and pass the required validation before being marked complete.
 
 The next big but controlled batch should focus on `Local Match Fidelity 2`:
@@ -1044,6 +1643,8 @@ Acceptance criteria for this batch:
 Avoid mixing this with the full online protocol or final release hardening in the same batch. Those should come after the local gameplay loop is stronger.
 
 ## Next Agent Handoff
+
+**Active handoff (2026-09-25):** continue from the [current project](#projeto-2026-09). This delivery planned both user requests and updated documentation validation; it did not implement the F/O backlog. Recheck the environment and working tree. Start M0, then F01/F02/F03. All older continuation suggestions and validation counts below are historical evidence and must not override this order or be reported as newly run tests.
 
 This section is the practical handoff for the next agent that opens this repository. The migration strategy above is current as of this document update, but the working tree is already carrying many Godot, Python gateway, QA, reference, and documentation changes. Current verified state:
 
@@ -1623,13 +2224,13 @@ First browser-safe protocol contract between the Godot client and the Python `gr
 
 #### Versioning
 
-- Current protocol: `1`.
-- Supported protocol range: `1..1`.
+- Current protocol: `2`.
+- Supported protocol range: `1..2`.
 - Every JSON message must include integer field `protocol`.
 - The gateway rejects missing protocol values with `missing_protocol`.
 - The gateway rejects unsupported protocol values with `protocol_mismatch`.
 - Protocol changes that remove or rename fields must use a new protocol number.
-- Additive fields may stay on protocol `1` if older receivers can ignore them.
+- Protocol `1` remains the legacy gameplay path; protocol `2` adds session resume, explicit lobby/rematch commands, chat, and command results.
 - The gateway advertises `min_protocol`, `max_protocol`, and `supported_protocols` in its `hello` response and protocol errors.
 
 #### Compatibility Policy
@@ -1648,7 +2249,7 @@ All messages are UTF-8 JSON objects:
 ```json
 {
   "type": "hello",
-  "protocol": 1
+  "protocol": 2
 }
 ```
 
@@ -1662,7 +2263,7 @@ Errors use the same envelope:
 ```json
 {
   "type": "error",
-  "protocol": 1,
+  "protocol": 2,
   "message": "missing_field",
   "field": "player_name"
 }
@@ -1675,7 +2276,7 @@ Errors use the same envelope:
 ```json
 {
   "type": "hello",
-  "protocol": 1,
+  "protocol": 2,
   "client": "godot"
 }
 ```
@@ -1687,7 +2288,7 @@ Errors use the same envelope:
 ```json
 {
   "type": "join",
-  "protocol": 1,
+  "protocol": 2,
   "player_name": "GodotPlayer",
   "password": "",
   "auth_token": ""
@@ -1708,7 +2309,7 @@ Optional:
 ```json
 {
   "type": "input",
-  "protocol": 1,
+  "protocol": 2,
   "sequence": 7,
   "command": {
     "move_left": false,
@@ -1740,15 +2341,36 @@ Allowed `command` fields:
 - `fire`
 - `weapon_next`
 - `weapon_prev`
+- `ready` (legacy protocol-1 lobby input)
+- `rematch` (legacy protocol-1 winner input)
 
 Every command field value must be a boolean. Unknown command names are rejected. `input` is only valid after a successful `join`; pre-join input returns `not_joined` and must not advance the simulation.
+
+##### `session_resume` (protocol 2)
+
+```json
+{
+  "type": "session_resume",
+  "protocol": 2,
+  "session_id": "session-id",
+  "player_number": 1,
+  "resume_token": "opaque-token",
+  "player_name": "GodotPlayer"
+}
+```
+
+The server validates the session, player number, and opaque token. After five seconds without an authenticated command the player is marked disconnected and its old address stops receiving snapshots; the slot, score, money, and token remain reserved for a 30-second resume window. A voluntary `disconnect` removes the identity immediately. Accepted resume rebinds the address and forces a full authoritative snapshot; an expired slot is rejected.
+
+##### `lobby_set_ready`, `match_rematch`, and `chat_send` (protocol 2)
+
+Mutable commands include a non-empty `request_id`. Ready/rematch messages contain boolean `ready`; chat contains string `text` (normalized and limited to 240 characters). The backend authenticates the player and caches each result so repeating the same request cannot toggle readiness or submit chat twice.
 
 ##### `ping`
 
 ```json
 {
   "type": "ping",
-  "protocol": 1,
+  "protocol": 2,
   "sequence": 8,
   "client_time_msec": 1234
 }
@@ -1764,7 +2386,7 @@ Required:
 ```json
 {
   "type": "disconnect",
-  "protocol": 1,
+  "protocol": 2,
   "reason": "client_disconnect"
 }
 ```
@@ -1778,12 +2400,13 @@ Required:
 ```json
 {
   "type": "hello",
-  "protocol": 1,
+  "protocol": 2,
   "min_protocol": 1,
-  "max_protocol": 1,
-  "supported_protocols": [1],
+  "max_protocol": 2,
+  "supported_protocols": [1, 2],
   "match_snapshot_schema": 1,
   "event_schema": 1,
+  "capabilities": ["lobby_ready", "match_rematch", "session_resume", "chat"],
   "password_required": false,
   "auth_required": false,
   "auth_token_mode": "none",
@@ -1791,12 +2414,12 @@ Required:
   "ban_enforced": false,
   "max_players": 0,
   "players_connected": 0,
-  "server": "python-websocket-gateway"
+  "server": "python-websocket-proxy"
 }
 ```
 
 The client should treat `supported_protocols` as the authoritative compatibility list for this gateway instance.
-The Godot Online Match flow waits for this message before sending `join`, checks whether protocol `1` is in `supported_protocols`, handles pre-hello protocol errors, and disconnects without automatic retry when the gateway is incompatible.
+The Godot Online Match flow waits for this message before sending `join`, chooses the highest mutually supported protocol in `supported_protocols`, handles pre-hello protocol errors, and disconnects without automatic retry when the gateway is incompatible.
 `password_required` is advisory metadata from `groundfire-web-gateway`; the server still validates the actual `join.password` value when a gateway password is configured.
 `auth_required` is advisory metadata from `groundfire-web-gateway`; the server validates `join.auth_token` when a static gateway auth token or signed session-token secret is configured.
 `auth_token_mode` is `none`, `static`, `signed`, or `static_or_signed`; signed tokens use the `gf1.<claims>.<signature>` HMAC shape generated by `groundfire-web-gateway --session-secret SECRET --issue-token PLAYER_NAME` and expire according to the embedded `expires_at` claim.
@@ -1809,7 +2432,7 @@ The Godot Online Match flow waits for this message before sending `join`, checks
 ```json
 {
   "type": "snapshot",
-  "protocol": 1,
+  "protocol": 2,
   "sequence": 7,
   "state": {
     "status": "input",
@@ -1867,6 +2490,8 @@ Replicated players currently include:
 - `acknowledged_snapshot_sequence`: integer.
 - `colour`: RGB integer tuple/array.
 - `is_leader`: boolean.
+- `is_ready`: boolean.
+- `rematch_ready`: boolean.
 - `selected_weapon`: string.
 - `weapon_stocks`: array of `[weapon_name, count]` pairs.
 - `round_defeated_player_numbers`: array of integers.
@@ -1887,14 +2512,22 @@ Events in schema `1` include:
 - `event_type`: string.
 - `payload`: object.
 
-Current schema `1` event coverage remains limited; the terrain/event path exercised by the local gateway/server tests is `terrain_explosion`.
+Schema `1` covers gameplay events including `terrain_explosion`, lobby/readiness, rematch, and `chat_message`; clients deduplicate effects and chat delivery by the surrounding event/snapshot sequence.
+
+##### `session_resumed` (protocol 2)
+
+Returns the restored `session_id`, `player_number`, and `resume_token`. The next authoritative state is a full snapshot so a client never applies a delta from the abandoned transport baseline.
+
+##### `command_result` and `chat_event` (protocol 2)
+
+`command_result` echoes `request_id`, identifies `command`, and contains `accepted` plus a machine-readable `reason` when rejected. `chat_event` carries the authoritative player identity and normalized text.
 
 ##### `pong`
 
 ```json
 {
   "type": "pong",
-  "protocol": 1,
+  "protocol": 2,
   "sequence": 8,
   "client_time_msec": 1234,
   "server_time_msec": 123456789
@@ -1906,7 +2539,7 @@ Current schema `1` event coverage remains limited; the terrain/event path exerci
 ```json
 {
   "type": "disconnect",
-  "protocol": 1,
+  "protocol": 2,
   "reason": "client_disconnect"
 }
 ```
@@ -1916,7 +2549,7 @@ Current schema `1` event coverage remains limited; the terrain/event path exerci
 ```json
 {
   "type": "error",
-  "protocol": 1,
+  "protocol": 2,
   "message": "invalid_field",
   "field": "sequence",
   "expected": "integer"
@@ -1935,6 +2568,10 @@ Known validation errors:
 - `unknown_command`
 - `invalid_command`
 - `not_joined`
+- `unsupported_capability`
+- `session_expired`
+- `resume_rejected`
+- `rate_limited`
 - `unknown_type`
 
 Reserved fatal join/runtime errors for client recovery:
@@ -1959,7 +2596,7 @@ It emits `banned` when started with one or more `--ban-player` values or comma-s
 
 - After manual deployment, harden the gateway/server runtime under hosted production load, including real-domain WebSocket routing, close/disconnect cleanup, latency, reconnect, and multi-client edge cases.
 - Extend the schema `1` required-field constants and WebSocket state-builder tests whenever new snapshot, terrain-patch, or event payload families are added.
-- Keep the current real TCP/WebSocket/UDP gateway transport test as the minimum compatibility guard for handshake/framing, password rejection, join, input forwarding, snapshot forwarding, ping, disconnect, and backend cleanup messages.
+- Keep the current real TCP/WebSocket/UDP gateway transport tests as the minimum compatibility guard for protocol-1 legacy negotiation, protocol-2 resume after abrupt close, idempotent ready/chat commands, snapshot forwarding, ping, voluntary disconnect, and backend cleanup messages.
 - Keep the signed-token path and `groundfire-directory` `/session-token.json` endpoint as the minimum production auth bridge until manual deployment places it behind the final hosted account/session policy.
 - Keep browser-level end-to-end tests against the exported Godot web build in the release/manual QA loop; extend them to hosted staging/production endpoints once those services exist.
 
@@ -2055,3 +2692,90 @@ The Options screen persists these values in `user://groundfire_options.cfg` unde
 - Add presence/latency updates through WebSocket or another browser-safe channel.
 - Deploy signed token issuance behind the hosted production authentication/session flow manually; the local directory service now blocks static directory-carried shared-secret tokens by default, leaving only explicit private/dev opt-in as a compatibility escape hatch.
 - After manual deployment, expand browser runtime QA beyond the current served schema `1` fixture, first-pass cache/refresh header checks, and local `304 Not Modified` rehearsal to cover production directory cache behavior under real hosting.
+
+---
+
+<a id="projeto-edicoes-standalone"></a>
+
+## Projeto de autonomia das edições Python e Godot
+
+**Data:** 2026-09-26. **Estado:** projeto de alteração; os critérios abaixo ainda não foram aceitos. Os launchers existentes iniciam os jogos na árvore de desenvolvimento, mas isso **não** comprova que `versao-python/` ou `versao-godot/` possam ser copiadas e executadas sozinhas. Este projeto detalha a parte de distribuição de P08/O14 sem declarar esses lotes concluídos.
+
+### Contrato de entrega e limites
+
+As **duas pastas finais e separadas** serão `versao-python/` e `versao-godot/`, cada uma com seus próprios launchers na raiz, código, assets, binários e dados. Não haverá uma terceira versão standalone em `build/` ou `dist/` da raiz do repositório. Depois de gerar os binários para Windows ou Linux dentro da edição, o usuário poderá copiar **a pasta `versao-python/` inteira ou a pasta `versao-godot/` inteira** para uma máquina compatível, desconectar a Internet e abrir o jogo pelos launchers daquela pasta. Cada uma conterá executável do cliente, bibliotecas nativas, regras, assets, configuração, servidor LAN e, se oferecido no menu, gateway local. Nenhum passo de execução poderá ler `../`, importar `groundfire_net/` da raiz, usar `.venv` de outra pasta, baixar dependências ou exigir que a outra edição esteja instalada. A pasta copiada incluirá também `userdata/` para preferências, favoritos, histórico, logs e saves locais; o launcher indicará erro claro se a pasta não for gravável. O launcher escolherá o binário interno da plataforma atual; não se exige que o binário Windows rode no Linux.
+
+Há dois níveis de aceite, ambos obrigatórios: **fonte isolada**, na qual todo código e dado do jogo está dentro da própria pasta (o desenvolvedor ainda pode usar seu Python/editor Godot para construir); e **pacote portátil**, na qual o usuário final inicia sem Python, editor Godot, `pip`, export templates, Git Bash ou ferramentas do repositório. Um checkout de fontes sem os binários gerados não será anunciado como pacote portátil.
+
+“Sozinha” inclui partida local, criação e ingresso em LAN e configuração offline. A experiência de **Internet gerenciada** continua consumindo o [`servico-externo`](../servico-externo/README.md) como serviço remoto independente: ele não será copiado para as duas edições nem iniciado automaticamente por elas. Falta de conexão ao serviço não pode bloquear menu, partida local ou LAN. Godot web é um alvo separado: o conjunto de arquivos exportados deve ser autossuficiente como cliente estático, mas depende de navegador e hospedagem HTTP(S); não pode hospedar UDP/LAN ou processos locais.
+
+### Bloqueios confirmados na árvore atual
+
+| Edição | Evidência no código | Trabalho necessário |
+|---|---|---|
+| Python | [`pyproject.toml`](../pyproject.toml) fica na raiz e procura pacotes em `versao-python` **e** `.`; [`run_game.sh`](../versao-python/run_game.sh), `.bat` e `.ps1` instalam a partir da raiz. `versao-python/` não contém seu próprio manifesto de instalação. | Criar metadados, lock, licenças, bootstrap e comandos locais. O launcher não pode usar `pip -e ..` no pacote portátil. |
+| Python | `versao-python/src/groundfire/{client,server,master,network,app}/` importa [`groundfire_net/`](../groundfire_net/) da raiz. Os `iniciar-*.sh` definem `PYTHONPATH` incluindo a pasta pai. | Incluir uma cópia versionada de `groundfire_net` na edição, resolver imports dentro dela e verificar hash/versão contra a fonte compartilhada. |
+| Python | `app/dedicated_server_menu.py` ainda tenta `project_dir/versao-python/data`; caminhos de assets, INI, livro de servidores e executáveis dependem do layout de desenvolvimento. | Centralizar resolução de recursos e dados mutáveis na raiz da edição, com testes após mover a pasta e com nomes contendo espaço/acento. |
+| Godot | `versao-godot/scripts/launcher_common.sh` e `run_game.ps1/.bat` procuram Godot em `../tools/godot`; `iniciar-server.sh`, `iniciar-clientes.sh` e `iniciar-all.sh` usam Python e módulos da pasta irmã. | Priorizar binários incluídos em `versao-godot/`; empacotar servidor/gateway próprios e tornar todos os launchers locais. |
+| Godot | `godot/scripts/main.gd` procura `groundfire-web-gateway` em `res://../.venv`; `godot/export_presets.cfg` grava em `../../build`. | Separar caminhos de editor e exportação; distribuir gateway junto ao cliente e gerar artefatos dentro da edição. |
+| Ambas | Estado de desenvolvimento e parte dos testes usam pastas irmãs, `.venv`, `user://` ou diretórios globais; o pacote Linux/Web anterior cobre só um recorte. | Definir diretório portátil de dados e executar teste de cópia isolada de **cada** edição, incluindo Windows/Linux e multiplayer real. |
+
+### Arquitetura de pacotes escolhida
+
+```text
+versao-python/                         versao-godot/
+  run_game.*, iniciar-*                  run_game.*, iniciar-*
+  pyproject.toml, requirements.lock      godot/ (fontes e assets)
+  src/, groundfire/, groundfire_net/     scripts/, runtime/headless/ (fontes)
+  conf/, data/, scripts/                 runtime-manifest.json
+  runtime-manifest.json                 runtime/windows/ e runtime/linux/
+  runtime/windows/ e runtime/linux/       Groundfire + dados de exportação
+    Groundfire, groundfire-server          groundfire-server, gateway
+    groundfire-master, gateway           userdata/ (dados portáteis)
+  userdata/ (dados portáteis)
+```
+
+O código compartilhado poderá ser gerado durante o **build**, mas a cópia versionada necessária deverá existir antes de testar ou distribuir cada pasta. Um gerador reproduzível, manifesto SHA-256 e gate de divergência impedirão versões incompatíveis de `groundfire_net`, mensagens, física e servidor. Reutilizar a técnica de [`servico-externo/scripts/vendor_runtime.py`](../servico-externo/scripts/vendor_runtime.py) para o runtime headless Godot, sem importar `servico-externo/` em tempo de execução. A edição Python mantém o jogo completo; a Godot inclui apenas o núcleo headless e protocolos necessários para LAN/gateway, sem exigir Pygame no companion. Não criar um segundo servidor com regras divergentes.
+
+Os builds portáteis serão **conteúdo interno das duas pastas acima**, não um executável único que extrai em diretório temporário. Um ZIP de distribuição terá `versao-python/` **ou** `versao-godot/` como pasta superior; extrair e abrir `run_game.*` nessa pasta é o fluxo completo. Isso permite localizar assets, dados editáveis, processos filhos e logs por caminhos relativos ao executável. Ferramentas de build podem existir na raiz para desenvolvimento, mas os binários e manifestos usados na execução ficam sob a edição que entregam. Os launchers usam primeiro `runtime/<plataforma>/` da própria pasta; o editor Godot/Python do sistema fica disponível somente para desenvolvimento de fonte, nunca como dependência do pacote anunciado como standalone.
+
+### Etapas e critérios de conclusão
+
+| Etapa | Alterações previstas | Dependência | Aceite observável |
+|---|---|---|---|
+| ST00 — inventário congelado | Mapear imports, arquivos abertos, subprocessos, ambiente, bibliotecas nativas e URLs em local/LAN/Internet; registrar manifesto atual e lista de caminhos proibidos. | Nenhuma. | Auditoria reproduzível falha ao detectar leitura/import de pastas irmãs em uma cópia isolada. |
+| ST01 — fonte Python independente | Mover/espelhar `groundfire_net` para `versao-python/`, criar `pyproject.toml` e lock próprios, ajustar wrappers, `PYTHONPATH`, assets/INI, diretório, servidor, master e gateway. Manter wrappers da raiz como atalhos compatíveis. | ST00. | Copiar somente `versao-python/` e instalar em ambiente temporário sem arquivos da raiz; imports e comandos local, servidor, master, gateway e navegador funcionam. |
+| ST02 — pacote Python portátil | Gerar executáveis e bibliotecas nativas Windows/Linux, assets e configuração com caminhos relativos; substituir instalação automática no primeiro start por execução offline do pacote. Criar comandos LAN nativos CMD/PowerShell para Windows. | ST01. | Em máquina limpa, `run_game.*` abre jogo local sem Python/pip/rede; launchers locais da plataforma completam partida LAN; nenhum arquivo é procurado fora da pasta. |
+| ST03 — fonte/cliente Godot independente | Corrigir `launcher_common.sh`, `run_game.*`, presets e caminhos de configuração; manter todos os assets dentro de `godot/`; separar comportamento editor/exportado. | ST00. | Projeto abre após copiar apenas `versao-godot/` com editor de desenvolvimento; export desktop abre com o binário Godot incluído, sem `../tools/godot`. |
+| ST04 — servidor e gateway Godot incluídos | Versionar runtime headless mínimo e protocolo, gerar companion Windows/Linux, trocar `res://../.venv` por resolução local e ligar `iniciar-server.sh`, `iniciar-clientes.sh`, `iniciar-all.sh` e ferramenta do menu ao companion. Adicionar comandos equivalentes `.bat`/`.ps1` no Windows, sem exigir Git Bash. | ST01, ST03. | Godot inicia servidor LAN próprio, recebe dois clientes Godot e um Python externo compatível, aceita espectador/retomada; parada recolhe somente processos que criou. Nenhum launcher chama `../versao-python`. |
+| ST05 — dados e configuração portáteis | Unificar `userdata/`, migração única de preferências/favoritos existentes, logs e SQLite; defaults de serviço/dir configuráveis sem caminhos da máquina do desenvolvedor. | ST01, ST03. | Reiniciar após mover a pasta preserva configurações; execução offline não cria dados fora dela; erro de pasta somente leitura é explicado ao usuário. |
+| ST06 — build e integridade | Criar `runtime/<plataforma>/` dentro de **cada edição**, lock/manifesto de arquivos, licenças e checksums; impedir export com caminhos absolutos ou symlinks externos. O ZIP mantém a pasta da edição como raiz. Godot Windows entra na matriz existente Linux/Web. | ST02–ST05. | As duas pastas são verificáveis por SHA-256 e seus `run_game.*` abrem após extrair cada ZIP em caminho com espaço/acento. |
+| ST07 — prova isolada e regressão | CI copia **a pasta `versao-python/` inteira** e, em outro ambiente, **a pasta `versao-godot/` inteira**, sem o repositório; limpa `PYTHONPATH`, nega rede no teste local, verifica processos/arquivos e roda partidas simuladas local/LAN/mista. | ST06. | Testes de Windows/Linux, jogo local, LAN, bot, compra, espectador, queda/retomada e encerramento passam em Python e Godot; falha se uma pasta tocar a outra ou a raiz antiga. |
+| ST08 — publicação e documentação | Atualizar README, comandos por edição, matriz de plataformas, upgrade de dados e versão de protocolo; vincular resultados ao P08/O14 e ao serviço externo. | ST07. | Usuário consegue instalar/copiar e jogar a partir das instruções de **cada pasta**, sem consultar a raiz nem executar build manual. |
+
+**Mapa de arquivos para a implementação:** ST01 envolve `versao-python/pyproject.toml`, `requirements.lock`, `groundfire_net/`, `run_game.*`, `iniciar-*.sh`, `scripts/launcher_common.sh`, `src/groundfire/{app,network,assets}/` e os wrappers em `groundfire/`. ST02 acrescenta `versao-python/runtime/<plataforma>/` com executáveis de cliente/servidor/gateway. ST03 envolve `versao-godot/run_game.*`, `scripts/launcher_common.sh`, `godot/export_presets.cfg`, `godot/scripts/{main,control_settings,browser_store}.gd` e os recursos de `godot/assets/`/`godot/data/`. ST04 envolve `versao-godot/iniciar-*.sh`, novos comandos Windows, `runtime/headless/`, `runtime/<plataforma>/`, o localizador de companion em `godot/scripts/main.gd` e o manifesto de hashes. ST05–ST07 acrescentam resolvedores de dados, testes de cópia isolada e etapas de CI dentro das duas edições; a raiz pode apenas **orquestrar** esses testes, sem fornecer código em tempo de execução.
+
+### Matriz mínima de ensaio isolado
+
+1. Copiar `versao-python/` inteira para um diretório temporário **fora do checkout** e executar seu `run_game.*`; repetir separadamente com `versao-godot/`. Usar caminhos com espaços e acentos. Não copiar `README` da raiz, `groundfire_net/` externo, `.venv`, `tools/` nem a outra edição. Confirmar hash e ausência de symlinks que apontem para fora.
+2. Iniciar sem acesso de rede e com `PYTHONPATH` vazio. Verificar menu, áudio, dois jogadores/IA, cinco armas, rodada, loja, vencedor, controles, alteração de resolução e persistência após fechar e mover a pasta.
+3. Criar servidor LAN a partir de **cada** edição e entrar com dois clientes da mesma edição; repetir com cliente da outra edição **em outra pasta/máquina**. Validar discovery, senha, pronto, chat, espectador, snapshots, queda/retomada, revanche e lotação. Encerrar e provar liberação de portas/processos.
+4. Repetir em Windows e Linux suportados, usando CMD/PowerShell no Windows sem Git Bash. O pacote Godot web passa em navegador servido apenas pelos arquivos exportados, com partida local sem o serviço externo; fluxos on-line são testados separadamente contra serviço remoto HTTPS/WSS.
+5. Publicar relatório com versão do artefato, OS/arquitetura, hash, comandos, resultado por cenário, dependências do sistema operacional inevitáveis e qualquer exceção. **Não** declarar standalone se o teste só passou com o checkout ao lado.
+
+**Relação com os demais planos:** ST01–ST05 resolvem autonomia estrutural; ST06–ST08 são parte do aceite de distribuição P08/O14. A fidelidade F01–F16 e a experiência O01–O13 permanecem critérios cumulativos: empacotar um jogo executável não prova equivalência funcional. Os documentos do serviço externo continuam sendo o contrato de operação do backend remoto, e nenhum lote acima altera sua independência.
+
+### Registro de ensaio (2026-09-26, Windows 10 x86_64)
+
+Pacote portátil Windows gerado e provado fora do checkout, em caminho
+com espaço e acento, com `PYTHONPATH` vazio e sem `.venv`: `versao-python/`
+(PyInstaller, 5 executáveis — cliente, servidor, master, gateway e
+directory) e `versao-godot/` (jogo exportado Windows/Linux/Web via Godot
+4.6.2 + companion headless versionado e congelado). Servidor binário de
+cada edição respondeu Ping/Pong UDP real; cliente Godot exportado entrou
+em servidor Python (`join_accept`/`player_joined`) e jogador + espectador
+Godot entraram no servidor companion. ZIPs em `dist/` com a pasta da
+edição no topo e `.sha256`; extrair e abrir o launcher é o fluxo
+completo. Pendente: build PyInstaller Linux (sem cross-compile),
+execução do binário Godot Linux, partida com janela/áudio, queda/retomada
+e revanche interativas, e comportamento do pacote web em navegador.

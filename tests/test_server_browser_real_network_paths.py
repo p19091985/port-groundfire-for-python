@@ -129,6 +129,50 @@ class ServerBrowserRealNetworkPathTests(unittest.TestCase):
             thread.join(timeout=1.0)
             server.close()
 
+    def test_auto_retry_joins_when_a_full_server_slot_opens(self):
+        server = ServerApp(
+            host="127.0.0.1",
+            port=0,
+            discovery_port=0,
+            enable_discovery=False,
+            max_players=1,
+        )
+        server.open()
+        stop = threading.Event()
+        thread = self._run_server(server, stop)
+        holder = ClientApp()
+        waiting = ClientApp()
+        try:
+            port = server.get_bound_port()
+            holder.connect("127.0.0.1", port, player_name="Holder")
+            self._wait_for(lambda: holder.get_client_state().player_number == 0, holder)
+
+            waiting.connect(
+                "127.0.0.1",
+                port,
+                player_name="Waiting",
+                auto_retry_when_full=True,
+            )
+            self._wait_for(lambda: waiting._next_join_retry_at is not None, waiting)
+            self.assertIsNone(waiting.get_client_state().join_reject_reason)
+
+            holder.close()
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline and server.get_match_controller().match_state.player_slots:
+                time.sleep(0.005)
+            waiting._next_join_retry_at = 0.0
+            self._wait_for(lambda: waiting.get_client_state().player_number == 0, waiting)
+            self.assertEqual(
+                server.get_match_controller().match_state.get_player(0).name,
+                "Waiting",
+            )
+        finally:
+            holder.close()
+            waiting.close()
+            stop.set()
+            thread.join(timeout=1.0)
+            server.close()
+
     def test_favorites_and_history_entries_connect_real_clients(self):
         with TemporaryDirectory() as temp_dir:
             book_path = f"{temp_dir}/servers.json"

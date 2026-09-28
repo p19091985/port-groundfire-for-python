@@ -2,11 +2,10 @@ extends SceneTree
 
 const MainScene := preload("res://scenes/main.tscn")
 const LocalMatchScene := preload("res://scenes/local_match.tscn")
-const ServerBrowserScene := preload("res://scenes/server_browser.tscn")
 
 const CAPTURE_SIZE := Vector2i(1024, 768)
-const GOLDEN_DIR := "res://../docs/references/godot_visual"
-const ACTUAL_DIR := "res://../.tmp/godot_visual_actual"
+const GOLDEN_DIR := "res://../../docs/references/godot_visual"
+const ACTUAL_DIR := "res://../../.tmp/godot_visual_actual"
 const UPDATE_ENV := "GODOT_VISUAL_UPDATE"
 const SAMPLE_STEP := 8
 const AVG_DELTA_TOLERANCE := 1.0
@@ -52,10 +51,8 @@ func _run() -> void:
 func _capture_case(case_name: String) -> Image:
 	var node: Node
 	match case_name:
-		"main_menu", "options":
+		"main_menu", "options", "server_browser":
 			node = MainScene.instantiate()
-		"server_browser":
-			node = ServerBrowserScene.instantiate()
 		"local_match":
 			node = LocalMatchScene.instantiate()
 		_:
@@ -67,6 +64,14 @@ func _capture_case(case_name: String) -> Image:
 	await process_frame
 	if case_name == "options":
 		node.call("_show_options")
+		await process_frame
+		await process_frame
+	elif case_name == "server_browser":
+		node.call("_on_find_servers")
+		await process_frame
+		await process_frame
+	elif case_name == "local_match":
+		node.call("_update_round_starting", 3.0)
 		await process_frame
 		await process_frame
 	var viewport_texture := root.get_texture()
