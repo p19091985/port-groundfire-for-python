@@ -1,5 +1,7 @@
 extends RefCounted
 
+const World := preload("res://scripts/classic_world.gd")
+
 const SHELL := "Shell"
 const MACHINE_GUN := "Machine Gun"
 const MIRV := "MIRV"
@@ -13,14 +15,13 @@ const CORBOMITE := "Corbomite"
 
 const DEFAULT_AMMO_SPEND := 1
 const LIMITED_WEAPON_INITIAL_STOCK := 0
-const ROUND_STARTING_COOLDOWN_ADVANCE := 2.0
 const SHELL_DAMAGE := 40
 const SHELL_COOLDOWN := 4.0
 const MACHINE_GUN_ROUND_AMMO := 50
 const MACHINE_GUN_VOLLEY := 5
 const MACHINE_GUN_COOLDOWN := 0.1
 const MACHINE_GUN_SHOP_PACK := 50
-const MACHINE_GUN_TRACER_GRAVITY := 190.0
+const MACHINE_GUN_TRACER_GRAVITY := World.PROJECTILE_GRAVITY
 const MACHINE_GUN_CLASSIC_POWER := 25.0
 const MIRV_ROUND_AMMO := 1
 const MIRV_DAMAGE := 30
@@ -71,7 +72,6 @@ func _init() -> void:
 func configure_classic(settings: Dictionary) -> void:
 	_weapons = WEAPONS.duplicate(true)
 	var configured := Dictionary(settings.get("weapons", {}))
-	var gravity_scale := float(Dictionary(settings.get("tank", {})).get("gravity", 5.0)) / 5.0
 	for index in range(_weapons.size()):
 		var weapon: Dictionary = _weapons[index]
 		var name := str(weapon["name"])
@@ -81,6 +81,9 @@ func configure_classic(settings: Dictionary) -> void:
 		weapon["damage"] = int(round(float(values.get("damage", weapon["damage"]))))
 		weapon["cooldown"] = float(values.get("cooldown", weapon.get("cooldown", 0.0)))
 		weapon["cost"] = int(values.get("cost", weapon.get("cost", 0)))
+		weapon["speed"] = 1.0
+		if values.has("blast_size"):
+			weapon["blast"] = float(values["blast_size"]) * World.SCALE
 		if values.has("fuel"):
 			weapon["fuel"] = float(values["fuel"])
 		if values.has("steer_sensitivity"):
@@ -92,7 +95,8 @@ func configure_classic(settings: Dictionary) -> void:
 		if values.has("spread"):
 			weapon["spread"] = float(values["spread"])
 		if name == MACHINE_GUN:
-			weapon["tracer_gravity"] = MACHINE_GUN_TRACER_GRAVITY * gravity_scale
+			weapon["tracer_gravity"] = MACHINE_GUN_TRACER_GRAVITY
+			weapon["launch_power"] = float(values.get("speed", MACHINE_GUN_CLASSIC_POWER))
 		_weapons[index] = weapon
 	_reset_initial_stock()
 	_reset_initial_cooldowns()
@@ -118,7 +122,7 @@ func reset_round_ammo() -> void:
 		var weapon_name := str(weapon["name"])
 		_ammo[weapon_name] = int(_stock.get(weapon_name, weapon["ammo"]))
 	_selected_index = 0
-	_arm_current_cooldown(-ROUND_STARTING_COOLDOWN_ADVANCE)
+	_arm_current_cooldown()
 
 
 func current() -> Dictionary:
@@ -162,7 +166,9 @@ func update_current_cooldown(delta: float) -> void:
 	var cooldown := float(_cooldowns.get(weapon_name, 0.0))
 	if cooldown <= 0.0:
 		return
-	_cooldowns[weapon_name] = max(0.0, cooldown - max(0.0, delta))
+	_cooldowns[weapon_name] = cooldown - max(0.0, delta)
+	if weapon_name == MACHINE_GUN:
+		_cooldowns[weapon_name] = max(0.0, float(_cooldowns[weapon_name]))
 
 
 func ammo_for(weapon_name: String) -> int:
@@ -218,12 +224,12 @@ func consume_current_amount(amount := DEFAULT_AMMO_SPEND) -> bool:
 	return consume_ammo(current_name(), amount)
 
 
-func consume_ammo(weapon_name: String, amount := DEFAULT_AMMO_SPEND) -> bool:
+func consume_ammo(weapon_name: String, amount := DEFAULT_AMMO_SPEND, fallback_to_shell := true) -> bool:
 	var ammo := int(_ammo.get(weapon_name, 0))
 	if ammo == -1:
 		return true
 	if ammo <= 0:
-		if weapon_name == current_name():
+		if fallback_to_shell and weapon_name == current_name():
 			select_shell()
 		return false
 	var spend: int = max(DEFAULT_AMMO_SPEND, amount)
@@ -232,7 +238,7 @@ func consume_ammo(weapon_name: String, amount := DEFAULT_AMMO_SPEND) -> bool:
 	var stock := int(_stock.get(weapon_name, ammo))
 	if stock > 0:
 		_stock[weapon_name] = max(0, stock - actual_spend)
-	if int(_ammo[weapon_name]) == 0 and weapon_name == current_name():
+	if fallback_to_shell and int(_ammo[weapon_name]) == 0 and weapon_name == current_name():
 		select_shell()
 	return true
 

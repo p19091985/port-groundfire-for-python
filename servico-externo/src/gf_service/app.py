@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from .config import Settings, load_settings
+from .console import console_router
 from .domain import GroundfireService
 from .errors import ServiceError
 from .store import Store
@@ -33,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Groundfire External Service", version="0.1.0", lifespan=lifespan)
     app.state.service = service
     app.state.worker_supervisor = supervisor
+    app.include_router(console_router(selected, service, supervisor))
 
     app.add_middleware(
         CORSMiddleware,

@@ -66,13 +66,14 @@ static func hello_message(protocol_version := PROTOCOL_VERSION) -> Dictionary:
 	return {"type": MESSAGE_HELLO, "protocol": protocol_version, "client": "godot"}
 
 
-static func join_message(player_name: String, password := "", auth_token := "", spectator := false) -> Dictionary:
+static func join_message(player_name: String, password := "", auth_token := "", spectator := false, is_computer := false) -> Dictionary:
 	var message := {
 		"type": MESSAGE_JOIN,
 		"protocol": PROTOCOL_VERSION,
 		"player_name": player_name,
 		"password": password,
 		"spectator": spectator,
+		"is_computer": is_computer and not spectator,
 	}
 	if not str(auth_token).is_empty():
 		message["auth_token"] = auth_token

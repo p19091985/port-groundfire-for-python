@@ -1,11 +1,21 @@
 extends Control
 
+signal match_requested(entry: Dictionary)
+signal back_requested
+
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
 const BrowserStore := preload("res://scripts/browser_store.gd")
 const NetworkAdapter := preload("res://scripts/network_adapter.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
 const WebSocketClient := preload("res://scripts/websocket_client.gd")
 const LanDiscovery := preload("res://scripts/lan_discovery.gd")
+const ClassicBrowser := preload("res://scripts/classic_server_browser.gd")
+const ServerProbe := preload("res://scripts/server_probe.gd")
+var _server_probe: Node
+var _probe_entry: Dictionary = {}
+var classic_presentation := false
+var classic_show_all := false
+var classic_sort_descending := false
 
 const TABLE_COLUMN_WIDTHS := [560.0, 115.0, 80.0, 110.0, 75.0]
 const TABLE_REFERENCE_WIDTH := 1024.0
@@ -87,6 +97,7 @@ func _notification(what: int) -> void:
 
 
 func _exit_tree() -> void:
+	_cancel_server_probe()
 	if _http_request != null:
 		_http_request.cancel_request()
 	if _websocket_client != null:
@@ -94,10 +105,14 @@ func _exit_tree() -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#00000066"))
+	if not classic_presentation:
+		draw_rect(Rect2(Vector2.ZERO, size), Color("#00000066"))
 
 
 func _build() -> void:
+	_server_probe = ServerProbe.new()
+	_server_probe.completed.connect(_on_server_probe_completed)
+	add_child(_server_probe)
 	_load_browser_store()
 	_directory_url = ServerDirectory.configured_directory_url()
 	_http_request = HTTPRequest.new()
@@ -322,6 +337,13 @@ func _build() -> void:
 	_build_join_dialog()
 	_apply_responsive_table_metrics()
 	_refresh_entries()
+	if classic_presentation:
+		root.hide()
+		var classic := ClassicBrowser.new()
+		classic.name = "ClassicBrowser"
+		classic.browser = self
+		add_child(classic)
+		move_child(_join_modal, -1)
 
 
 func _add_header(text: String, column_index: int) -> void:
@@ -375,9 +397,10 @@ func _merge_lan_entries(entries: Array[Dictionary]) -> Array[Dictionary]:
 
 
 func _render_entries() -> void:
+	_cancel_server_probe()
 	_clear_table_rows()
 	var tab_name := _tabs.get_tab_title(_tabs.current_tab)
-	_visible_entries = ServerDirectory.filter_for_tab(_entries, tab_name)
+	_visible_entries = _entries.duplicate() if classic_presentation and classic_show_all else ServerDirectory.filter_for_tab(_entries, tab_name)
 	_visible_entries = _filter_entries(_visible_entries, tab_name)
 	_selected_index = -1
 	_hovered_index = -1
@@ -397,6 +420,9 @@ func _render_entries() -> void:
 		_add_row(_visible_entries[index], false, index)
 	_wire_table_focus()
 	_status.text = "%d server(s) listed for %s." % [_visible_entries.size(), tab_name]
+	if classic_presentation:
+		_selected_index = 0
+		_update_action_buttons()
 
 
 func _clear_table_rows() -> void:
@@ -518,6 +544,16 @@ func _add_action(parent: Container, text: String, accent := false) -> Button:
 
 func _empty_message(tab_name := "") -> String:
 	var normalized_tab := tab_name.to_lower()
+	if classic_presentation:
+		if not _filter_text.is_empty() or _hide_passworded or _hide_full or _hide_empty or _secure_only or not _region.is_empty() or _max_latency > 0:
+			return "No servers match the current filters."
+		if normalized_tab == "favorites":
+			return "No favorite servers have been added."
+		if normalized_tab == "history":
+			return "No servers have been played recently."
+		if normalized_tab == "lan":
+			return "No LAN games responded to the query."
+		return "No internet games responded to the query."
 	if normalized_tab == "favorites":
 		if _favorites.is_empty():
 			return "No favorites saved yet."
@@ -614,6 +650,10 @@ func _entry_has_open_slot(entry: Dictionary) -> bool:
 
 func _sort_entries(entries: Array[Dictionary]) -> void:
 	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if classic_presentation:
+			var first: Variant = _latency_value(a) if _sort_mode == "latency" else (_player_count(a) if _sort_mode == "players" else str(a.get(_sort_mode, "")).to_lower())
+			var second: Variant = _latency_value(b) if _sort_mode == "latency" else (_player_count(b) if _sort_mode == "players" else str(b.get(_sort_mode, "")).to_lower())
+			return first > second if classic_sort_descending else first < second
 		if _sort_mode == "name":
 			return str(a.get("name", "")).to_lower() < str(b.get("name", "")).to_lower()
 		if _sort_mode == "players":
@@ -868,6 +908,14 @@ func _clear_focus_neighbors(control: Control) -> void:
 
 
 func _toggle_selected_favorite() -> void:
+	if classic_presentation:
+		if _selected_index >= 0 and _selected_index < _visible_entries.size():
+			var endpoint := str(_visible_entries[_selected_index].get("endpoint",""))
+			_favorites = BrowserStore.remember_favorite(_favorites,endpoint)
+			_save_browser_store()
+			_render_entries()
+			_status.text = "Added %s to Favorites." % endpoint
+		return
 	if _selected_index < 0 or _selected_index >= _visible_entries.size():
 		_status.text = "Select a server before changing favorites."
 		return
@@ -1060,6 +1108,7 @@ func _on_row_focused(row_index: int) -> void:
 
 
 func _select_row(row_index: int) -> void:
+	_cancel_server_probe()
 	if row_index < 0 or row_index >= _visible_entries.size():
 		return
 	_selected_index = row_index
@@ -1137,6 +1186,37 @@ func _on_connect_pressed() -> void:
 	var entry := _visible_entries[_selected_index]
 	_password_line.text = ""
 	_auto_retry_check.button_pressed = false
+	_cancel_server_probe()
+	if classic_presentation and NetworkAdapter.transport_for_endpoint(str(entry.get("endpoint", "")), _capabilities.supports(_capabilities.FEATURE_UDP_TRANSPORT)) == NetworkAdapter.TRANSPORT_UDP:
+		_probe_entry = entry.duplicate(true)
+		_status.text = "Checking %s..." % entry.endpoint
+		_server_probe.start(str(entry.endpoint))
+		return
+	_show_join_dialog(entry)
+
+
+func _cancel_server_probe() -> void:
+	_probe_entry.clear()
+	if _server_probe != null:
+		_server_probe.cancel()
+
+
+func _on_server_probe_completed(endpoint: String, latency: int) -> void:
+	if is_queued_for_deletion() or _probe_entry.is_empty() or str(_probe_entry.get("endpoint", "")) != endpoint:
+		return
+	var entry := _probe_entry.duplicate(true)
+	_probe_entry.clear()
+	if _selected_index < 0 or _selected_index >= _visible_entries.size() or str(_visible_entries[_selected_index].get("endpoint", "")) != endpoint:
+		return
+	entry["latency"] = str(latency) if latency >= 0 else "-"
+	_visible_entries[_selected_index] = entry
+	for index in range(_entries.size()):
+		if str(_entries[index].get("endpoint", "")) == endpoint:
+			_entries[index]["latency"] = entry.latency
+	if latency < 0:
+		_status.text = "%s did not respond. Start the server or refresh the list." % endpoint
+		return
+	_status.text = "%s responded in %d ms." % [endpoint, latency]
 	_show_join_dialog(entry)
 
 
@@ -1205,6 +1285,9 @@ func _confirm_join_dialog() -> void:
 
 
 func _show_join_dialog(entry: Dictionary) -> void:
+	if classic_presentation:
+		get_node("ClassicBrowser").show_join(entry)
+		return
 	_direct_join_mode = false
 	_direct_address_line.visible = false
 	_join_modal_title.text = "Connect to %s" % entry.get("name", "server")
@@ -1214,6 +1297,10 @@ func _show_join_dialog(entry: Dictionary) -> void:
 
 
 func _show_direct_join_dialog() -> void:
+	_cancel_server_probe()
+	if classic_presentation:
+		get_node("ClassicBrowser").show_add()
+		return
 	_direct_join_mode = true
 	_join_modal_title.text = "Add Server"
 	_join_modal_hint.text = "Enter a direct server address and an optional password."
@@ -1228,11 +1315,45 @@ func _show_direct_join_dialog() -> void:
 func _hide_join_dialog() -> void:
 	_join_modal.visible = false
 	_direct_join_mode = false
+	if classic_presentation and has_node("ClassicBrowser"):
+		get_node("ClassicBrowser").close_dialog()
+
+
+func _add_classic_server(address: String) -> bool:
+	var endpoint := address.strip_edges()
+	if endpoint.is_empty():
+		_status.text = "Type a server address first."
+		return false
+	if not endpoint.begins_with("ws://") and not endpoint.begins_with("wss://"):
+		endpoint = endpoint.trim_prefix("udp://")
+		var separator := endpoint.rfind(":")
+		var host := endpoint.substr(0,separator).strip_edges() if separator >= 0 else endpoint
+		var port_text := endpoint.substr(separator+1).strip_edges() if separator >= 0 else "27015"
+		var port := int(port_text) if port_text.is_valid_int() else 27015
+		if port < 1 or port > 65535:
+			_status.text = "Server port must be between 1 and 65535."
+			return false
+		endpoint = "%s:%d" % ["127.0.0.1" if host.is_empty() else host,port]
+	if not NetworkAdapter.can_connect(endpoint, _capabilities.supports(_capabilities.FEATURE_UDP_TRANSPORT)):
+		_status.text = "Invalid server address."
+		return false
+	_favorites = BrowserStore.remember_favorite(_favorites, endpoint)
+	_save_browser_store()
+	classic_show_all = false
+	for index in range(_tabs.tab_count):
+		if _tabs.get_tab_title(index).to_lower() == "favorites":
+			_tabs.current_tab = index
+	_render_entries()
+	for index in range(_visible_entries.size()):
+		if str(_visible_entries[index].get("endpoint","")) == endpoint:
+			_selected_index = index
+	_status.text = "Added %s to Favorites." % endpoint
+	return true
 
 
 func _stage_connect(entry: Dictionary) -> void:
 	var prepared_entry := entry.duplicate(true)
-	if _tabs != null and _tabs.get_tab_title(_tabs.current_tab).to_lower() == "spectate":
+	if not prepared_entry.has("spectator") and _tabs != null and _tabs.get_tab_title(_tabs.current_tab).to_lower() == "spectate":
 		prepared_entry["spectator"] = true
 	var allow_udp: bool = _capabilities.supports(_capabilities.FEATURE_UDP_TRANSPORT)
 	var endpoint := str(prepared_entry.get("endpoint", ""))
@@ -1240,12 +1361,12 @@ func _stage_connect(entry: Dictionary) -> void:
 	if transport == NetworkAdapter.TRANSPORT_WEBSOCKET:
 		_pending_join_entry = prepared_entry
 		_status.text = "Connecting to %s..." % endpoint
-		get_parent().get_parent()._show_online_match(_pending_join_entry)
+		match_requested.emit(_pending_join_entry)
 		return
 	if transport == NetworkAdapter.TRANSPORT_UDP:
 		_pending_join_entry = prepared_entry
 		_status.text = "Opening native UDP connection to %s..." % endpoint
-		get_parent().get_parent()._show_online_match(_pending_join_entry)
+		match_requested.emit(_pending_join_entry)
 		return
 	_status.text = NetworkAdapter.staged_connect_message(prepared_entry, allow_udp)
 
@@ -1324,4 +1445,5 @@ func _sort_index(sort_mode: String) -> int:
 
 
 func _on_back_pressed() -> void:
-	get_parent().get_parent()._show_main_menu()
+	_cancel_server_probe()
+	back_requested.emit()

@@ -53,10 +53,10 @@ CHECKSUMS="$DIST_DIR/${PACKAGE_PREFIX}-SHA256SUMS"
 mkdir -p "$DIST_DIR"
 rm -f "$LINUX_ARCHIVE" "$WEB_ARCHIVE" "$MANIFEST" "$CHECKSUMS"
 
-tar -C "$BUILD_DIR/godot" -czf "$LINUX_ARCHIVE" Groundfire.x86_64
+tar -C "$GODOT_LINUX_DIR" -czf "$LINUX_ARCHIVE" Groundfire.x86_64
 
 "$PYTHON_BIN" - \
-    "$BUILD_DIR" \
+    "$GODOT_WEB_DIR" \
     "$WEB_ARCHIVE" \
     "$MANIFEST" \
     "$PROJECT_VERSION" \
@@ -70,14 +70,13 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-build_dir = Path(sys.argv[1])
+web_dir = Path(sys.argv[1])
 web_archive = Path(sys.argv[2])
 manifest_path = Path(sys.argv[3])
 version = sys.argv[4]
 linux_archive_name = sys.argv[5]
 web_archive_name = sys.argv[6]
 release_notes_path = Path(sys.argv[7]) if sys.argv[7] else None
-web_dir = build_dir / "godot-web"
 
 with zipfile.ZipFile(web_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
     for path in sorted(web_dir.rglob("*")):
@@ -95,7 +94,7 @@ manifest = {
     "godot": "4.6.2.stable",
     "notes": [
         "Linux archive contains the exported desktop executable.",
-        "Web archive contains the static files from build/godot-web.",
+        "Web archive contains the static files from the selected Godot Web export directory.",
         "Release presets exclude res://tests/*.",
     ],
 }

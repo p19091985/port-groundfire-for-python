@@ -9,7 +9,8 @@ Uso (a partir da raiz do repo em desenvolvimento):
 
 O modo --check falha quando a copia versionada diverge da fonte
 (gate de divergencia, ST06). A copia dispensa pygame: o servidor e o
-gateway usam apenas stdlib + codigo vendored. Comparacao ignora
+gateway usam apenas stdlib + codigo vendored. Adaptacoes Godot explicitas
+em _source_bytes preservam a referencia Python. Comparacao ignora
 CRLF/LF (checkout Windows vs Linux).
 """
 
@@ -48,6 +49,34 @@ def _canonical(data: bytes) -> bytes:
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(_canonical(data)).hexdigest()
+
+
+def _source_bytes(src: Path) -> bytes:
+    """Apply audited Godot gateway fixes without changing the Python edition."""
+    data = _canonical(src.read_bytes())
+    if src.relative_to(PYTHON_EDITION).as_posix() != "groundfire_net/websocket_gateway.py":
+        return data
+    patches = (
+        (
+            b'                                spectator=bool(message.get("spectator", False)),\n',
+            b'                                spectator=bool(message.get("spectator", False)),\n'
+            b'                                is_computer=bool(message.get("is_computer", False)),\n',
+        ),
+        (
+            b'            or _optional_boolean_field(message, "spectator")\n',
+            b'            or _optional_boolean_field(message, "spectator")\n'
+            b'            or _optional_boolean_field(message, "is_computer")\n',
+        ),
+        (
+            b"            await writer.wait_closed()\n",
+            b"            with contextlib.suppress(ConnectionError):\n                await writer.wait_closed()\n",
+        ),
+    )
+    for before, after in patches:
+        if data.count(before) != 1:
+            raise ValueError("Gateway source changed; review Godot adaptations before vendoring")
+        data = data.replace(before, after)
+    return data
 
 
 def _pairs() -> list[tuple[Path, Path]]:
@@ -89,7 +118,7 @@ def main() -> int:
                 print(f"ausente no companion: runtime/headless/{rel}", file=sys.stderr)
                 failed = True
                 continue
-            if _sha256(src.read_bytes()) != _sha256(dst.read_bytes()):
+            if _sha256(_source_bytes(src)) != _sha256(dst.read_bytes()):
                 print(f"divergente: runtime/headless/{rel}", file=sys.stderr)
                 failed = True
             want = expected.get(f"runtime/headless/{rel}")
@@ -103,7 +132,7 @@ def main() -> int:
     hashes: dict[str, str] = {}
     for src, dst in pairs:
         dst.parent.mkdir(parents=True, exist_ok=True)
-        data = src.read_bytes()
+        data = _source_bytes(src)
         dst.write_bytes(data)
         rel = dst.relative_to(TARGET_DIR).as_posix()
         hashes[f"runtime/headless/{rel}"] = _sha256(data)

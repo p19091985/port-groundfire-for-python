@@ -512,6 +512,7 @@ class WebSocketGateway:
                                 requested_slot=None,
                                 password=str(message.get("password", "")),
                                 spectator=bool(message.get("spectator", False)),
+                                is_computer=bool(message.get("is_computer", False)),
                             )
                         )
                     )
@@ -662,7 +663,8 @@ class WebSocketGateway:
             transport.close()
             session.close()
             writer.close()
-            await writer.wait_closed()
+            with contextlib.suppress(ConnectionError):
+                await writer.wait_closed()
 
 
 async def _accept_handshake(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -768,6 +770,7 @@ def _validate_message_shape(message_type: str, message: dict[str, Any]) -> dict[
             or _optional_string_field(message, "password")
             or _optional_string_field(message, "auth_token")
             or _optional_boolean_field(message, "spectator")
+            or _optional_boolean_field(message, "is_computer")
         )
     if message_type == "input":
         shape_error = _required_integer_field(message, "sequence") or _required_dict_field(message, "command")

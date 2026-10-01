@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "scenarios": [
+    {
+      "id": "known-slope-rounding-1401",
+      "kind": "combat",
+      "seed": 1401,
+      "players": 2,
+      "ticks": 1600,
+      "coverage": [
+        "C01"
+      ],
+      "audio": true,
+      "initial_tanks": [
+        {
+          "x": -9.5,
+          "angle": 75.0,
+          "power": 1.0
+        },
+        {
+          "x": 9.5,
+          "angle": -75.0,
+          "power": 1.0
+        }
+      ],
+      "loadouts": [
+        {
+          "selected": "Shell",
+          "ammo": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "selected": "Shell",
+          "ammo": [
+            1,
+            1,
+            1,
+            1
+          ]
+        }
+      ],
+      "commands": [
+        {
+          "tick": 700,
+          "player": 0,
+          "buttons": [
+            0
+          ]
+        },
+        {
+          "tick": 700,
+          "player": 1,
+          "buttons": [
+            0
+          ]
+        }
+      ],
+      "required_shots": [
+        {
+          "owner": 0,
+          "kind": "shell"
+        },
+        {
+          "owner": 1,
+          "kind": "shell"
+        }
+      ]
+    }
+  ]
+}

@@ -17,12 +17,21 @@ set "GODOT_BIN_CANDIDATE="
 if exist "%EDITION_DIR%\runtime\windows\Groundfire.exe" set "GODOT_BIN_CANDIDATE=%EDITION_DIR%\runtime\windows\Groundfire.exe"
 if not defined GODOT_BIN_CANDIDATE if exist "%EDITION_DIR%\runtime\windows\Godot.exe" set "GODOT_BIN_CANDIDATE=%EDITION_DIR%\runtime\windows\Godot.exe"
 if defined GODOT_BIN if exist "%GODOT_BIN%" set "GODOT_BIN_CANDIDATE=%GODOT_BIN%"
+rem Checkout de desenvolvimento: reutiliza a engine instalada no repositorio.
+rem A edicao copiada sozinha continua usando runtime\windows ou GODOT_BIN.
+if not defined GODOT_BIN_CANDIDATE if exist "%EDITION_DIR%\..\tools\godot\Godot.exe" set "GODOT_BIN_CANDIDATE=%EDITION_DIR%\..\tools\godot\Godot.exe"
+if not defined GODOT_BIN_CANDIDATE (
+    for %%G in ("%EDITION_DIR%\..\tools\godot\Godot_v*_win64_console.exe") do if exist "%%~fG" set "GODOT_BIN_CANDIDATE=%%~fG"
+)
+if not defined GODOT_BIN_CANDIDATE (
+    for %%G in ("%EDITION_DIR%\..\tools\godot\Godot_v*_win64.exe") do if exist "%%~fG" set "GODOT_BIN_CANDIDATE=%%~fG"
+)
 if not defined GODOT_BIN_CANDIDATE (
     where godot >nul 2>&1
     if not errorlevel 1 set "GODOT_BIN_CANDIDATE=godot"
 )
 if not defined GODOT_BIN_CANDIDATE (
-    echo Godot nao encontrado. Coloque o binario em versao-godot\runtime\windows\ ou defina GODOT_BIN.
+    echo Godot nao encontrado. Coloque Godot.exe em runtime\windows\, instale em tools\godot\ no repositorio ou defina GODOT_BIN.
     exit /b 1
 )
 "%GODOT_BIN_CANDIDATE%" --path "%EDITION_DIR%\godot" %*

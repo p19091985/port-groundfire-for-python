@@ -53,6 +53,7 @@ const GAMEPAD_AXES := {
 }
 
 const AXIS_THRESHOLD := 0.5
+const Profiles := preload("res://scripts/classic_control_profiles.gd")
 
 static var _previous_gamepad_buttons: Dictionary = {}
 
@@ -75,7 +76,7 @@ static func action_name_for_controller(controller: int, action: String) -> Strin
 
 
 static func gamepad_device_for_controller(controller: int) -> int:
-	return controller - FIRST_GAMEPAD
+	return Profiles.device_id(controller - FIRST_GAMEPAD)
 
 
 static func command_for_controller(controller: int, include_edges := true) -> Dictionary:
@@ -108,18 +109,32 @@ static func empty_command() -> Dictionary:
 
 static func _pressed(controller: int, action: String) -> bool:
 	if controller <= KEYBOARD_2:
-		return Input.is_action_pressed(action_name_for_controller(controller, action))
-	var device := gamepad_device_for_controller(controller)
-	if GAMEPAD_BUTTONS.has(action):
-		return Input.is_joy_button_pressed(device, int(GAMEPAD_BUTTONS[action]))
-	if GAMEPAD_AXES.has(action):
-		var mapping: Dictionary = GAMEPAD_AXES[action]
-		var value := Input.get_joy_axis(device, int(mapping["axis"]))
-		return value * float(mapping["direction"]) >= AXIS_THRESHOLD
-	return false
+		var name := action_name_for_controller(controller, action)
+		if InputMap.has_action("keyboard_" + name) and Input.is_action_pressed("keyboard_" + name):
+			return true
+		# action_press is also used by deterministic replays. Real gamepad input
+		# in the shared online action must not leak into keyboard participants.
+		return Input.is_action_pressed(name) and not _gamepad_action_held(name)
+	return Profiles.pressed(controller - FIRST_GAMEPAD, action)
 
 
 static func _just_pressed(controller: int, action: String) -> bool:
 	if controller <= KEYBOARD_2:
-		return Input.is_action_just_pressed(action_name_for_controller(controller, action))
+		var name := action_name_for_controller(controller, action)
+		if InputMap.has_action("keyboard_" + name) and Input.is_action_just_pressed("keyboard_" + name):
+			return true
+		return Input.is_action_just_pressed(name) and not _gamepad_action_held(name)
+	return false
+
+static func _gamepad_action_held(action: String) -> bool:
+	for event in InputMap.action_get_events(action):
+		if not (event is InputEventJoypadButton or event is InputEventJoypadMotion):
+			continue
+		for device in Input.get_connected_joypads():
+			if event.device >= 0 and event.device != device:
+				continue
+			if event is InputEventJoypadButton and Input.is_joy_button_pressed(device, event.button_index):
+				return true
+			if event is InputEventJoypadMotion and Input.get_joy_axis(device, event.axis) * signf(event.axis_value) >= AXIS_THRESHOLD:
+				return true
 	return false

@@ -16,9 +16,12 @@ var item_count := 0
 
 var _items := PackedStringArray()
 var _disabled := false
-var _font_size := 24
+var _font_size := 24.0
 var _hover_arrow := 0
 var _pressed_arrow := 0
+var classic_geometry := false
+var show_disabled_value := false
+var classic_spacing_ratio := ClassicFont.DEFAULT_SPACING_RATIO
 
 
 func _ready() -> void:
@@ -32,9 +35,9 @@ func _ready() -> void:
 	_sync_disabled_state()
 
 
-func set_font_size(font_size: int) -> void:
+func set_font_size(font_size: float) -> void:
 	_font_size = max(1, font_size)
-	add_theme_font_size_override("font_size", _font_size)
+	add_theme_font_size_override("font_size", int(_font_size))
 	queue_redraw()
 
 
@@ -84,24 +87,25 @@ func _draw() -> void:
 	var left_base := _left_arrow_base_x()
 	var right_base := _right_arrow_base_x()
 	var arrow_size := _arrow_size()
+	var arrow_height := size.y if classic_geometry else arrow_size
 	var center_y: float = round(size.y * 0.5)
 	draw_colored_polygon(
 		PackedVector2Array([
 			Vector2(left_base - arrow_size, center_y),
-			Vector2(left_base, center_y + arrow_size * 0.5),
-			Vector2(left_base, center_y - arrow_size * 0.5),
+			Vector2(left_base, center_y + arrow_height * 0.5),
+			Vector2(left_base, center_y - arrow_height * 0.5),
 		]),
 		_arrow_color(-1)
 	)
 	draw_colored_polygon(
 		PackedVector2Array([
 			Vector2(right_base + arrow_size, center_y),
-			Vector2(right_base, center_y + arrow_size * 0.5),
-			Vector2(right_base, center_y - arrow_size * 0.5),
+			Vector2(right_base, center_y + arrow_height * 0.5),
+			Vector2(right_base, center_y - arrow_height * 0.5),
 		]),
 		_arrow_color(1)
 	)
-	if _items.is_empty():
+	if _items.is_empty() or (classic_geometry and _disabled and not show_disabled_value):
 		return
 	var text := _items[selected]
 	var text_left := left_base
@@ -116,14 +120,15 @@ func _draw() -> void:
 		float(_font_size),
 		text_color,
 		HORIZONTAL_ALIGNMENT_CENTER,
-		VERTICAL_ALIGNMENT_CENTER,
-		ClassicFont.DEFAULT_SPACING_RATIO,
+		VERTICAL_ALIGNMENT_BOTTOM if classic_geometry else VERTICAL_ALIGNMENT_CENTER,
+		classic_spacing_ratio,
 		not _disabled,
-		GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR,
+		Color8(0, 0, 0, 100) if classic_geometry else GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR,
 		Vector2(
 			float(GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_X),
 			float(GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_Y)
-		)
+		) if not classic_geometry else Vector2(-_font_size / 8, size.y / 8),
+		classic_geometry
 	)
 
 
@@ -192,18 +197,24 @@ func _arrow_color(direction: int) -> Color:
 	var color := GroundfireTheme.COLOR_TEXT
 	if _disabled:
 		color.a = DISABLED_ARROW_ALPHA
-	elif _pressed_arrow == direction or _hover_arrow == direction or (has_focus() and _hover_arrow == 0):
+	elif _pressed_arrow == direction or _hover_arrow == direction or (not classic_geometry and has_focus() and _hover_arrow == 0):
 		color = GroundfireTheme.COLOR_WARN
 	return color
 
 
 func _arrow_size() -> float:
+	if classic_geometry:
+		return _font_size
 	return clamp(size.y * 0.72, MIN_ARROW_SIZE, MAX_ARROW_SIZE)
 
 
 func _left_arrow_base_x() -> float:
+	if classic_geometry:
+		return _arrow_size()
 	return EDGE_PADDING + _arrow_size()
 
 
 func _right_arrow_base_x() -> float:
+	if classic_geometry:
+		return size.x - _arrow_size()
 	return max(_left_arrow_base_x() + _arrow_size() * 2.0, size.x - EDGE_PADDING - _arrow_size())

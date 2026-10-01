@@ -36,7 +36,8 @@ static func draw_text(
 	spacing_ratio := DEFAULT_SPACING_RATIO,
 	shadow := true,
 	shadow_color := Color("#00000096"),
-	shadow_offset := Vector2(3.0, 3.0)
+	shadow_offset := Vector2(3.0, 3.0),
+	python_geometry := false
 ) -> void:
 	if text.is_empty() or font_size <= 0.0:
 		return
@@ -50,7 +51,8 @@ static func draw_text(
 			shadow_color,
 			horizontal_alignment,
 			vertical_alignment,
-			spacing_ratio
+			spacing_ratio,
+			python_geometry
 		)
 	_draw_text_run(
 		canvas_item,
@@ -61,7 +63,8 @@ static func draw_text(
 		color,
 		horizontal_alignment,
 		vertical_alignment,
-		spacing_ratio
+		spacing_ratio,
+		python_geometry
 	)
 
 
@@ -74,10 +77,13 @@ static func _draw_text_run(
 	color: Color,
 	horizontal_alignment: HorizontalAlignment,
 	vertical_alignment: VerticalAlignment,
-	spacing_ratio: float
+	spacing_ratio: float,
+	python_geometry := false
 ) -> void:
 	var text_width := measure(text, font_size, spacing_ratio)
 	var glyph_width: float = max(1.0, round(font_size * GLYPH_WIDTH_RATIO))
+	if python_geometry:
+		glyph_width = maxf(1, int(int(font_size) * GLYPH_WIDTH_RATIO))
 	var x := position.x
 	if horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER:
 		x += (available_size.x - text_width) * 0.5
@@ -95,9 +101,12 @@ static func _draw_text_run(
 		var code := text.unicode_at(index)
 		if code >= 32 and code < 128 and code != 32:
 			var source := _source_rect_for_code(code)
+			var destination := Rect2(Vector2(round(x), round(y)), Vector2(glyph_width, round(font_size)))
+			if python_geometry:
+				destination = Rect2(Vector2(int(x), int(y)), Vector2(glyph_width, int(font_size)))
 			canvas_item.draw_texture_rect_region(
 				FONT_TEXTURE,
-				Rect2(Vector2(round(x), round(y)), Vector2(glyph_width, round(font_size))),
+				destination,
 				source,
 				color
 			)

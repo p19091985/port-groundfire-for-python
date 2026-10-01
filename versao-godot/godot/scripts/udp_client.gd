@@ -71,13 +71,13 @@ func _exit_tree() -> void:
 		disconnect_from_endpoint("node_exit")
 
 
-func join(player_name: String, password := "", _auth_token := "", spectator := false) -> void:
+func join(player_name: String, password := "", _auth_token := "", spectator := false, is_computer := false) -> void:
 	_player_name = player_name
 	_send_typed("JoinRequest", {
 		"player_name": player_name,
 		"requested_slot": null,
 		"password": password,
-		"is_computer": false,
+		"is_computer": is_computer and not spectator,
 		"spectator": spectator,
 		"protocol_version": PROTOCOL_VERSION,
 	})

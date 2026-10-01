@@ -5,7 +5,541 @@ The repository now keeps both implementations side by side: the Godot client liv
 
 This is the single Markdown source of truth for the Godot migration. Keep strategy, current status, validation, build/runtime notes, release walkthroughs, WebSocket protocol details, and server-directory schema updates here instead of creating new migration Markdown files under `docs/`. The image folders under `docs/references/` are fidelity assets used by tests and review, not separate narrative migration documents.
 
-**Mapa de leitura:** o [projeto de fidelidade e experiência on-line](#projeto-2026-09) define o comportamento desejado; o [plano P00–P08](#projeto-encerramento-pendencias) organiza as entregas; o [registro de implementação](#registro-implementacao-2026-09-26) é o retrato mais recente do que foi comprovado e do que ainda falta; o [projeto de autonomia das edições](#projeto-edicoes-standalone) especifica como copiar e executar cada pasta sem o restante do repositório. Trechos antigos deste documento preservam decisões e resultados da fase em que foram escritos. Para instalar e operar o serviço, use o [README próprio](../servico-externo/README.md).
+**Mapa de leitura:** o [projeto completo de equivalência da experiência](#projeto-equivalencia-2026-09-29) é o plano vigente para tornar Godot equivalente ao Python; o [projeto de fidelidade e experiência on-line](#projeto-2026-09) preserva os requisitos F/O anteriores; o [plano P00–P08](#projeto-encerramento-pendencias) registra as entregas anteriores; o [registro de implementação](#registro-implementacao-2026-09-26) contém evidências históricas, sem certificar mudanças posteriores; o [projeto de autonomia das edições](#projeto-edicoes-standalone) especifica como copiar e executar cada pasta sem o restante do repositório. Para instalar e operar o serviço, use o [README próprio](../servico-externo/README.md).
+
+**Para o próximo agente:** começar pelo [plano operacional das pendências e passagem de trabalho](#continuidade-equivalencia-2026-09-30). Ele registra o estado após a correção do rastro, a primeira tarefa, os arquivos e os critérios de conclusão.
+
+<a id="projeto-equivalencia-2026-09-29"></a>
+
+## Projeto completo — experiência Godot equivalente à Python
+
+**Data:** 2026-09-29; atualização de implementação em 2026-09-30. **Estado:** implementação em execução; menus, controles, comparações de projéteis/estados, combate com IA, ciclo de rodada, capturas e verificação de pacote implementados nesta árvore. **Referência Python congelada:** `0c4b5ee33f743c080fddfaf535e92142c2305413`, com hashes em `tests/fixtures/experience_parity/baseline.json`. O Python permanece inalterado. A execução Windows aprovou os testes descritos na seção 10, incluindo cinco ciclos por arma e uma partida de duas rodadas até o vencedor. O projeto completo ainda não está homologado: combinações adicionais de combate e a matriz visual, sonora, de rede, dispositivos e plataformas permanecem abertas.
+
+### 1. Objetivo, referência e limites
+
+O jogador que conhece a edição Python deve conseguir abrir a edição Godot, configurar participantes e controles, jogar, comprar, consultar resultados e participar de partidas conectadas usando as mesmas ações, informações e regras, sem precisar reaprender o jogo. A aparência, o áudio e o tempo das respostas também fazem parte do resultado.
+
+Este plano detalha o fechamento da fidelidade solicitada em 29/09. Quando houver conflito de prioridade com lotes antigos, concluir os lotes EQ primeiro. Os requisitos F01–F16 continuam válidos; sua implementação parcial será reaproveitada e revalidada, não refeita sem evidência. Os lotes O/P de expansão social e salas gerenciadas permanecem como evolução posterior. Não mudar o Python para disfarçar uma diferença do Godot.
+
+| Dentro deste projeto | Fora deste projeto |
+|---|---|
+| Experiência desktop correspondente ao Python: inicialização, menus, partida local, opções, controles, LAN/on-line já acessível no cliente Python, resultados e saída. | Criar novas armas, regras, mapas, ranking, voz, integração Steam ou redesenhar a identidade visual. |
+| Equivalência de textos, navegação, configurações padrão, geometria, HUD, efeitos, sons e ritmo. | Expandir a interface Python para alcançar funcionalidades exclusivas ou experimentais do Godot. |
+| Corrigir divergências Godot, criar provas comparativas e validar pacotes independentes. | Reescrever o motor inteiro, substituir o servidor Python ou remover uma das edições. |
+| Compatibilidade web no subconjunto suportado, com limitações identificadas. | Declarar equivalência web de UDP, descoberta LAN ou criação de processos locais; publicar infraestrutura como condição de equivalência local. |
+
+**Duas referências separadas:** para modo local, usar `versao-python/src/game.py`, `gamesimulation.py`, entidades, menus e `conf/`; para modo conectado, usar o fluxo Python efetivamente acessível, `versao-python/src/groundfire/app/`, `gameplay/match_controller.py`, `render/`, `ui/` e servidor correspondente. A existência de um adapter ou endpoint não prova que há uma jornada utilizável na interface. Regras locais e de servidor não devem ser misturadas.
+
+**Política para recursos extras:** o caminho padrão Godot deve reproduzir o Python. Ferramentas exclusivas existentes serão preservadas em uma entrada de desenvolvimento optativa, fora da navegação clássica e desativada no primeiro uso. Isso inclui servidor dedicado exclusivo do menu Godot, opções técnicas extras e hub gerenciado que ainda não tenha equivalente Python. Não acrescentar um botão “Avançado” ao menu clássico apenas para acomodar extras. A seleção da entrada optativa poderá ser feita por configuração ou launcher de desenvolvimento; EQ-01 documentará o mecanismo antes da alteração. Recursos que já tenham equivalente Python devem ser mantidos no local correspondente, mesmo que pertençam ao navegador e não ao menu principal.
+
+### 2. Diagnóstico inicial e classificação das evidências
+
+| Área | Evidência inspecionada | Decisão de projeto |
+|---|---|---|
+| Menu principal | `src/mainmenu.py` contém quatro ações; `_show_main_menu` em `godot/scripts/main.gd` acrescenta `Dedicated Server` no desktop e altera espaçamentos. | Diferença confirmada no código. Restaurar composição e quatro ações no caminho clássico. |
+| Opções | `src/optionmenu.py` oferece resolução, modo de tela, controles, aplicar e voltar; `_show_options` Godot combina essas funções com seções roláveis de vídeo, áudio, gameplay e on-line. | Diferença confirmada. Reproduzir tela e sequência Python, incluindo quando mudanças são aplicadas e salvas. |
+| Núcleo local | Há roteador por participante, passo fixo, testes de combate/loja simultâneos, terreno e IA no Godot. | Base existente, não ausência de implementação. Revalidar contra o mesmo estado Python antes de corrigir. |
+| Comparador | `compare_classic_replay.py` compara JSON recursivamente, com tolerância numérica global; `export_classic_replay.py` executa projéteis reais, mas seu cenário usa terreno sem colisão e lista vazia de jogadores. | Insuficiente para certificar uma partida completa. Ampliar cenário, esquema e comparação por campo; criar executor Godot equivalente. |
+| Visual e áudio | Existem referências PNG e testes Godot, mas o registro anterior mantém captura pareada completa, escuta e dispositivos pendentes. | Não transformar aprovação de regressão Godot em prova de igualdade com Python. |
+| On-line gerenciado | Hub Godot e adapters estão presentes; o registro P04/P07 aponta interface gerenciada Python pendente. | Não usar a expansão gerenciada como referência para modificar o Python neste projeto. Validar primeiro a jornada comum existente. |
+| Pacotes e plataformas | Pastas standalone e launchers existem; evidências antigas pertencem a builds e ambientes específicos. | Revalidar a distribuição produzida ao final, sem herdar aprovação de outro commit. |
+
+Estados de acompanhamento: `planejado`, `em execução`, `implementado sem aceite`, `em validação`, `aceito` e `bloqueado por dependência identificada`. Toda divergência recebe ID, modalidade, cenário, referência Python, comportamento Godot, severidade e evidência. Ausência de teste significa não certificado; não significa automaticamente defeito.
+
+Severidades: **P0** impede jogar, troca o jogador controlado, muda resultado/regra ou perde dados; **P1** quebra uma jornada ou produz diferença perceptível de informação, comando, visual ou áudio; **P2** é diferença cosmética menor ou documental. Diferença conhecida não pode ser renomeada como adaptação de plataforma.
+
+### 3. Contrato de experiência e inventário de jornadas
+
+Em EQ-00, registrar para cada tela todos os estados realmente alcançáveis: inicial, foco, mouse sobre o item, pressionado, desabilitado, vazio, preenchido, modal, erro e retorno. Marcar como não aplicável quando o Python não apresentar determinado estado; não inventar estados apenas para preencher a matriz. Preservar os textos e o idioma da referência, inclusive nomes das armas.
+
+| Jornada / cenário | Referência Python | Resultado exigido no Godot |
+|---|---|---|
+| UX-01: abrir offline → menu → confirmar/cancelar saída | `mainmenu.py`, `quitmenu.py`, launchers | Mesmas ações, ordem, composição, foco inicial e confirmação; sem exigir serviço externo. |
+| UX-02: configurar → iniciar → voltar | `playermenu.py`, `player.py` | Mesmos limites de participantes/rodadas, nomes, cores, humano/IA, controladores, valores iniciais e estado ao retornar. |
+| UX-03: opções → controles → aplicar/cancelar/voltar | `optionmenu.py`, `controllermenu.py`, `setcontrolsmenu.py`, `controlsfile.py` | Mesmas transições, mapeamento e momento de aplicação; reinício preserva as preferências que o Python preserva. |
+| UX-04: rodada com dois humanos e bots | `gamesimulation.py`, `humanplayer.py`, `tank.py`, `aiplayer.py` | Ações simultâneas, comando por participante, câmera/HUD corretos e mesmo efeito das entradas. |
+| UX-05: eliminar tanques → placar → loja → nova rodada | `scoremenu.py`, `shopmenu.py`, simulação | Mesmos pontos, dinheiro, catálogo, preços, quantidades, compra simultânea, confirmação e tempos de transição. |
+| UX-06: última rodada → vencedor/empate → retorno | `winnermenu.py`, `game.py` | Mesmo vencedor e desempate, informações, comandos e destino de retorno. |
+| UX-07: interromper partida → opções/retorno/saída | `game.py` e estados de menu alcançáveis | Pausa, foco, confirmação, áudio e avanço da simulação seguem a modalidade Python correspondente. |
+| UX-08: procurar servidor → filtrar/ordenar → favorito/histórico → conectar | `serverbrowsermenu.py`, `groundfire/ui/menus.py`, `groundfire_net/browser.py` | Mesmas abas aplicáveis, filtros, dados, endereço manual, seleção, mensagens e retorno com contexto preservado. |
+| UX-09: lobby → pronto → jogo → loja → resultado → revanche | `groundfire/app/`, `gameplay/match_controller.py`, `render/`, `ui/` | Identidade atribuída pelo servidor; mesmas ações por fase e apresentação equivalente do estado autoritativo. |
+| UX-10: servidor cheio/senha incorreta/timeout → cancelar/repetir; queda → retomada | navegador, sessão e protocolos Python | Mensagem acionável equivalente, UI responsiva, cancelamento definitivo e retomada sem duplicar comandos/sons. |
+| UX-11: espectador e chat | fluxo conectado Python | Espectador recebe informações permitidas, sem controlar tanque; chat/foco não dispara comandos de combate. |
+| UX-12: fechar → reabrir → mover pasta inteira | configuração, armazenamento e launchers standalone | Preferências/favoritos/histórico mantidos conforme contrato de cada edição; pacote Godot funciona sem acessar a pasta Python. |
+
+**Contrato visual:** comparar mesmo roster, valores, seed/estado inicial, fase, tick e tamanho de viewport. Congelar animação e dados variáveis na captura. Cor, fonte, atlas, escala, posição, alinhamento, camadas, transparência e área clicável fazem parte do contrato. O alvo primário é 1024×768; verificar também 640×480, 800×600, 1280×960, 1280×1024, 1600×1200 e 1920×1080. Resoluções adicionais de teste não devem aparecer como nova opção no menu se o Python não as oferece. Em proporções sem referência equivalente, registrar a adaptação de viewport, preservando geometria do mundo e conteúdo legível.
+
+**Contrato de resposta:** medir entrada → tick de aplicação → primeiro quadro visível, repetição de seleção, cooldown, transições, tremor e câmera. Não basta chegar ao mesmo resultado após um atraso diferente. A política de pausa e perda de foco será observada na referência, sem presumir que partida conectada possa pausar o servidor.
+
+### 4. Organização técnica da solução
+
+Manter o núcleo e os componentes existentes. Separar responsabilidades apenas onde uma diferença comprovada exigir isso; não condicionar fidelidade a uma grande refatoração.
+
+| Superfície | Arquivos principais | Direção da implementação |
+|---|---|---|
+| Telas clássicas | `main.gd`, `classic_button.gd`, `classic_selector.gd`, `classic_label.gd`, `classic_font.gd`, `groundfire_theme.gd` | Centralizar medidas e estilo da referência; máquina de estados explícita para navegação; aplicar preferências no mesmo momento que Python. |
+| Entrada e configuração | `player_input_router.gd`, `control_settings.gd`, `classic_config.gd`, `data/classic/` | Perfil por participante, prioridade entre comandos, dispositivo, deadzone/repetição e defaults derivados da referência. |
+| Simulação local | `local_match.gd`, `classic_fixed_step.gd`, `terrain_model.gd`, entidades existentes | Atualização fixa e observável; estado de replay independente da resolução/renderização; RNG compatível ou sequência de amostras explícita. |
+| Apresentação | `local_match_hud.gd`, `local_match_shop.gd`, `online_match.gd` | Componentes compartilháveis recebem estado da modalidade correta; não recalculam regras do servidor. |
+| Rede | `network_adapter.gd`, `lan_discovery.gd`, `server_directory.gd`, `browser_store.gd` | Preservar protocolos e servidor autoritativo; identificar jogador, geração de pedido e evento para cancelar/deduplicar corretamente. |
+| Provas de equivalência | exportador/comparador em `scripts/`, `tests/fixtures/`, testes Godot | Executar os dois runtimes reais; produzir estados normalizados, eventos, imagens e relatório da primeira divergência. |
+| Entrega | launchers, `runtime/`, manifests e scripts de cada edição | Testar o artefato que será distribuído em pasta isolada; não depender de caminhos do computador de desenvolvimento. |
+
+Arquivos implementados: `tests/fixtures/experience_parity/scenarios.json` inventaria UX-01–12 e as lacunas de aceite; `projectiles.json` descreve os disparos e cadências; `versao-godot/godot/tests/classic_replay_export.gd` executa o atualizador Godot de produção; `scripts/compare_projectile_runtimes.py` executa as entidades Python e compara ambos. `states.json`, `classic_state_export.gd` e `compare_state_runtimes.py` cobrem terreno, tanques, recarga, IA, economia, fases e combates integrados. `scripts/validate_experience_parity.py` produz logs, cobertura por jornada e relatório JSON/HTML. Os exportadores usam classes de produção; os ensaios isolados e os combates integrados são identificados separadamente. Há ciclos das cinco armas e uma partida completa de duas rodadas; isso não certifica todas as combinações de armas e participantes.
+
+### 5. Plano de execução e entregas
+
+A tabela abaixo preserva o escopo exigido. O estado de execução de cada lote está na seção 10. “Implementado” em um registro F/P anterior não equivale a “aceito” no lote EQ. Cada lote deve fechar cenários contra a referência congelada e atualizar este documento.
+
+| Lote / prioridade | Trabalho e entrega concreta | Dependências | Aceite para encerrar |
+|---|---|---|---|
+| EQ-00 / P0 — congelar a referência | Inventariar UX-01–12; registrar commit, versões, hashes de assets/config, defaults, telas e perfis; capturar execução Python; abrir lista de diferenças e manifesto de cenários. | Nenhuma. | Cada ação alcançável tem referência, cenário, modalidade e evidência; lacunas explicitamente listadas. |
+| EQ-01 / P1 — entrada, menus e opções | Restaurar menu de quatro ações, geometria, confirmação, Options e telas de controles; isolar extras optativos; preservar navegação/estado de retorno e semântica de aplicar/salvar. | EQ-00. | UX-01–03 passam em estados normais, cancelamento, teclado/mouse e reinício, com pares visuais. |
+| EQ-02 / P0 — controles e ritmo | Auditar dois perfis de teclado, joysticks por slot, prioridade de teclas opostas, rebinding, repetição, perda de foco e desconexão; confirmar passo fixo e política de frames lentos. | EQ-00. | Dois humanos independentes em combate/loja; comparação de entrada por tick passa em 30/60/144 FPS; dispositivos físicos ensaiados. |
+| EQ-03 / P0 — prova diferencial completa | Exportar estado real Python/Godot; ampliar colisão, terreno, tanques, eventos, RNG, compra/fases; adaptar comparador por tipo/campo; gerar relatório de primeira divergência. | EQ-00. | Teste negativo detecta tick, evento e estado adulterados; mesmo cenário é executado nas duas engines; cobertura faltante falha no aceite completo. |
+| EQ-04 / P0 — mundo, tanques e IA | Corrigir apenas divergências de terreno/camada/queda, movimento, combustível, escudo, dano, morte, escolha de alvo e memória de IA; preservar ordem de atualização. | EQ-02 e EQ-03. | Mesmos estados e decisões nos cenários de borda, terreno suspenso, redimensionamento, eliminação simultânea e bots. |
+| EQ-05 / P0 — cinco armas e efeitos | Auditar Shell, Missile, MIRV, Nuke e Machine Gun: lançamento, controle, divisão, munição, dano, colisão, explosão, cooldown e entidades derivadas. | EQ-03 e EQ-04. | Todas as armas passam em trajetória livre, terreno, tanque, dano em área, limite do mundo, tiro simultâneo e última munição. |
+| EQ-06 / P0 — ciclo e economia | Fechar placar, bônus, autoderrota, empate, loja simultânea, compra insuficiente, item indisponível, conclusão individual, próxima rodada e vencedor. | EQ-04 e EQ-05. | Partida completa produz os mesmos saldos, inventários, fases e resultado; UX-05–07 passam. |
+| EQ-07 / P1 — visual completo | Parear setup, controles, arena, HUD, placar, loja, vencedor, pausa, opções, modais e navegador; corrigir fontes, cores, escala, efeitos, câmera e áreas clicáveis. | EQ-01 e EQ-06; telas de rede fechadas após EQ-09. | Todas as telas/estados aplicáveis têm pares revisados nas resoluções previstas; sem informação faltante ou recorte. |
+| EQ-08 / P1 — áudio | Inventariar assets e disparos/loops; medir início, volume, duração, sobreposição, interrupção e saída; revisar conversões existentes. | EQ-05 e EQ-06. | Traços de eventos e escuta A/B passam em disparos concorrentes, morte, pausa e retorno; sem sons duplicados ou loops órfãos. |
+| EQ-09 / P0 — jornada conectada equivalente | Fechar navegador, filtros, favorito/histórico, lobby, identidade, HUD/fases, loja, resultado, revanche, chat, espectador e recuperação de falhas contra Python conectado. | EQ-00, EQ-02, EQ-03 e EQ-06. | UX-08–11 passam com Python/Godot mistos, slots 2/8, UDP real, servidor separado e transporte WS quando aplicável. |
+| EQ-10 / P1 — persistência e pacotes | Validar configurações existentes, armazenamento, inicialização offline, cópia isolada, Windows/Linux e subconjunto web; tratar dados inválidos sem perder preferências válidas. | EQ-01–09 aceitos para a plataforma. | UX-12 e smoke de partida completa passam no pacote exportado; web tem matriz de exceções própria; ausência de ambiente fica como não certificado. |
+| EQ-11 / P1 — homologação e encerramento | Executar jornadas contínuas, revisão comparativa de UX e matriz final; anexar manifesto/relatórios; documentar defeitos resolvidos, adaptações e plataformas aceitas. | EQ-00–10. | Critérios da seção 9 cumpridos; nenhum lote fechado só por inspeção de código ou quantidade de testes. |
+
+**Sequência de entrega:** EQ-00 → EQ-01/02/03 → EQ-04/05/06 → EQ-07/08/09 → EQ-10 → EQ-11. As barras indicam frentes compatíveis, não obrigação de execução simultânea. Cada dependência da tabela prevalece; acabamento de rede em EQ-07 depende de EQ-09. A implementação pode avançar por fatias de jornada, preservando as dependências e um jogo utilizável a cada entrega.
+
+**Correspondência histórica:** EQ-02–06 fecham F01–F06/F12/F13 e P00/P01; EQ-01/07/08 fecham F14–F16 e P02; EQ-09 fecha F07–F11 e os recursos O já presentes na referência; EQ-10/11 reutilizam o aceite de distribuição P08/ST aplicável. P03–P07 de funcionalidades gerenciadas novas não se tornam dependência artificial da fidelidade clássica.
+
+**Responsabilidades:** implementação Godot responde pelas correções; testes/fidelidade responde por cenários e relatório independente da implementação; revisão de UX responde pelas capturas, escuta e jornadas; empacotamento responde pelos artefatos e execução isolada. São papéis, não uma equipe já alocada, e podem ser exercidos sequencialmente pela mesma pessoa. Registrar o responsável real ao iniciar cada lote. A revisão final apresenta evidências ao mantenedor; não exige interrupções para aprovar cada correção rotineira.
+
+**Planejamento de prazo:** não há data de entrega prometida nem equipe alocada. Ao concluir EQ-00, estimar esforço por lote a partir do número de divergências reproduzíveis, disponibilidade dos dispositivos e ambientes. Atualizar previsão ao fechar EQ-03 e EQ-09, que concentram a incerteza de comparação e rede. Priorizar P0, depois jornadas P1 e acabamento P2; não cortar cenários para cumprir uma previsão.
+
+### 6. Protocolo de comparação e critérios mensuráveis
+
+Cada cenário terá `id`, modalidade, referência Python, versão do esquema, seed/estado de RNG, configuração, participantes/dispositivos, estado inicial, comandos indexados por tick, duração, resultados esperados, resoluções/FPS e plataformas aplicáveis. Registrar separadamente metadata de execução: commit, engine, Python, SO, renderer, display/DPI, dispositivo de áudio e hashes. Metadata diferente entre engines não é estado de gameplay a comparar.
+
+Exportar por tick: fase/rodada, relógio de simulação, jogadores, posição/velocidade/ângulo, HP/escudo/combustível, arma/munição/cooldown, projéteis e filhos, terreno/camadas, memória da IA, saldo/placar, estado de loja e eventos com ordem e identidade. Evitar comparar IDs internos de memória: criar correspondência determinística por entidade, preservando ordem quando ela afeta o jogo.
+
+| Dimensão | Critério de aceite |
+|---|---|
+| Valores discretos | Igualdade exata de fase, tick de evento, identidade, munição, saldo, vencedor, comandos, contagens e ordem relevante. |
+| Valores físicos contínuos | Tolerância absoluta inicial de `1e-5` nas unidades normalizadas Python; documentar campos e conversão. Diferença que altera colisão, dano, decisão ou tick de evento reprova mesmo dentro da tolerância numérica. |
+| RNG e mundo inicial | Mesmas amostras/estado e geometria; a mesma seed em geradores diferentes não é prova suficiente. |
+| Tempo de entrada/simulação | Mesmo tick de aplicação para replay; em dispositivo real, diferença observada de resposta no p95 de no máximo um quadro a 60 Hz no mesmo equipamento, com pelo menos 100 ações por perfil e logs de medição. Não mascarar atraso por média. |
+| Imagens | Layout e áreas interativas iguais no viewport de referência; alvo de desvio geométrico máximo de 1 pixel por arredondamento, sem deslocamento cumulativo. Textos, valores e cores intencionais devem corresponder. |
+| Diferença de rasterização | Produzir diff e métricas por região. Máscaras só para conteúdo realmente variável e identificado. Revisão humana deve confirmar que diferenças residuais são de rasterização, sem aceitar fonte/escala/layout errado por média global baixa. |
+| Áudio | Mesmo evento/tick na simulação, loop/interrupção e duração; para áudio reamostrado, diferença de duração de no máximo um tick. Medir onset e loudness em condições iguais, investigar variação superior a um quadro/1 dB e exigir escuta A/B para aceite. |
+| Rede | Mesmo estado autoritativo e ações disponíveis; apresentar snapshot equivalente no mesmo instante lógico, sem comparar cegamente frames de chegadas diferentes. Cancelamento e reconexão não duplicam ação/efeito. |
+| Responsividade | Em hardware/renderer registrados, sessão de 30 min com perfil de 8 participantes, sem travar menus/rede; p95 de frame dentro de 16,7 ms para alvo de 60 FPS. Se a máquina não sustentar a referência, registrar ambiente inadequado ao alvo, sem declarar aprovação. |
+
+Esses limites são metas de aceite deste projeto, não medições já obtidas. Ajuste de tolerância exige justificativa por campo/plataforma e evidência de que a experiência permanece equivalente; não ampliar limite global para fazer um teste passar. O comparador atual precisa distinguir números discretos de contínuos antes do aceite EQ-03.
+
+### 7. Matriz mínima de ensaios
+
+| Eixo | Casos obrigatórios |
+|---|---|
+| Participantes | Um humano com bot, dois humanos, humanos+IA e oito participantes; somente bots onde a referência permitir; slots extremos e reuso de slot. |
+| Dispositivos | Dois perfis de teclado simultâneos, mouse, dois controles físicos simultâneos; rebinding, desconectar/reconectar, perder foco, chat aberto e comando oposto. |
+| Armas | As cinco armas, extremos válidos de ângulo/potência, disparos concorrentes, última munição, troca durante recarga, teleguiado enquanto outro atira. |
+| Terreno e dano | Bordas, camadas suspensas, crateras sobrepostas, queda/apoio, dano zero, morte exata, autoderrota e eliminação simultânea. |
+| Economia/fases | Saldo insuficiente, pacote de munição, compra simultânea, Done individual, empate, bônus, última rodada, saída e retorno. |
+| Render/tempo | 30/60/144 FPS, frame lento e redimensionamento; todas as resoluções da seção 3, janela/tela cheia e DPI 100%/150% no Windows. |
+| Rede real | Python+Python, Godot+Godot e Python+Godot; um espectador; servidor em processo separado e outra máquina LAN; cheio, senha incorreta, incompatibilidade, cancelamento e retomada. |
+| Rede degradada | Perfis controlados de RTT 50/150/300 ms, perda 1%/5%, jitter 30 ms e interrupção de 5 s; registrar a injeção utilizada e recuperação observada, sem tratar simulação em memória como socket real. |
+| Persistência | Primeiro uso, preferências anteriores, reinício, mover pasta com espaço/acento, arquivo inválido e diretório sem escrita; nenhuma dependência da outra edição. |
+| Plataformas | Windows e Linux desktop em pacotes exportados; web em navegadores/versões registrados, com subconjunto explícito. macOS fica não certificado até ter ambiente e build ensaiados. |
+
+Não é necessário produto cartesiano de todos os eixos: usar cobertura por pares para ambiente/dispositivo/resolução, mas executar todas as armas e bordas críticas contra ambas as engines e todas as jornadas em cada plataforma declarada aceita. Um teste headless não substitui dispositivo físico, áudio, GPU ou pacote final.
+
+### 8. Ferramentas, automação e evidências
+
+Reaproveitar `scripts/validate_godot_fidelity.sh`, `scripts/validate_godot_visuals.sh`, `scripts/capture_pygame_references.py`, `scripts/validate_godot_udp_integration.py`, os testes Python e `versao-godot/godot/tests/`. O capturador existente não cobre sozinho todo o inventário UX; EQ-00/EQ-07 devem ampliá-lo com estados reproduzíveis. Fixtures e goldens existentes não serão sobrescritos automaticamente para acomodar uma mudança Godot.
+
+Comandos existentes de verificação, a partir da raiz e com dependências instaladas:
+
+```powershell
+python scripts/validate_godot_migration_contract.py
+python scripts/export_classic_reference_fixture.py --check
+python scripts/export_classic_replay.py --check
+python -m pytest -q tests/test_classic_replay_comparator.py tests/test_port_fidelity.py tests/test_landscape_fidelity.py
+python scripts/validate_godot_udp_integration.py --godot-bin "C:\caminho\para\Godot.exe"
+git diff --check
+```
+
+O caminho Godot acima é um parâmetro a substituir, não uma instalação presumida. Os gates `.sh` exigem Bash; a orquestração Python proposta deverá permitir rodar a matriz desktop sem acrescentar essa dependência ao jogador. Usar versões compatíveis com os manifests atuais: `versao-python/pyproject.toml` inspecionado declara `>=3.10,<3.15`, diferente de trechos históricos deste documento. Registrar versão exata da engine e templates correspondentes no build, sem inferir suporte pela disponibilidade de um executável.
+
+Artefatos por execução em `.tmp/experience-parity/<run_id>/` (ou `--output`): `manifest.json`, `journey-coverage.json`, `report.json`/`report.html`, replays Python/Godot, primeira divergência, capturas, logs e identificação dos pacotes. O gate atual gera esses artefatos; eventos/escuta de áudio e demais evidências manuais continuam pendentes. Versionar apenas cenários e referências pequenas revisadas; anexar artefatos grandes ao resultado da execução. Relatórios não devem conter senhas/tokens de teste.
+
+**CI por alteração relevante:** validar contrato, fixtures, testes unitários focados, contratos headless e comparação diferencial curta. **CI periódica e candidata a release:** matriz mais ampla, rede real, capturas e exports nos ambientes disponíveis. **Aceite manual registrado:** controles físicos, escuta, revisão visual e pacote em máquina limpa. Falta de cenário obrigatório deve retornar estado incompleto no relatório; um skip não pode produzir selo de equivalência.
+
+Para cada lote, preencher: `Reference material:`, `User-visible contract:`, `Allowed adaptation:` e `Required validation:`; registrar commit, responsável, cenários aprovados/reprovados, primeira divergência, correção e links das evidências. Esses campos continuam obrigatórios pelo Migration Compatibility Contract.
+
+### 9. Riscos, adaptações e definição de pronto
+
+| Risco | Tratamento e prova exigida |
+|---|---|
+| Referência Python muda durante a execução | Congelar commit/config/fixtures; atualização consciente da base exige reexecutar cenários afetados e registrar o motivo. |
+| Testes repetem a lógica Godot e concordam com o mesmo erro | Executar classes reais de cada runtime e comparar resultados; usar cenários negativos para provar capacidade de detectar diferenças. |
+| Aparência semelhante esconde física diferente | Aceite separado de replay e visual; os dois são obrigatórios. |
+| Arredondamento ou RNG diverge em casos limites | Unidades normalizadas, ordem/eventos e primeiras divergências por tick; corrigir causa antes de mudar tolerância. |
+| Extras alteram defaults/foco ou reativam comportamento diferente | Testar perfil limpo e perfil existente; entrada optativa isolada do caminho clássico e sem alterar configurações dele. |
+| Dispositivo, Linux ou GPU indisponível | Registrar cenário e ambiente pendentes; concluir outros lotes, mas não certificar essa cobertura. |
+| Export funciona apenas na máquina de desenvolvimento | Executar pacote em pasta isolada/máquina limpa, sem raiz/Python irmão; conferir manifests e localização dos dados. |
+| Escopo cresce para social/serviço público | Manter expansão O/P separada; servidor de teste controlado basta para validar comportamento conectado, sem alegar homologação pública. |
+
+Adaptações permitidas são somente limitações explícitas de plataforma e diferenças internas invisíveis. Para web: sem UDP/LAN ou criação de processos, áudio sujeito à interação exigida pelo navegador, armazenamento conforme navegador e perda de foco tratada explicitamente. Cada exceção recebe recurso, motivo, alternativa, efeito perceptível e teste; não usar “web” como exceção genérica de gameplay ou visual.
+
+**O projeto estará concluído somente quando:**
+
+1. UX-01–12 e todos os cenários obrigatórios aplicáveis estiverem aceitos, com rastreabilidade EQ → cenário → referência → evidência.
+2. Não houver divergência P0/P1/P2 aberta no escopo declarado equivalente. Uma limitação ainda aberta impede a declaração global; aceitações parciais devem nomear precisamente modalidade/plataforma coberta.
+3. Replays completos comprovarem regras, armas, terreno, IA, economia, ciclo e controles; screenshots isoladas e quantidade de testes não substituírem essa prova.
+4. Capturas pareadas, escuta A/B e controles físicos estiverem revisados; diferença residual permitida tiver causa e limite documentados.
+5. Partidas locais e mistas conectadas completas passarem no pacote exportado, com persistência, cancelamento, retomada e saída verificados.
+6. O Python continuar preservado como referência e ambas as pastas permanecerem independentes e executáveis.
+7. Relatório final listar versões, cenários, plataforma, adaptações e evidências, distinguindo claramente equivalência desktop, subconjunto web e infraestrutura pública não ensaiada.
+
+**Entrega revisável ao final:** código Godot corrigido, cenários/fixtures e comparador completos, cobertura automatizada, referências visuais/sonoras revisadas, pacotes testados e atualização deste documento. Não publicar, criar tag ou anunciar fidelidade total apenas porque um gate antigo passou.
+
+### 10. Primeiro lote executável e estado desta entrega
+
+Implementação e verificação realizadas por Codex no Windows, Python 3.14.7 / pygame-ce 2.5.8 e Godot 4.6.2. O caminho padrão apresenta as quatro ações Python; `Find Servers` abre diretamente o navegador. Ferramentas anteriores continuam acessíveis ao iniciar Godot com `-- --development-tools`, sem acrescentar uma ação ao menu clássico. Options mantém alterações de vídeo em rascunho até Apply; Back descarta o rascunho. A configuração começa sem participantes, permite entrada pelo disparo e mantém controladores distintos. Os oito layouts de joystick, a seleção por dispositivo, a edição dos dois teclados e o roteamento de mísseis usam o perfil do participante.
+
+| Lote | Estado desta execução | Evidência e limite |
+|---|---|---|
+| EQ-00 | em execução | Baseline com hashes e inventário UX-01–12 versionados; ainda faltam estados completos de combate/rede e dispositivos. |
+| EQ-01 | em validação | Menu, saída, setup, Options, Controllers e edição de layout implementados; teste funcional e 42 pares de imagens em sete resoluções. Revisão visual completa e todos os estados de foco/erro ainda pendentes. |
+| EQ-02 | em execução | Teclados separados, layouts/atribuições persistentes, importação de bindings antigos, eixos vinculados e slots estáveis após desconexão simulada. Passo fixo comparado em 30/60/144 FPS e frames lentos; não é medição de latência nem ensaio físico. |
+| EQ-03 | em execução | Dois runtimes reais, comparação por campo, tipos discretos exatos e testes negativos. 99 cenários de estado: os 82 anteriores, dez combinações entre armas, quatro confrontos adicionais humano/bot e três ensaios de propulsores/terremoto. Mantidos os cinco ciclos por arma e a partida de duas rodadas até o vencedor. |
+| EQ-04 | em execução | Escala única, enquadramento fixo, terreno/RNG/posições iniciais pareados; movimento e apoio comparados por tick; crateras, camadas suspensas e terremotos comparados nas 500 fatias. IA usa comandos graduais, memória de impactos e decisão de alvo da referência; combate com 2/4/8 bots comparado. As cinco armas têm combate integrado; combinações adicionais entre armas e participantes ainda pendentes. |
+| EQ-05 | em execução | 33 cenários isolados das cinco armas e nove de recarga/munição/seleção, combate integrado, quatro disparos simultâneos e as dez combinações de duas armas diferentes. Quatro casos adicionais confrontam humano com arma especial e bot com Shell. Isso ainda não cobre todas as sementes, ordens de disparo, loadouts e bordas. |
+| EQ-06 | em validação parcial | Cinco ciclos reais arma → eliminação → placar → compra → rodada seguinte e uma partida de duas rodadas até WinnerMenu. Comparam posição, dano, munição, arma, recarga, dinheiro, pontuação, seleção e Done por tick. Saldo inicial explícito garante compra efetiva; mortes não são injetadas nesses seis casos. |
+| EQ-07 | em execução | Dezoito estados capturáveis nas sete resoluções, incluindo navegador, filtros, endereço e conexão com/sem senha. `classic_server_browser.gd` usa a composição e os controles da referência sobre o backend existente. Os 28 novos pares de diálogos receberam revisão de composição; rasterização, efeitos e revisão integral dos demais estados permanecem pendentes. |
+| EQ-08 | em validação parcial | Eventos de disparo/impacto e quantidade de fontes dos quatro loops comparados por tick. Mísseis, metralhadoras e propulsores possuem reprodução independente por fonte; teste de reprodução confirma concorrência, soltura sem reiniciar o outro som, pausa e limpeza. Limites dos quatro loops WAV corrigidos. Dez assets medidos; escuta A/B e mistura/loudness no dispositivo ainda pendentes. |
+| EQ-09 | em validação parcial | Navegador direto, persistência, protocolo, recuperação e UDP misto em processos separados passam. A escolha Human/AI/Spectator chega aos transportes; entrada como IA confirmada no snapshot do servidor Python real. Ainda faltam a verificação prévia de disponibilidade no fluxo clássico, outra máquina LAN e a matriz de rede degradada. |
+| EQ-10 | em validação parcial | Export Windows com INIs incluídos, cópia somente do EXE para pasta temporária com espaço/acento, percurso headless e reload aprovados; não certifica máquina limpa, Linux, navegador nem partida interativa completa. |
+| EQ-11 | em execução | Gate integrado ao CI, relatório e inventário de lacunas; aceite final e sessão de 30 minutos pendentes. |
+
+**Diferenças corrigidas e como reproduzir:**
+
+| ID / severidade | Cenário / referência | Correção Godot / evidência |
+|---|---|---|
+| EQ-D01 / P1 | UX-01/08; `mainmenu.py` | Quatro ações; navegador direto; extras optativos. `experience_menu_check.gd`. |
+| EQ-D02 / P1 | UX-03; `optionmenu.py` | Apply/Back e retorno dos controles preservam o rascunho; gravação verificada. |
+| EQ-D03 / P1 | UX-02; `playermenu.py` | Setup vazio, entrada por Fire, perfis únicos, nomes/cores e rounds clássicos. |
+| EQ-D04 / P0 | UX-04; `humanplayer.py`, `missile.py` | Míssil consulta o controlador do dono, inclusive Keyboard2; input de joystick não deve acionar o participante de teclado. |
+| EQ-D05 / P0 | `missile.py`, `mirv.py`, `shell.py` | Velocidade de míssil usa a conversão da gravidade; combustível preservado ao sair do mundo/atingir solo; MIRV divide no ápice real, sem atraso mínimo artificial; posição balística usa estado de lançamento e míssil conserva coordenadas escalares entre ticks. Replay das entidades reais. |
+| EQ-D06 / P1 | UX-01–03; `font.py`, `selector.py`, `menu.py` | Geometria clássica, tamanho de glyph derivado da largura, sombras, áreas de clique, setas e tiles em pixels nativos após resize. Capturas pareadas. |
+| EQ-D07 / P0, parcialmente corrigido | EQ-03/04/06; mundo e partida completa | `classic_world.gd` centraliza 104 px/unidade para tanques, projéteis, explosões, gravidade e terreno; câmera clássica fixa. Cinco mundos com seed/roster, seis percursos de movimento e cinco sequências de terreno passam. Os 20 combates incluem humanos, bots, cinco ciclos por arma com compra e uma partida de duas rodadas até o vencedor. Permanecem combinações adicionais e a homologação das jornadas fora desses cenários. |
+| EQ-D08 / P0 | UX-04/05; `tank.py`, `gamesession.py`, `gamesimulation.py` | Combustível/reserva começam em zero. Última eliminação inicia cinco segundos de simulação antes do score; morte tardia pode gerar empate. Contagem inicial respeita `< 0`. `states.json` e percurso do pacote. |
+| EQ-D09 / P1 | UX-05/06; `scoremenu.py`, `winnermenu.py`, `shopmenu.py` | Fire de qualquer participante e Fire mantido durante a espera avançam placar/resultado. Autoavanço mantém liderança anterior. Done de todos só muda a fase no próximo tick; menus não continuam simulando o mundo. 29 cenários diferenciais. |
+| EQ-D10 / P0 | UX-12; `classic_config.gd`, export presets | Confirmada ausência dos INIs no EXE anterior; incluídos em todos os presets. Verificador do release percorre menu → setup → combate → pausa → score → loja → próxima rodada → opções e verifica persistência após reinício. |
+| EQ-D11 / P0 | UX-04; `tank.py`, `landscape.py` | Corrigidos sinal da inclinação, encaixe prematuro no solo, salto com movimento e combustível vazio, queda/bordas e deslizamento de tanque morto. Integração escalar em double e soma compensada do terreno preservam as decisões do Python 3.12+; desenho continua usando Vector2. Seis cenários por tick. |
+| EQ-D12 / P0 | UX-04/05; `gamesession.py`, `landscape.py` | Explosão inclui o raio de impacto do tanque no dano radial; não reposiciona o tanque antecipadamente. Crateras preservam camadas finas; terremoto não limita artificialmente a base; espera negativa da queda é preservada. Três cenários de dano real e cinco de deformação/queda. |
+| EQ-D13 / P0 | UX-04; `weapons_impl.py`, `tank.py`, `gamesimulation.py` | Removido desconto duplicado da recarga inicial, recarga rearma após disparar, Fire mantido exige liberação como no Python, troca mantida repete com o mesmo atraso, metralhadora preserva recarga/munição e seleção ao esgotar. Projéteis novos começam a atualizar no tick seguinte. Nove cenários de arma e seis combates reais. |
+| EQ-D14 / P0 | UX-04/05; `aiplayer.py`, `tank.py`, `shopmenu.py` | `classic_ai.gd` reproduz escolha de alvo, mira gradual, espera por tiro, memória de impacto, alvo deslocado/morto e comandos por fase. Usa a mesma aplicação de comandos dos humanos, em ordem de participante. Bots passam pela loja com os atrasos de 0,4/0,2 s; não compram. IA anterior de mira instantânea/armas especiais permanece optativa em `--development-tools`. Dois ensaios de decisão, quatro combates com bots e duas lojas. |
+| EQ-D15 / P0 | UX-04; `common.py`, `shell.py`, `landscape.py` | Preservados o PI decimal da referência para mira/lançamento, timestamps de lançamento, coordenadas escalares de Shell/Nuke, interseção por fatia e dano radial em double. Cratera integrada é calculada nas unidades Python; alturas e folgas de pouso não passam por Vector2 float32. Corrigido desvio de dano e de apoio sobre camada suspensa descoberto no combate com quatro bots. Inclinação volta à tolerância normal `1e-5`. |
+| EQ-D16 / P0 | UX-04/05; `mirv.py`, `missile.py`, `machinegunround.py` | Fragmentos nascem com timestamp do ápice; míssil conserva posição/velocidade escalar; balas de metralhadora usam atraso de lançamento correto, deixam de nascer após morte e conservam recarga. Nuke simultâneo revelou corte de camada superior abaixo do piso `-7`; clamp passa a valer também nessa camada. Casos individuais, simultâneos e regressão isolada de terreno. |
+| EQ-D17 / P1 | UX-05/06; `scoremenu.py`, `shopmenu.py`, `winnermenu.py` | Telas completas com fundo clássico, tipografia do atlas, posições, estoque, seleção por jogador e resultado com até oito vencedores. Removidas rodas desenhadas apenas no Godot e corrigida altura do corpo do tanque. Capturas de estados idênticos, separadas da prova de combate. |
+| EQ-D18 / P1 | EQ-08; `sounds.py` | Segundo efeito não interrompe o primeiro; até 32 vozes por efeito pontual via `AudioStreamPlayer.max_polyphony`. Loop de metralhadora cessa no tick da morte, sem interromper outro atirador vivo. Corrigidos tamanho RIFF/padding de cinco WAVs Godot, preservando PCM; exportação sem os erros de leitura anteriores. Nove PCM idênticos; Nuke convertido com mesma duração e diferença RMS de aproximadamente 0,0094 dB. RMS de arquivo não equivale a loudness medido no dispositivo. |
+| EQ-D19 / P1 | UX-07; `gamesimulation.py`, `quitmenu.py` | Escape no combate clássico abre QuitMenu; No retorna a MainMenu, como no Python. Menu de pausa anterior continua optativo em `--development-tools`. Percurso verificado no teste de menu e no EXE isolado. |
+| EQ-D20 / P1 | EQ-08; `tank.py`, `missile.py`, `weapons_impl.py`, `quake.py` | Reprodução independente por fonte dos loops. Jogador sem salto não interrompe o propulsor de outro; morte/soltura/combustível esgotado encerram a fonte correspondente. `loop_end` abrange o WAV completo; sair interrompe inclusive metralhadora com gatilho mantido. Comparação agora preserva multiplicidade e inclui jet/quake. |
+| EQ-D21 / P0 | EQ-04/08; terremoto integrado | A conversão repetida entre pixels e unidades clássicas alterava uma decisão de apoio do tanque no tick 160. `drop_terrain` conserva alturas clássicas em double, aplicando a mesma subtração da referência e atualizando apenas a representação gráfica. O ensaio de 500 ticks passa sem ampliar tolerâncias. |
+| EQ-D22 / P1, parcialmente corrigido | UX-08; `serverbrowsermenu.py` | Navegador clássico usa coordenadas, atlas, colunas, cores, rodapé e 24 linhas da referência. Diálogos de filtros, endereço e conexão implementados com entrada de texto, Enter/Escape, senha mascarada, Human/AI/Spectator e espera por vaga. Roda percorre uma linha e PageUp/PageDown movem a seleção em 24 linhas. Estados de rede indisponível e aceite visual completo permanecem abertos. |
+| EQ-D23 / P1 | UX-08; `serverbrowsermenu.py` | Add a Server salva nos favoritos e permanece na lista, sem conectar automaticamente. Endereço vazio/porta inválida mantêm o diálogo com erro; hostname usa porta 27015. Add Favorite repetido não remove o favorito. Testes de menu e percurso do EXE. |
+| EQ-D24 / P1 | UX-08/09; JoinRequest | Escolha AI era perdida pelo cliente Godot. `is_computer` agora atravessa Online Match, UDP e WebSocket; Spectator exclui AI. Teste de protocolo e entrada real no servidor Python verificam o campo no snapshot; cancelamento limpa credenciais. |
+| EQ-D25 / P1 | UX-04; `trail.py`, `smoke.py` e desenho de efeitos | Rastro existia na simulação, mas UVs em pixels faziam a textura amostrar quase somente a borda transparente. UVs normalizadas corrigem rastro, fumaça, propulsor, explosão e cursor. `experience_effects_check.gd` usa renderização real e verifica pixels dos cinco efeitos, um disparo Shell no cenário e desaparecimento do rastro. O teste reproduziu a falha antes da correção (zero pixels de rastro) e passou depois (1587 pixels no disparo em 1024×768). Entra no gate com `--capture` ou `--capture-matrix`; testes headless anteriores não comprovavam visibilidade. |
+
+**Validação atual:** 36 verificações aprovadas em `.tmp/experience-parity/dialog-report`, incluindo 491 testes Python (34 ignorados e 11 subtestes), 13 contratos Godot, 99 cenários de estado, 33 projéteis e quatro cadências, dez assets de áudio, integração UDP incluindo IA, percurso do código-fonte e EXE Windows isolado no primeiro uso/reinício. O percurso do pacote tem 22 verificações, agora incluindo filtros, adição sem conexão, escolha de IA/senha e cancelamento. A suíte Python e os dois percursos foram repetidos após atualizar a asserção de protocolo e o ensaio do pacote; `report-before-rerun.json` preserva o resultado inicial. Os hashes Python da baseline permanecem intactos. As execuções anteriores permanecem em `expanded-report` (99 cenários/98 pares) e `final` (82 cenários/488 testes).
+
+**Correção posterior EQ-D25:** `.tmp/trail-fix/report.json` registra reprodução visual da falha e aprovação após a correção, contrato de fidelidade local, 491 testes Python (34 ignorados/11 subtestes) e novo EXE isolado aprovado no primeiro uso/reinício. `before/shot-with-trail.png` e `after/shot-with-trail.png` mostram o mesmo disparo; `after/effects.png` verifica os cinco efeitos texturizados. O EXE no caminho de entrega foi reconstruído; seu hash atualizado está em `trail-fix/package/report.json`. Os 99 cenários e os 126 pares do relatório anterior não foram repetidos nesta correção de desenho. A próxima execução com capturas inclui também `rendered-effects`.
+
+Capturas pareadas: Main Menu, Options, Controllers, Keyboard Layout, Quit, Setup, arena/HUD, início de rodada, placar, loja inicial, loja com seleções/estoque, vencedor único, empate entre oito, navegador com dois servidores e quatro estados de diálogo (filtros, adicionar, conectar sem senha, conectar com senha), nas sete resoluções do plano. Total gerado: 126 pares. A composição da lista e dos quatro diálogos foi inspecionada nas sete resoluções; campos e ações acompanham a referência, mas há diferenças de rasterização e pequenos deslocamentos de texto. A revisão anterior de arena, placar, loja e resultados em 1024×768 continua parcial, inclusive nas letras giratórias. Capturar um par não significa aprová-lo. O capturador fixa também a ordenação por latência, impedindo que preferências salvas por outros testes mudem o estado comparado. Assets de áudio têm relatório próprio `audio-assets.json`; eventos discretos e multiplicidade dos efeitos e loops são comparados por tick, sem afirmar igualdade da mistura acústica no dispositivo.
+
+Tolerância dos projéteis: `1e-5` por padrão; somente vetores `position` e `back_position` aceitam `1.5e-5` unidades Python. Vector2 float32 tem ULP de `0.0009765625` pixel na maior coordenada do ensaio isolado (próxima de 11544 px); dividido por 104 px/unidade, cabe nesse limite. A largura artificial de 100 unidades pertence somente ao cenário sem terreno do exportador Python; o jogo usa o limite real de 11 unidades para cada lado. Cinco novos casos exercitam esse limite real.
+
+O replay de estados usa tolerância `1e-5`, sem exceção para campos discretos. A tolerância anterior de `0.001` grau para inclinação após cratera foi removida: com cálculo escalar, a maior diferença observada nos seis combates foi `1.21e-12` grau. Vida, mira, decisões da IA e transições continuam sob os limites originais; um teste negativo verifica os campos. Os ensaios novos calculam o passo por `1.0 / 60.0` em ambos os runtimes, evitando arredondamento diferente ao ler essa fração em JSON.
+
+Executa `Tank`, `Player`, `AIPlayer`, `Landscape`, armas, `ShopMenu`, `ScoreMenu`, `WinnerMenu`, `GameSessionController` e `GameSimulationController` Python, e métodos de produção Godot. Os cenários isolados de fases injetam mortes para verificar contagem/recompensas; os 20 cenários `combat-*` usam disparos, colisão e dano reais. Incluem os seis ensaios anteriores, quatro armas adicionais, quatro disparos simultâneos e seis ciclos. Cada ciclo de arma exige compra real de 50 balas e entrada na segunda rodada; o sexto prossegue até o vencedor da partida de duas rodadas. Os testes negativos rejeitam truncamento, ausência de loja/compra e áudio ausente, duplicado ou atrasado. Os dois cenários `ai-*` injetam eventos para isolar a memória de decisão; os cenários `weapons-*` isolam a recarga do voo. Esta cobertura ainda não prova todas as combinações de armas, IA, dispositivos e plataformas.
+
+As 27 checagens adicionais de compilação e abertura de cenas de `validate_godot.sh` também passaram, assim como Ruff nos scripts/testes alterados e `git diff --check`. O Ruff global mantém o problema anterior `I001` em `versao-python/src/groundfire/assets/__init__.py:1`; esse arquivo faz parte da referência congelada e não foi alterado para limpar o lint.
+
+A verificação do EXE usa checagens explícitas, ativas mesmo com assertions desativadas no template release; a cópia temporária é mantida para inspeção. Uso direto: `Groundfire.exe --headless -- --verify-package C:/caminho/relatorio.json`. Os testes de movimento usam o comportamento numérico de Python 3.12+; a matriz anterior 3.10/3.11 não recebe aceite diferencial por essa execução.
+
+Reproduzir a execução e abrir o relatório:
+
+```powershell
+.venv/Scripts/python.exe scripts/validate_experience_parity.py --godot-bin tools/godot/Godot_v4.6.2-stable_win64_console.exe --output .tmp/experience-parity/dialog-report --capture-matrix --package .tmp/experience-parity/windows/Groundfire.exe
+# Aceite estrito: retorna 2 enquanto houver lacunas; falha de teste retorna 1.
+.venv/Scripts/python.exe scripts/validate_experience_parity.py --godot-bin tools/godot/Godot_v4.6.2-stable_win64_console.exe --require-complete
+```
+
+Artefatos locais atuais: `.tmp/experience-parity/dialog-report/report.html`, `report.json`, `manifest.json`, `journey-coverage.json`, `projectiles/comparison.json`, `states/comparison.json`, `audio-assets.json`, `package/report.json`, replays, logs e `captures/`. O EXE fica em `.tmp/experience-parity/windows/Groundfire.exe`; o relatório registra SHA-256 e caminho da cópia isolada. As 36 verificações passaram; o estado permanece **incomplete** pelas lacunas declaradas. O CI produz e anexa o mesmo relatório; a execução remota do workflow ainda não foi observada nesta sessão. Nenhuma plataforma nem lote EQ é declarado integralmente aceito apenas por essas contagens.
+
+<a id="continuidade-equivalencia-2026-09-30"></a>
+
+### 11. Projeto de continuidade — pendências para o próximo agente
+
+**Atualizado em 30/09/2026, execução iniciada após EQ-D25.** Este é o ponto de entrada operacional; complementa os contratos e critérios das seções 1–9. O usuário autorizou executar a continuidade. A seção 11.7 registra os resultados novos; a seção 11.2 preserva o estado recebido. Os lotes permanecem pendentes salvo as evidências explicitamente identificadas. Não estimar porcentagem a partir da quantidade de testes.
+
+#### 11.1. Objetivo e regras de trabalho
+
+Concluir a experiência Godot equivalente ao Python congelado, começando pelas pendências automatizáveis e depois registrando a homologação nos ambientes reais. Continuar o código existente; não reiniciar a migração.
+
+- Repositório nesta máquina: `C:\Users\ratel\Documents\GitHub\port-groundfire-for-python`. Os comandos abaixo partem dessa raiz. Engine: Godot 4.6.2; Python usado na última validação: 3.14.7, pygame-ce 2.5.8.
+- Preservar `versao-python/src/`, `conf/`, `data/` e `tests/fixtures/experience_parity/baseline.json`. Referência congelada: `0c4b5ee33f743c080fddfaf535e92142c2305413`. Corrigir Godot, não a referência para fazê-la concordar.
+- Há muitas alterações locais e arquivos novos ainda não versionados. Ler `git status --short` e os diffs relevantes antes de editar. Não limpar a árvore, restaurar arquivos em massa ou sobrescrever trabalho anterior. `.tmp/` contém evidências locais que podem não existir em outro checkout.
+- Preservar defaults clássicos e a entrada optativa `-- --development-tools`. Não introduzir botões, armas ou regras extras no fluxo clássico.
+- A referência do modo conectado é o cliente/servidor Python conectado; a do modo local é a simulação local. Não assumir que as duas modalidades têm regras idênticas.
+- Toda correção deve partir de uma reprodução e terminar com evidência verificável. Não ampliar tolerâncias globais, atualizar goldens automaticamente ou remover lacunas para obter verde.
+- Não publicar release, fazer deploy, criar tag nem alterar infraestrutura pública como parte desta continuidade. Testes locais e correções rotineiras podem avançar sem confirmação a cada arquivo.
+- Manter o plano neste documento, que é a fonte única da migração. Artefatos grandes ficam no diretório da execução; cenários pequenos e testes ficam na árvore de código.
+
+#### 11.2. Estado real recebido — o que não precisa ser refeito
+
+| Área | Já implementado/observado | Limite da evidência |
+|---|---|---|
+| Combate local | 99 cenários de estado; 33 de projéteis e quatro cadências; ciclos das cinco armas com compra e rodada seguinte; partida de duas rodadas até vencedor; combinações de armas e bots. | Não cobre todas as bordas/ordens/loadouts. Os 99 não foram repetidos após EQ-D25, que altera desenho. |
+| Menus e navegador | Quatro ações clássicas, opções/controles, lista e quatro estados de diálogo; Add Server sem conexão automática, favorito idempotente, escolha Human/AI/Spectator. | Disponibilidade antes do diálogo e matriz completa de erros/rede ainda pendentes. |
+| Rede automatizada | Servidor Python e clientes Godot em processos separados; UDP, espectador, recuperação e entrada como IA confirmada por snapshot. | Não é ensaio em outra máquina nem aceite de uma partida conectada completa pela interface. |
+| Áudio | Eventos, multiplicidade, assets e reprodução concorrente dos loops; propulsores, morte, pausa e encerramento corrigidos. | Escuta e medição da saída de áudio permanecem abertas. |
+| Visual | 126 pares gerados: 18 estados × sete resoluções. Lista do navegador e 28 pares dos quatro diálogos inspecionados quanto à composição. | Não há aceite integral dos 126 pares. Arena/placar/loja/vencedor tiveram revisão parcial; animações e efeitos precisam de estados dinâmicos. |
+| Rastro e efeitos — EQ-D25 | UVs normalizadas corrigem rastro, fumaça, propulsor, explosão e cursor. Teste com GPU falhou antes e passou depois; disparo Shell real passou de zero para 1587 pixels de rastro no ensaio. | Contagem demonstra visibilidade, não igualdade visual completa de todos os efeitos com Python. |
+| Windows | EXE com recursos incluídos; primeiro uso/reinício em cópia isolada, 22 verificações por percurso. Launcher `.bat` encontra a engine em `tools/godot` no checkout. | Headless isolado não certifica partida interativa, máquina limpa nem autonomia completa das duas edições. |
+
+Evidências para ler, nesta ordem:
+
+1. `.tmp/experience-parity/dialog-report/report.json` e `report.html`: 36 verificações aprovadas, 491 testes Python, 34 ignorados, 11 subtestes; estado **incomplete**. Inclui 99 cenários e 126 pares, anteriores a EQ-D25.
+2. `.tmp/trail-fix/report.json`, `before/shot-with-trail.png`, `after/shot-with-trail.png` e `after/effects.png`: validação direcionada da correção mais recente. Também passaram novamente 491 testes Python e o contrato local.
+3. `.tmp/trail-fix/package/report.json`: hash e prova isolada do EXE reconstruído após EQ-D25. SHA-256 observado: `12251ff53a2a7ec04f4a597f7a699974e54227988c5f2fd6f22dce7004fc92b4`. O hash do relatório `dialog-report` pertence ao executável anterior.
+4. `tests/fixtures/experience_parity/scenarios.json`, `states.json`, `projectiles.json`: inventário e entradas dos ensaios. Todos os UX ainda têm aceite pendente.
+
+Artefato entregue mais recente: `.tmp/experience-parity/windows/Groundfire.exe`. Se os relatórios locais estiverem ausentes, reproduzi-los; não presumir aprovação por esta descrição. No estado inspecionado, `versao-godot/runtime/windows/` contém apenas `.gitkeep`: não confundir o EXE de teste acima com uma pasta standalone já homologada.
+
+#### 11.3. Ordem de execução e tarefas fechadas por evidência
+
+Executar CT-00 primeiro. A primeira correção funcional seguinte é CT-01. CT-02/03/04 podem avançar sem outra máquina ou controles físicos. Preparar automações de CT-05/06/07 enquanto os ambientes reais não estiverem disponíveis. CT-08 consolida a evidência; não substitui os demais lotes.
+
+| ID / prioridade | Entrega concreta | Dependência | Critério de conclusão |
+|---|---|---|---|
+| CT-00 / P0 | Revalidar a árvore após o rastro e registrar nova linha de base operacional. | Nenhuma | Hashes Python intactos; export atual testado; gate completo com imagens e `rendered-effects` aprovado ou falhas reproduzíveis registradas. |
+| CT-01 / P1 | Fechar disponibilidade, erros e cancelamento do navegador. | CT-00 | Casos N01–N06 abaixo passam contra servidor real, com captura das mensagens e retorno. |
+| CT-02 / P1 | Concluir revisão visual e acrescentar efeitos em movimento. | CT-00; estados de rede após CT-01 | Inventário por imagem/região revisado, diferenças corrigidas ou justificadas pelos critérios da seção 6; teste gráfico ligado ao CI. |
+| CT-03 / P0 | Fechar bordas de combate e ciclo misto ainda não comprovadas. | CT-00 | Matriz explícita C01–C05 com pares reais de runtimes; primeira divergência e testes negativos disponíveis. |
+| CT-04 / P1 | Medir e ouvir a saída de áudio. | CT-00; correções de combate relevantes | Eventos por tick, gravações pareadas, onset/loudness e escuta com resultado registrado. |
+| CT-05 / P0 | Partida conectada completa e rede degradada. | CT-01 | Matriz de modalidades, fases e falhas passa; ensaio LAN em duas máquinas identificado separadamente. |
+| CT-06 / P1 | Controles físicos, foco e latência. | CT-00 | Dois dispositivos reais e dois teclados independentes, reconexão e 100 ações por perfil medidas. |
+| CT-07 / P1 | Pacotes Windows/Linux/Web e persistência. | Correções aplicáveis prontas | Executar o artefato final em cada alvo; registrar dependências e exceções, sem herdar aceite de build antigo. |
+| CT-08 / P1 | Relatório de aceite baseado em evidências e sessão de 30 minutos. | CT-01–07 para o escopo aceito | UX-01–12 rastreáveis; lacunas não desaparecem por edição manual de uma lista; nenhuma declaração global com pendência aberta. |
+
+**CT-00 — retomar sem perder trabalho.** Conferir status/diffs e hashes; executar os comandos de 11.5 com um diretório novo. O gate com a mesma seleção anterior terá uma verificação adicional, `rendered-effects` (37 em vez de 36, se a matriz não mudar). Isso é expectativa do código, não resultado já observado. Não é necessário repetir continuamente o gate inteiro durante cada ajuste: depois da linha de base, executar testes afetados e repetir o conjunto ao fechar uma entrega. Falha gráfica deve produzir evidência de erro, não ser ignorada porque a física passou.
+
+**CT-01 — próxima implementação funcional.** Referências: `versao-python/src/serverbrowsermenu.py::_verified_selected_entry`, `_connect_selected`, `groundfire_net/browser.py` e fluxo conectado Python. Alterar principalmente `classic_server_browser.gd`, `server_browser.gd`, `lan_discovery.gd`, `udp_client.gd` e, conforme o erro, `online_match.gd`/`websocket_client.gd`. Caminhos Godot são relativos a `versao-godot/godot/scripts/`.
+
+- N01: servidor selecionado desligado. Python faz uma consulta de até 0,08 s, atualiza a entrada e permanece na lista com mensagem quando não há resposta. Godot atualmente abre o diálogo sem essa consulta. Implementar verificação assíncrona equivalente para UDP, com prazo e identidade da solicitação; não bloquear a interface nem exigir UDP para endpoints WS.
+- N02: servidor disponível e senha correta/incorreta/vazia. Atualizar informação do servidor antes da entrada; testar mensagem e destino de retorno observados no Python. Não registrar senha em logs, screenshots ou manifesto.
+- N03: lotação, opção de esperar vaga, vaga liberada e cancelamento durante espera. Não deixar uma tentativa antiga conectar depois de Cancel/Back ou da escolha de outro servidor.
+- N04: timeout, endereço inválido, falha de resolução de nome e incompatibilidade de protocolo. Preservar abas/filtros/seleção e oferecer as ações que a referência permite.
+- N05: alternar rapidamente seleção, atualizar lista ou fechar a tela enquanto há consulta. Resposta atrasada não abre o servidor errado nem reabre uma tela fechada.
+- N06: favoritos/histórico após sucesso e falha, reentrada como Human/AI/Spectator e limpeza das credenciais. Conferir quando Python registra histórico; não presumir que tentar conectar significa conexão concluída.
+
+Ampliar `experience_menu_check.gd`, `online_reliability_check.gd` e o executor `scripts/validate_godot_udp_integration.py`; criar ensaio de erro com servidor real/porta fechada controlada quando o existente não cobrir. Testar UDP local e protocolo WS aplicável, separando teste de adapter da jornada de tela. Capturar erro/retorno e atualizar UX-08/10. Aceite: nenhuma transição tardia, nenhuma tentativa órfã, textos/ações/contexto equivalentes à referência em todos os casos aplicáveis.
+
+**CT-02 — visual e efeitos.** Arquivos: `scripts/capture_pygame_references.py`, `tests/experience_capture.gd`, `tests/experience_effects_check.gd`, `classic_font.gd`, controles clássicos, `local_match.gd`, `local_match_hud.gd`, `classic_round_menu.gd` e `online_match.gd`. Os caminhos de testes Godot são relativos a `versao-godot/godot/`.
+
+1. Criar um índice de revisão no diretório da execução (proposta: `visual-review.json`) com tela, estado, resolução, caminhos Python/Godot/diff, regiões examinadas, resultado, divergência EQ-Dxx, responsável e data. Ausência de revisão permanece pendente; não converter automaticamente 126 arquivos em 126 aprovações.
+2. Revisar os 18 estados atuais nas sete resoluções, começando por arena/HUD, placar, loja e vencedor. Comparar texto, atlas, cores, posições, recorte, foco/hover e área clicável. Separar variação de rasterização de erro de geometria; alvo de 1 pixel conforme seção 6.
+3. Acrescentar estados no mesmo tick para Shell em voo, míssil propulsado/sem combustível, MIRV antes/depois da divisão, Nuke, tracer da metralhadora, explosão, fumaça de tanque morto, propulsores e desaparecimento dos efeitos. Metralhadora não deve ganhar um rastro de Shell se a referência usa apenas tracer. Verificar tamanho, orientação, alpha, sobreposição com tanque/terreno e persistência após impacto.
+4. Acrescentar estados de erro/modal de CT-01 e frames fixos de animações do vencedor. Usar código real Python; não desenhar uma referência artificial a partir das medidas Godot.
+5. Corrigir o CI: `.github/workflows/ci.yml` chama hoje o gate sem `--capture`, portanto **não executa `rendered-effects`**. Adicionar etapa com renderer real disponível (por exemplo, ambiente Linux gráfico virtual com OpenGL), anexar imagens e logs e provar que uma regressão de UV invisível falha. Não colocar esse teste no grupo `--headless` com renderer dummy.
+
+O teste EQ-D25 já prova regressão antes/depois e visibilidade. Não enfraquecê-lo para acomodar imagem vazia. A revisão completa deve também medir geometria e comparar a aparência Python, que a contagem de pixels isolada não certifica.
+
+**CT-03 — combate e bordas.** Usar `tests/fixtures/experience_parity/states.json`, `scripts/compare_state_runtimes.py`, `scripts/compare_projectile_runtimes.py`, `tests/test_classic_replay_comparator.py` e os exportadores Godot `classic_state_export.gd`/`classic_replay_export.gd`. Antes de criar casos, mapear quais dos 99 já cobrem cada requisito; reaproveitar os equivalentes.
+
+| Família | Lacuna a fechar ou demonstrar já coberta | Evidência exigida |
+|---|---|---|
+| C01 | Extremos válidos de potência/ângulo; bordas dos dois lados; tiro em apoio/camada suspensa; últimas munições. | Cada arma aplicável com trajetória, colisão, inventário e tick comparados. |
+| C02 | Inverter ordem/atraso dos disparos das combinações existentes; míssil guiado enquanto outro jogador atira; troca durante recarga. | Entradas por participante/tick; não apenas mesmo resultado final. |
+| C03 | MIRV/Nuke/terremoto com crateras sobrepostas, morte durante disparo contínuo e apoio alterado durante voo. | Filhos, dano, terreno, combustível, áudio e fase sem ampliar tolerância. |
+| C04 | Humanos+IA com slots extremos, oito participantes e diferentes sementes, atravessando loja e rodada seguinte. | Decisões e inventário por participante; bots usando a semântica Python. |
+| C05 | Compra insuficiente, esgotamento, Done individual/simultâneo, empate final e tiro tardio. | Ciclo completo quando a lacuna envolve integração; mortes injetadas só em ensaio isolado identificado. |
+
+Manter igualdade exata de campos discretos, `1e-5` para estados e a exceção documentada dos vetores de projéteis. Testes negativos devem rejeitar perda de evento, tick alterado e término prematuro do ciclo. Não buscar infinitas combinações: fechar a matriz obrigatória da seção 7 e justificar cobertura por pares onde permitida.
+
+**CT-04 — áudio real.** Referências: `versao-python/src/sound.py`, `sounds.py`, entidades e configurações, conforme o caminho efetivamente usado. Instrumentação existente: `scripts/compare_audio_assets.py`, eventos do comparador de estados e `tests/experience_audio_check.gd`; reprodução Godot em `local_match.gd`.
+
+Preparar sessões determinísticas e gravações de saída das duas edições no mesmo dispositivo, taxa e volume. Cobrir cinco armas, impacto, dois mísseis/MGs simultâneos, dois propulsores, combustível esgotado, morte, terremoto, pausa e saída. Medir onset, duração, sobreposição e nível; investigar diferença superior a um quadro/1 dB nos termos da seção 6. Registrar dispositivo, método de captura, níveis e escuta A/B humana. PCM idêntico não prova mistura igual; teste de eventos não prova áudio audível. Sem dispositivo/escuta, concluir preparação/automação e manter o aceite sonoro pendente.
+
+**CT-05 — conectado e rede degradada.** Reaproveitar testes `udp_python_integration_check.gd`, `udp_spectator_integration_check.gd`, `udp_ai_integration_check.gd`, `network_adapter_protocol_check.gd`, `online_reliability_check.gd` e ferramentas locais de servidor/gateway. Não refazer um protocolo nem mudar o servidor de referência para facilitar o cliente.
+
+Executar Python+Python, Godot+Godot e Python+Godot, com dois e oito slots quando aplicável, IA e espectador. Percorrer lobby/pronto → combate → placar/loja → rodada/resultado → revanche/saída pelo fluxo acessível. Verificar identidade, chat/foco, comandos duplicados, sons duplicados, queda/retomada e liberação de sockets. Aplicar RTT 50/150/300 ms, perda 1%/5%, jitter 30 ms e interrupção de 5 s por proxy/injeção controlada sobre sockets reais; registrar parâmetros e limite de recuperação observado. Usar processos separados como etapa automática e duas máquinas LAN como etapa adicional obrigatória. Escutar somente interfaces necessárias ao ensaio; não alterar firewall global nem publicar servidor. Evidência por cenário: versão dos dois clientes/servidor, transporte, máquinas, perfil de rede, eventos/fases e resultado.
+
+**CT-06 — dispositivos e foco.** Arquivos: `classic_control_profiles.gd`, `player_input_router.gd`, `control_settings.gd`, `classic_options.gd` e teste de menu/controles existente. Ensaiar dois teclados e dois controles físicos, eixos/botões remapeados, desconexão do primeiro preservando o segundo, reconexão, janela sem foco, menus, loja, míssil guiado e chat. Medir entrada → aplicação → quadro visível com pelo menos 100 ações por perfil, p95 comparativo de no máximo um quadro a 60 Hz. Registrar modelo/dispositivo, SO, renderer, FPS e método. Injeção sintética é regressão útil, mas não preenche a coluna de dispositivo físico.
+
+**CT-07 — pacotes e plataformas.** Reaproveitar `scripts/validate_godot_package.py`, `scripts/export_godot.sh`, `scripts/qa_godot_web.sh`, `scripts/package_godot_release.sh`, presets, launchers e `versao-godot/scripts/build_portable.sh`/manifestos. Conciliar com o projeto ST neste documento; não alterar a edição Python congelada durante EQ. Se uma dependência ST exigir mudar a referência, registrar o conflito de escopo e a evidência em vez de aplicar silenciosamente.
+
+- Windows: EXE final em pasta isolada, partida com janela/áudio, opções, favoritos/histórico, reinício, mudança de caminho com espaço/acento, perfil inválido e pasta sem escrita; DPI 100%/150%, janela/tela cheia. Confirmar qual binário `run_game.bat` realmente inicia: um `runtime/windows/Groundfire.exe` antigo tem prioridade sobre a engine do checkout, salvo `GODOT_BIN` explícito.
+- Linux: exportar e **executar** em Linux com GPU/áudio e dependências registradas; percorrer partida e rede. Gerar um binário Linux no Windows não é homologação Linux; WSL/headless não substitui automaticamente desktop real.
+- Web: servir export por HTTP, testar versões registradas de Chromium e Firefox, interação para áudio, foco/redimensionamento, persistência e WS. UDP/LAN/processos locais ficam indisponíveis com comportamento explícito. Antes de usar `qa_godot_web.sh`, alinhar caminhos: o script ainda usa `$BUILD_DIR/godot-web`, enquanto o preset exporta em `versao-godot/runtime/web/index.html`. Confirmar fixtures/hospedagem para não testar build antigo. `scripts/export_godot.sh` aceita `linux`, `web` ou `all`; não tem alvo Windows.
+- Empacotar dentro da edição conforme ST; manter artefatos intermediários de evidência separados. Atualizar manifesto/hash e testar a cópia exata a entregar. Execuções antigas do plano ST são históricas, não certificado do código atual.
+
+**CT-08 — encerramento e evidência.** `scripts/validate_experience_parity.py` ainda contém `MISSING_EVIDENCE` estático. Projetar leitura de registros de aceite por cenário/plataforma, com ID, responsável, data, versões/hash, método, resultado e artefatos existentes. Ausência, reprovação ou hash incompatível deve preservar `incomplete`/`failed`; não liberar `accepted` simplesmente removendo strings. Criar testes negativos para evidência ausente, desatualizada e cenário obrigatório ignorado. A inspeção/escuta humana continua sendo evidência humana, não resultado inventado pelo programa.
+
+Executar sessão de 30 minutos com oito participantes e perfil registrado, medindo p95 de frame, memória/entidades/vozes e responsividade. Meta p95 de 16,7 ms a 60 FPS em equipamento adequado. Consolidar CT → EQ → UX → cenário → evidência e defeitos restantes. Publicar no relatório local o escopo aceito (por exemplo, desktop Windows local) e os alvos pendentes; equivalência global só quando todos os critérios aplicáveis da seção 9 estiverem cumpridos.
+
+#### 11.4. Dependências externas e como não interromper o restante
+
+| Evidência | Recurso necessário | Trabalho possível antes dele |
+|---|---|---|
+| Controle real/latência | Dois controles e equipamento de medição apropriado | Casos de eventos, perfis, slots, logs e roteiro. |
+| Escuta A/B | Saída de áudio, captura e pessoa que registre a comparação | Sessões sincronizadas, eventos e medição de arquivos. |
+| LAN em duas máquinas | Segunda máquina autorizada na LAN | Servidor/clientes em processos separados e injeção controlada de falhas. |
+| Linux desktop | Ambiente Linux com renderer/áudio apropriados | Export, testes de dados e preparação da matriz. |
+| Web | Navegadores e servidor HTTP/gateway de teste | Corrigir caminhos do QA, fixtures e testes de protocolo. |
+
+Verificar primeiro o que está disponível; ausência de informação neste plano não prova ausência do recurso. Registrar indisponibilidade concreta com tarefa, equipamento e prova faltante, e continuar as tarefas independentes. Não marcar a pendência como concluída com um skip e não parar toda a implementação por uma única homologação externa.
+
+#### 11.5. Comandos de retomada e validação
+
+PowerShell, na raiz do repositório. Não executar em uma pasta com artefatos de outra rodada: usar um identificador novo.
+
+```powershell
+git status --short
+$taskRoot = (Get-Location).Path
+$taskPython = Join-Path $taskRoot '.venv/Scripts/python.exe'
+$taskGodot = Join-Path $taskRoot 'tools/godot/Godot_v4.6.2-stable_win64_console.exe'
+$taskRun = Join-Path $taskRoot ('.tmp/experience-parity/resume-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+New-Item -ItemType Directory -Path $taskRun -Force | Out-Null
+& $taskPython --version
+& $taskGodot --version
+$env:PYTHONPATH = "$taskRoot/versao-python;$taskRoot"
+$env:GROUNDFIRE_USERDATA_DIR = Join-Path $taskRun 'python-userdata'
+$env:APPDATA = Join-Path $taskRun 'godot-userdata'
+$env:EXPERIENCE_EFFECTS_DIR = Join-Path $taskRun 'effects'
+
+# Verificar os hashes ANTES de atualizar qualquer fixture.
+& $taskPython -c "import json; from scripts.validate_experience_parity import FIXTURES, source_hashes; assert source_hashes() == json.loads((FIXTURES/'baseline.json').read_text())['source_hashes']; print('Frozen Python reference: OK')"
+
+# Testes direcionados para a última alteração. Efeitos precisam de renderer real.
+& $taskGodot --path versao-godot/godot --rendering-method gl_compatibility --script res://tests/experience_effects_check.gd
+& $taskGodot --headless --path versao-godot/godot --script res://tests/local_match_fidelity_check.gd
+& $taskPython scripts/validate_godot_udp_integration.py --godot-bin $taskGodot
+```
+
+Para o export Windows nesta máquina, o template já utilizado está em `.tmp/godot-export-userdata/Godot/export_templates/4.6.2.stable/windows_release_x86_64.exe`. Confirmar sua existência; em outro ambiente usar templates correspondentes à engine. A troca de `APPDATA` abaixo é apenas no processo PowerShell, com restauração ao final.
+
+```powershell
+$taskPackage = Join-Path $taskRun 'Groundfire.exe'
+$taskPreviousAppData = $env:APPDATA
+try {
+    $env:APPDATA = Join-Path $taskRoot '.tmp/godot-export-userdata'
+    & $taskGodot --headless --path versao-godot/godot --export-release 'Windows Desktop' $taskPackage
+    if ($LASTEXITCODE -ne 0) { throw 'Export Windows falhou; consultar log.' }
+} finally {
+    $env:APPDATA = $taskPreviousAppData
+}
+
+# Gate completo: já inclui pytest, contratos, diferencial, UDP, efeitos, capturas e pacote.
+& $taskPython scripts/validate_experience_parity.py --godot-bin $taskGodot --output $taskRun --capture-matrix --package $taskPackage
+# Para repetir somente a verificação do pacote após um novo export:
+& $taskPython scripts/validate_godot_package.py --package $taskPackage --output (Join-Path $taskRun 'package-recheck')
+git diff --check
+```
+
+Ler `report.json`, logs e `journey-coverage.json`, não apenas o código de saída da engine. O gate detecta `ERROR:`/`SCRIPT ERROR:` mesmo quando Godot termina com código zero. Exit 0 significa verificações solicitadas aprovadas; **não** equivalência completa. `--require-complete` retorna 2 enquanto faltarem evidências. Falha efetiva retorna 1. A captura de tela e a versão do renderer devem constar no resultado do teste gráfico.
+
+Não disparar os scripts `.sh` como se fossem PowerShell; exigem Bash e dependências do ambiente. No Linux, adaptar separador de `PYTHONPATH`, caminho do Python/engine e armazenamento de userdata. Não usar a versão Python 3.10/3.11 como substituição silenciosa: os ensaios numéricos atuais foram ajustados ao comportamento de Python 3.12+.
+
+#### 11.6. Entrega de cada lote e texto pronto para iniciar outro agente
+
+Para cada CT, atualizar este documento com `Reference material:`, `User-visible contract:`, `Allowed adaptation:` e `Required validation:`, além de resultado, defeitos, arquivos, execução/hash e próximo passo. Os critérios já estão descritos acima; preencher com a evidência real, não repetir apenas o plano. Manter responsável e situação do lote. Não declarar CT aceito se falta sua prova obrigatória.
+
+Texto de entrada para o próximo agente:
+
+> Continue o projeto Godot → Python na seção “11. Projeto de continuidade” de `docs/godot_migration_strategy.md`, âncora `continuidade-equivalencia-2026-09-30`. Preserve a referência Python e todas as alterações locais. Leia primeiro 11.7: CT-00 já passou; disponibilidade UDP, cancelamento e parte dos erros de entrada já têm implementação e testes. Complete os casos CT-01 ainda abertos, incluindo retorno/contexto pela interface e erros WebSocket; avance também na revisão visual e nos efeitos dinâmicos de CT-02. Prossiga pelas tarefas independentes do plano, sem refazer o que já tem evidência. Corrija divergências reproduzidas, execute os testes afetados, reconstrua os artefatos quando necessário e atualize a rastreabilidade. Não confunda capturas geradas com revisadas nem teste headless com áudio/dispositivo/plataforma homologados. Não publique release. Ao encerrar uma entrega, informe o que mudou, a evidência real, as dependências ainda abertas e a próxima tarefa concreta.
+
+#### 11.7. Execução da continuidade — 30/09/2026
+
+Responsável: Codex. **CT-00 concluído; CT-01 e CT-02 parcialmente implementados, sem aceite integral.** Os demais lotes mantêm suas pendências. Python de referência e baseline permanecem preservados.
+
+**CT-00 — revalidação após o rastro.** `Reference material:` baseline congelado e EQ-D25. `User-visible contract:` efeitos visíveis sem alterar simulação, menus ou distribuição. `Allowed adaptation:` teste gráfico com renderer real; métricas de pixels não substituem comparação de aparência. `Required validation:` gate, hashes, capturas e pacote isolado. A execução `.tmp/experience-parity/ct00/` passou em 37 verificações, incluindo `rendered-effects`, 99 cenários de estado e 126 pares de imagens. O pacote final foi novamente reconstruído e testado no fechamento abaixo.
+
+**CT-01 — consulta e encerramento das tentativas.** `Reference material:` `_verified_selected_entry`/`_connect_selected` do navegador Python e fluxo conectado Python. `User-visible contract:` consultar disponibilidade antes de abrir a entrada; servidor indisponível mantém o usuário na lista; cancelar não permite conexão tardia; espera por vaga e modo IA seguem a referência. `Allowed adaptation:` DNS e Ping/Pong assíncronos, sem bloquear a interface; endpoints WebSocket não exigem UDP. `Required validation:` respostas reais, timeout, respostas antigas/inválidas, senha, lotação, cancelamento e histórico.
+
+- **EQ-D26:** `server_probe.gd` consulta UDP com nonce e prazo de 80 ms, incluindo resolução assíncrona de hostname. O navegador atualiza a latência e abre o diálogo somente após resposta válida. Seleção, atualização da lista, filtros e saída cancelam a consulta. Respostas atrasadas, nonce incorreto e protocolo incompatível não abrem diálogos.
+- **EQ-D27:** sair da partida conectada encerra transporte, requisição HTTP e tentativas pendentes; callbacks posteriores não reativam a sessão. A espera por vaga passou de três para um segundo, conforme Python. Entrada como IA deixa de enviar comandos humanos.
+- `browser_probe_check.gd` cobre disponibilidade, porta inválida, timeout, DNS, troca de seleção, fechamento e respostas fora de ordem. `online_join_errors_check.gd` cobre senha vazia/incorreta/correta, servidor cheio, espera/cancelamento, vaga liberada e histórico de sucesso/falha contra servidor Python real. Ambos integram `validate_godot_udp_integration.py`, junto com jogador, espectador e IA.
+- **Ainda aberto para CT-01:** mensagens e retorno/contexto completos pela interface, matriz equivalente de erros WebSocket, reentrada e limpeza de credenciais em todas as jornadas N01–N06. Testar `_stop_session` e callbacks não constitui sozinho homologação do botão Back em cada tela.
+
+**CT-02 — inventário visual verificável.** `Reference material:` telas reais Python nos mesmos estados. `User-visible contract:` composição, mensagens e efeitos correspondentes. `Allowed adaptation:` diferenças de rasterização devem ser registradas e examinadas, não aceitas automaticamente. `Required validation:` pares por resolução, diff, revisão explícita por região e teste gráfico em CI.
+
+- Dois estados novos, servidor indisponível e endereço inválido, ampliaram a matriz para **140 pares: 20 estados × sete resoluções**. Os dois estados em 1024×768 foram examinados: composição/mensagens correspondem, mas rasterização e pequenos deslocamentos de texto continuam registrados em EQ-D22.
+- Também foram examinados arena/HUD, placar, loja e vencedor em 1024×768: composição correspondente, com diferenças residuais de contornos e texto. São seis revisões explícitas nesta execução, todas `reviewed-with-differences`, sem aceite integral e sem herdar revisão para outras resoluções ou frames de animação.
+- `scripts/build_visual_review.py` gera `visual-review.json`, diffs e métricas; cada par começa pendente. A revisão só é preservada quando os hashes das duas imagens continuam iguais. Dois testes verificam preservação/invalidação e captura ausente. As métricas não concedem aceite.
+- O gate inclui `visual-review-index` após a matriz. CI foi configurado com Xvfb/OpenGL por software e `--capture`, incluindo `rendered-effects`. **A execução remota dessa configuração ainda não foi observada.** A revisão dos demais pares e as capturas de efeitos em movimento permanecem abertas.
+
+**EQ-D28 — escala e rotação da fumaça/propulsores.** A inspeção subsequente de CT-02 encontrou largura quatro vezes menor que a referência: no nascimento, Godot desenhava 0,125 unidade e `Smoke.get_render_state()` Python fornece 0,5. Corrigida a conversão para `World.SCALE`. A rotação também usava radianos e sinal incompatíveis com os graus passados ao Pygame; agora converte graus para o sentido correspondente na tela. `compare_effect_geometry.py` usa a classe `Smoke` real e compara largura, rotação, centro e desaparecimento com os pontos desenhados pelo Godot em 475 estados de dois efeitos em evolução. O ensaio falhou na largura antes da correção, falhou na rotação após corrigir somente a escala e passou após ambas. Não é uma nova contagem de cenários de combate nem aceite de aparência por pixels. Evidências: `.tmp/smoke-geometry/{before,scale-only,after}/` e `rendered/`. O teste gráfico passou novamente: rastro de disparo real com 1587 pixels; fumaça e propulsor visíveis com a escala corrigida. `effect-geometry` agora integra o gate e UX-04.
+
+**Fechamento de CT-01, anterior a EQ-D28.** `.tmp/experience-parity/ct01/report.html` e `report.json`: **38 verificações aprovadas**, **493 testes Python aprovados**, 34 ignorados e 11 subtestes; 99 cenários diferenciais de estado; 140 pares indexados. O status permanece **incomplete**, sem remoção de lacunas. A primeira execução encontrou uma asserção textual antiga do scaffold após a extração de `_stop_session`; ela foi atualizada, a suíte Python inteira e os testes afetados foram repetidos. O relatório anterior foi preservado em `report-before-rerun.json`; o relatório final registra a razão da repetição.
+
+O EXE de CT-01 passou novamente pelo primeiro uso/reinício em pasta isolada. SHA-256 histórico: `23050fd1f843a8670b6ffd194358b2e4088c4087fba3531ae8fceb1a884fc5a9`, registrado em `ct01/package/report.json`. Isso valida o percurso automatizado Windows, não escuta, dispositivos físicos ou outra plataforma. A exportação posterior a EQ-D28 substitui esse arquivo em `.tmp/experience-parity/windows/Groundfire.exe` e exige sua própria validação.
+
+**Fechamento atual, após EQ-D28:** `.tmp/experience-parity/ct02/report.html` e `report.json`, execução completa nova com **39 verificações aprovadas**, 493 testes Python, 34 ignorados, 11 subtestes, 99 cenários de estado e 140 pares de capturas. Inclui os 475 estados de geometria de fumaça, o teste gráfico e o pacote isolado reconstruído. As seis revisões visuais foram transferidas de CT-01 somente após igualdade dos hashes de ambas as imagens. O SHA-256 do EXE atual é `c43e8de213e555dc556ce4bc3c873c0bd13e486f73b5f2f31f5dc4b0d3a6e07d`, conferido com `ct02/package/report.json`. O estado global continua **incomplete**; Ruff nos scripts/testes alterados e `git diff --check` também passaram. A referência Python continua intacta.
+
+Próximos passos concretos: fechar retorno/contexto e erros WebSocket de CT-01; revisar arena/HUD e efeitos dinâmicos de CT-02; completar C01–C05 sem duplicar os 99 casos existentes. Escuta, dispositivos físicos, rede em duas máquinas e execução Linux/Web continuam sem homologação. A consulta local a WSL não encontrou ambiente Linux utilizável; não se instalou nem alterou o sistema para simular esse aceite.
+
+#### 11.8. Continuidade do objetivo completo — WebSocket e navegação
+
+Responsável: Codex, 30/09/2026. Objetivo permanece ativo, incluindo visual/áudio, combate e dispositivos/plataformas. **Este lote não encerra CT-01 nem o aceite global.** `Reference material:` navegador Python, `_run_connected_from_classic_menu` e `_return_legacy_to_main_menu` em `src/groundfire/app/client.py`, protocolo do gateway e `JoinRequest`. `User-visible contract:` entrar a partir do navegador, informar falhas, limitar espera por conexão, cancelar e retornar ao menu; escolha Human/AI/Spectator deve chegar ao servidor. `Allowed adaptation:` deadline para handshake WebSocket e adaptação explícita do gateway distribuído com Godot, sem modificar a edição Python. `Required validation:` sockets reais, percurso de confirmação/Back na hierarquia real de telas, servidor Python e manifesto do companion.
+
+- **EQ-D29 — navegação quebrada:** `server_browser.gd` e `online_match.gd` chamavam métodos de `Main` por `get_parent().get_parent()`, mas esse ancestral era `MarginContainer`. O teste de Back reproduziu erro de runtime. Foram introduzidos sinais de navegação ligados por `main.gd`, cobrindo início de partida UDP/WS, Back da partida e Back do navegador. O destino de retorno é o menu principal, conforme o fluxo Python conectado; preservar a seleção de uma lista após encerrar o modo conectado não é presumido como requisito contrário à referência.
+- **EQ-D30 — handshake TCP/HTTP sem prazo:** enquanto WebSocket não abria, `_handshake_age` não avançava. Um peer local que aceitava TCP sem responder HTTP deixou a tela esperando. `_connection_pending` e prazo de cinco segundos agora encerram a tentativa e usam o mecanismo limitado de reconexão existente. Os ensaios separam HTTP incompleto de WebSocket aberto sem `hello`; Back cancela ambos.
+- **EQ-D31 — IA perdida no gateway:** o cliente enviava `is_computer`, mas o gateway omitira o campo em `JoinRequest`. A adaptação em `versao-godot/scripts/vendor_headless.py::_source_bytes` acrescenta o encaminhamento e valida o tipo booleano; o companion gerado inclui a correção. O fechamento de socket também tolera reset durante `wait_closed`. As transformações exigem correspondência única do trecho de origem e falham se a fonte mudar; `--check` compara com a fonte transformada e com o manifesto. Nenhum arquivo de `versao-python/` foi alterado. O ensaio usa esse gateway da edição Godot contra o servidor Python intacto; não afirma que gateways antigos externos adquiriram a correção.
+
+`scripts/validate_godot_websocket.py` + `tests/websocket_errors_check.gd` passaram em **91 verificações**: senha vazia/incorreta/correta, autenticação rejeitada, servidor fechado, banimento, incompatibilidade de protocolo, dois tipos de timeout, lotação com/sem espera, cancelamento, vaga liberada, histórico, credenciais limpas, campo IA inválido, entrada Human/AI/Spectator e confirmação pelo navegador também via UDP. As ações de confirmação e Back percorrem métodos/sinais da interface real; ainda não representam aceite visual de cada mensagem nem rede entre máquinas.
+
+Evidências: `.tmp/experience-parity/ws-complete/report.json`, `checks.json`, `godot.log` e `package/report.json`; falhas anteriores em `ws-before`, `ws-journey` e `ws-companion`. Regressões Python: **493 aprovadas**, 34 ignoradas e 11 subtestes (`.tmp/ws-python-tests.log`). `online_reliability_check`, Ruff, baseline congelado, integridade do companion e `git diff --check` passaram. O gate agora inclui `mixed-websocket`, vinculado a UX-08/10; o gate completo de 39 verificações de CT-02 continua sendo histórico do build anterior, não foi declarado uma nova execução de 40.
+
+EXE Windows reconstruído e testado isoladamente após EQ-D29/30: `.tmp/experience-parity/windows/Groundfire.exe`, SHA-256 `28f2cfd48590e112656c804a843a3b0b5fbc5f71e9723baa50eda23c669943f1`. O código-fonte do companion e seu manifesto foram atualizados; o teste do EXE do jogo não substitui reconstrução e prova dos binários standalone do gateway em CT-07.
+
+Ambiente levantado: Chrome `154.0.8037.59` e Edge `154.0.4258.37` instalados. Firefox não foi encontrado no caminho padrão consultado; isso não prova ausência em todos os locais. O inventário HID inclui teclados, mas não identifica de forma suficiente dois gamepads físicos homologáveis. Foi solicitada informação sobre controles, segunda máquina LAN e Linux, mantendo o restante do trabalho em andamento. Próximas ações: corrigir o caminho do QA Web e executar o export atual no navegador disponível; continuar capturas dinâmicas, áudio e matriz C01–C05. TLS/WSS, fluxo de token de sessão e revisão visual dos erros permanecem a verificar.
+
+#### 11.9. Export Web atual — navegadores e token por nome
+
+Responsável: Codex, 30/09/2026. CT-02/07 avançaram no Windows; o aceite global permanece pendente. `Reference material:` capturas Python do gate `ct02`, protocolo de token assinado e scripts de export/QA existentes. `User-visible contract:` export abrir, preservar dados após reinício, informar erros de entrada e autenticar o nome escolhido. `Allowed adaptation:` navegador controla resolução; UDP/LAN não é oferecido na Web. `Required validation:` export real em navegador isolado, servidor/gateway reais, comparação de capturas e EXE isolado.
+
+- **EQ-D32 — caminhos de export/QA divergentes:** o preset gravava em `versao-godot/runtime/web`, enquanto QA/empacotamento procuravam `build/godot-web`. `repo_paths.sh`, export, QA e empacotamento agora usam `GODOT_WEB_DIR`/`GODOT_LINUX_DIR`, com defaults dentro da edição. O diretório HTTP fictício de QA fica temporário, fora do export. O teste não publica serviços externos.
+- **EQ-D33 — resolução vazia na Web:** o seletor desabilitado ocultava o valor. A opção Web agora mostra `Browser size` desabilitado; seletores inativos de jogadores continuam ocultando os valores como antes. O ensaio confirma texto e estado.
+- **EQ-D34 — token emitido para outro nome:** `_request_session_token` solicitava credencial para `Player` apesar de `_player_name` configurado. Caso real `QA Pilot + Silva` reproduziu rejeição de autenticação; após usar `_player_name`, o servidor confirmou exatamente esse nome. Espaços e `+` atravessam a codificação da URL. A referência Python permanece intacta.
+- **Capturas Web determinísticas:** `?qa=visual` congela animação do menu e estado inicial da arena (seed 1401, dois humanos). Não altera o percurso normal. As cinco imagens antigas eram de outra composição; as novas foram examinadas ao lado do Python antes de substituir o baseline de regressão. `docs/references/godot_browser_visual/review.json` registra hashes anteriores/novos/Python, diferenças de rasterização EQ-D22 e adaptações Web. Todos os casos têm `reviewed-with-differences`; isso não aprova animação, áudio, outras resoluções ou equivalência total.
+- **Diagnóstico do ensaio de pausa:** antes de abrir Edge, ocorreu falha intermitente em `local_match_fidelity_check.gd`. Impactos anteriores deixavam vozes polifônicas já encerradas; o getter de pausa consulta a primeira voz. Isolar o som com `stop()` antes do novo impacto elimina essa interferência, preservando a asserção e o teste separado de sobreposição. Dez execuções consecutivas passaram. Referência: [AudioStreamPlayerInternal em Godot 4.6.2](https://github.com/godotengine/godot/blob/4.6.2-stable/scene/audio/audio_stream_player_internal.cpp). Evidências `.tmp/audio-pause-repeat-*`, `.tmp/audio-pause-fixed-*` e `.tmp/web-qa-edge-preflight-failure.log`. Não é aceite sonoro.
+
+**Resultados observados:** Chrome `154.0.8037.59` e Edge `154.0.4258.37`, ambos headless/SwiftShader em perfis isolados, passaram: HTTP 200/304 com cache/ETag, filtro de transporte Web, favoritos/histórico após reiniciar o navegador, senha errada, autenticação rejeitada, banimento, servidor fechado/cheio, token assinado e entrada com nome personalizado. Cada navegador reproduziu as cinco imagens com diferença zero contra o baseline Web revisado. Evidências em `.tmp/experience-parity/web-chrome/` e `web-edge/`, arquivos `runtime-seed.json`, `runtime-verify.json`, `visual-report.json` e `qa.log`. `scripts/qa_godot_web.sh --check` agora grava resultados estruturados com versão e hashes. Os 19 testes direcionados de scaffold/gate, a sintaxe dos scripts shell e os hashes congelados Python passaram.
+
+EXE Windows reconstruído após EQ-D34 e testado em cópia isolada, incluindo menu, combate, pausa, placar, compra, nova rodada e persistência após reinício. Relatório `.tmp/experience-parity/web-windows/package/report.json`, com hash do artefato `.tmp/experience-parity/windows/Groundfire.exe`. É ensaio headless com mortes de preparação injetadas, não aceite interativo. Este lote não reconstruiu binários standalone do gateway.
+
+Template Web 4.6.2 extraído do pacote oficial por leitura parcial de ZIP, com CRC verificado. Proveniência em `.tmp/web-template-provenance.json`; SHA-256 do template extraído `7d91986ea27d901b37963ace014a88ab6ba8e4bfe830031043bcf89ebac307dc`. O digest do pacote completo não foi verificado, pois ele não foi integralmente baixado.
+
+**Reprodução no Windows:** definir `PYTHON_BIN` para `.venv/Scripts/python.exe`, `GODOT_BIN` para a engine do checkout e `CHROMIUM_BIN` para o executável Chrome ou Edge (caminhos absolutos com `/`). Neste ambiente os templates estão em `.tmp/godot-export-userdata/Godot/export_templates/4.6.2.stable`; definir `APPDATA` para `.tmp/godot-export-userdata` e `GODOT_TEMPLATE_DIR` para a pasta dos templates. Usar `GODOT_QA_KEEP_TEMP=1` para preservar logs e executar `bash scripts/qa_godot_web.sh --check` pelo Git Bash. Os executáveis do jogo exportado não exigem Git Bash; este comando é uma ferramenta de desenvolvimento.
+
+**Limites:** ensaio HTTP/WS local; HTTPS/WSS hospedado, Firefox, Linux desktop, escuta A/B, controles físicos, duas máquinas LAN, animações e sessão de 30 minutos continuam pendentes. Pygame enumerou zero joysticks neste ambiente. A inspeção interativa pelo conector não abriu por erro de política de cabeçalhos; o QA usa o executor isolado já existente no repositório. O gate completo `ct02` (39 verificações/493 testes/140 pares) continua vinculado àquele build; não foi reclassificado como execução completa deste lote. Próxima etapa: CT-03/C01–C05 e capturas dinâmicas de CT-02, mantendo as validações físicas separadas.
+
+#### 11.10. Bordas de combate e revisão visual em andamento
+
+**CT-03, 30/09/2026.** O inventário diferencial foi ampliado de 99 para 160 cenários. C02 inclui ordem invertida, atrasos de 1 e 17 ticks, orientação do míssil durante outro disparo e troca após recarga; C01 percorre as duas bordas, potência 1/20, tiro para dentro/fora e última munição das cinco armas; C03 adiciona crateras/terremoto com pares MIRV/Nuke, metralhadora/Nuke e míssil/MIRV; C04 percorre combate, placar, compra e nova rodada com humanos e bots, inclusive oito slots e duas sementes; C05 acrescenta saldo 49/50 e conclusão da loja em momentos diferentes. Cada cenário de combate novo declara os projéteis obrigatórios, impedindo aprovação sem disparo. A comparação registra posição de simulação, mira, potência, combustível e, nos casos C03, terreno em ticks definidos. A metralhadora no primeiro slot agora entra na lista de projéteis antes do disparo do segundo, seguindo a ordem de atualização dos tanques Python.
+
+O ensaio completo dividido em dez exportações Godot preservou a ordem e terminou com **158 aprovados e dois reprovados**, em `.tmp/experience-parity/ct03-all-batched/comparison.json`. `combat-edge-shell-in-min` diverge no ângulo do segundo tanque no tick 1081 (`79.73098280989223` Python, `77.3603566599531` Godot); `combat-edge-mirv-in-min` no tick 1105 (`77.52715134534894` versus `74.136603786407`). As posições de simulação coincidem até esses instantes e o terreno salvo difere menos que `1e-5`, mas uma decisão de apoio em camada/cratera altera a inclinação. A instrumentação pontual dos três apoios de Shell mostrou a comparação decisiva a `+1,24×10⁻¹⁴` no Python e `−1,24×10⁻¹⁴` no Godot (`.tmp/support-debug-python.log`, `.tmp/support-debug-godot.log`); a instrumentação foi removida. Uma regra fixa de desempate já reprovou outro tick da encosta, portanto não foi adotada. Os dois casos **também falhavam no lote isolado**; a leitura anterior de 20 aprovações apenas pelo fim do log estava errada. Uma terceira falha de arredondamento em encosta, `known-slope-rounding-1401`, continua reproduzível em `known_divergences.json`. Nenhuma das três recebeu tolerância ampliada ou aceite. O comparador processa lotes de até 20 mil ticks para evitar o timeout anterior; o gate concede até 900 segundos ao ensaio completo. Os testes do particionamento e do comparador passaram (30 testes direcionados).
+
+**CT-02.** A abertura da rodada deixou de usar painel e mensagem técnica: agora desenha `Round N` e `Get Ready` com atlas, posição, sombra e escala da referência. Capturas pareadas em 1024×768 e 1280×720 confirmam a composição. Em proporções fora de 4:3, o capturador Godot usava pixels da janela como se fossem coordenadas lógicas do viewport; isso deixou faixas cinzas e deslocou o terreno. O capturador agora dimensiona a arena pelo viewport lógico após anexá-la à árvore. Esta correção é do ensaio; a partida iniciada pelo menu já usa contêiner de largura total. Capturas de menus, placar, loja, vencedor e estados de erro em 1024×768 foram examinadas lado a lado, com pequenas diferenças de rasterização; efeitos dinâmicos e demais resoluções ainda requerem revisão explícita.
+
+A referência congelada `conf/controls.ini` usa códigos ASCII maiúsculos (`O=79`, por exemplo), para os quais `pygame.key.name(79)` devolve string vazia. Por isso a captura Python deixa dez valores da tela de teclado em branco, enquanto o Godot exibe os nomes das teclas funcionais. A divergência está registrada para decisão de compatibilidade; ocultar o nome no Godot sem corrigir o controle prejudicaria o usuário. `versao-python/src`, `conf` e `data` não foram alterados. **CT-03 e o aceite global continuam abertos**, assim como saída sonora ouvida, dispositivos reais, duas máquinas LAN e Linux.
+
+O gate `.tmp/experience-parity/ct03-full-gate/report.json` terminou com **38/39 verificações aprovadas**; `state-differential` é a única reprovada pelos mesmos dois casos, sem timeout. A suíte Python passou com **497 testes**, 34 ignorados e 11 subtestes; as 140 capturas pareadas e o teste gráfico foram gerados/aprovados como execução. Após inspecionar os arquivos atuais lado a lado, 20 pares estáticos em 1024×768 foram marcados `reviewed-with-differences` no `visual-review.json` desse lote, vinculados aos hashes das imagens. As capturas em 1280×720 adicionais estão em `.tmp/ct03-round-python-1280/` e `.tmp/ct03-round-visual-1280-fixed/`.
+
+Depois do gate, a revisão em 640×480 encontrou outro erro real: os ladrilhos da tela de placar/loja eram escalados pelo viewport, ficando com 40 pixels, enquanto o Python os mantém com 64. `classic_round_menu.gd` agora compensa a escala do viewport, como o menu principal já fazia. Capturas direcionadas em 640×480 e 1920×1080 confirmam os ladrilhos de 64 pixels; o erro médio RGB contra a captura Python do placar caiu de 24,15 para 1,02 em 640×480 e de 19,55 para 1,14 em 1920×1080. Na loja, caiu de 22,18 para 1,21 e de 16,60 para 1,41, respectivamente. A métrica confirma esta correção de fundo, não concede aceite visual ao restante. As sete resoluções Godot foram capturadas novamente no diretório `ct03-full-gate`, sem erros, e o índice foi recalculado preservando as 20 revisões de 1024×768 apenas porque seus hashes não mudaram. Mais cinco pares atuais, em 640×480 e 1920×1080, foram inspecionados: **25 revisados com diferenças, 115 pendentes**. Efeitos em movimento não fazem parte desses pares. As verificações não visuais de `report.json` foram executadas antes desta última correção de desenho; não as apresentamos como novo gate integral.
+
+O executável Windows **final deste lote** foi exportado em `.tmp/experience-parity/ct03-windows/Groundfire.exe`, SHA-256 `5508f2fb1460c9e53ec707625e7aef252776501202a9afcde1af0225b0e88746`. A prova `ct03-windows/package-final/report.json` passou primeiro uso e reinício em pasta isolada com espaço/acento. Esse percurso automatizado não certifica equivalência de combate nos dois cenários reprovados nem sessão interativa, áudio ouvido ou gamepads físicos.
 
 <a id="projeto-2026-09"></a>
 
@@ -835,6 +1369,8 @@ Allowed on web:
 
 ## First Migration Slice
 
+**2026-09-30 / EQ-03–06:** unified local world units and fixed camera, matched seeded terrain/spawns and tank motion, corrected splash/terrain deformation, and compared weapon reload/selection against the frozen Python runtime. `states.json` now includes six actual Shell combats, with self defeat, simultaneous draw, 2/4/8 bots and mixed human/bot play, in addition to isolated state scenarios. Classic AI shares human command application; bot shop timing and precise clipping/landing gaps are compared. No post-crater tolerance exception is needed. The current evidence and remaining acceptance work are in section 10 of the experience equivalence project.
+
 The `versao-godot/godot/` project is a standalone Godot client scaffold. It starts with:
 
 - `PlatformCapabilities` autoload.
@@ -1165,9 +1701,11 @@ The `versao-godot/godot/` project is a standalone Godot client scaffold. It star
 
 ## Current Status
 
+**Implementation update — 2026-09-30:** the [experience equivalence project](#projeto-equivalencia-2026-09-29), section 10, records the current code, differential scenarios, menu captures and isolated Windows package checks. The Python baseline is frozen and unchanged. Shared units, seeded geometry, tank motion, craters, reloads, AI decisions, six real Shell combats and bot shop timing have comparative evidence. All-weapon/full-cycle integration, visual/audio review and platform/device acceptance remain incomplete. Older records below retain their original scope and dates.
+
 > **Current audit, 2026-09-25:** the release-slice observations below are historical and do not certify full Python fidelity. The [current project](#projeto-2026-09) identifies confirmed structural gaps F01–F16 and defines the new acceptance criteria. Gameplay implementation is pending; the old gates did not test simultaneous local play or all connected presentation paths.
 
-The validated Godot release slice is no longer blocked by broad, generic categories such as gameplay, HUD/input, visual style, classic flow, browser runtime, or release packaging. It now covers playable local and online slices, export automation, packaging, browser runtime QA, browser visual regression QA, and the 248-test fidelity gate described below.
+The historical release slice below covers playable local and online slices, export automation, packaging, browser runtime QA, browser visual regression QA, and its 248-test gate. These results do not close the current EQ acceptance requirements.
 
 The Python/Pygame client remains the source of truth for any future audit. Remaining work should be stated as named follow-up targets, such as a specific `Landscape.clip_slice` branch, one exact score/shop timing path, a hosted production directory policy, or a concrete multiplayer edge case. Do not reopen the migration as incomplete based only on broad labels unless a new Pygame reference regression identifies the failing behavior.
 
@@ -1403,7 +1941,7 @@ Implemented or started:
 
 ## What Still Needs To Be Done
 
-> **Current backlog:** implement the [September 2026 project](#projeto-2026-09), starting at M0/F01/F02/F03. The older summaries below describe the previously accepted release slice only. Claims that all remaining work is polish are superseded by the concrete deltas in that audit.
+> **Current backlog:** finish EQ-00–EQ-11 in the [experience equivalence project](#projeto-equivalencia-2026-09-29). All five weapons now have integrated combat and shop/next-round cycles; a two-round match reaches the winner. The 99 state scenarios include ten mixed-weapon pairs, four additional human/bot combats and three jet/quake cases. Extend weapon/participant combinations, review the 98 paired captures, complete audio coverage and listening, and finish the platform/device/network matrix. Older summaries do not certify the current branch.
 
 > [!IMPORTANT]
 > **Resumo de Pendências e Estado de Fidelidade**
@@ -1609,6 +2147,8 @@ Fidelity annotations:
 
 ## Recommended Next Large Batch
 
+**Current priority - 2026-09-30:** continue EQ-03/04 from the frozen baseline and current runners. Extend the 33 projectile cases, four timing schedules and 67 state/combat scenarios through all-weapon combat and the full shop/next-round cycle. Check MIRV child launch timestamps, Machine Gun sub-tick launch timing, collision ordering and AI weapon decisions in the integrated replay. Remaining paired screens, audio events, devices and platforms still require evidence; managed/social expansion stays deferred.
+
 **Current recommendation (2026-09-25):** M0 reference fixtures, then F01/F02/F03 for simultaneous gameplay, per-player input and fixed-step simulation. Use the [current milestones](#projeto-etapas). The previous recommendation retained below is historical context, not the active priority.
 
 Every recommended batch inherits the `Migration Compatibility Contract`. Do not use these batches as accidental redesign opportunities; each implementation step should name the relevant reference material, document any intentional adaptation, and pass the required validation before being marked complete.
@@ -1620,7 +2160,7 @@ The next big but controlled batch should focus on `Local Match Fidelity 2`:
 3. Continue improving Online Match interpolation quality, replicated projectile fidelity, prediction, and HUD polish; first-pass prediction, prediction-error diagnostics, projectile extrapolation, and network diagnostics now exist.
 4. Continue tuning landing edge cases and final projectile scale against the original Python/C++ feel; classic gun angle/power defaults/bounds, acceleration/release-stop, conflicting aim/power input priority, passive steep-slope sliding, cos-projected grounded slope movement, `move_to_ground`-based stacked support landing, three-point track support alignment, slope-aware jump jet thrust, in-air boost rotation including the classic pre-step turn-limit overshoot, looped classic jump-jet audio, classic boost exhaust smoke, tuned airborne gravity, terrain-gap detachment, grounded/airborne playable-bound edge stopping, tank-owned projectile launch velocity inheritance, classic-style launch-origin geometry, center-anchored/size-scaled gun-arrow visual geometry, and textured dead-tank burn smoke now exist.
 5. Continue tuning Nuke beyond the first whiteout/audio pass, keep validating Machine Gun against full-match classic turn flow beyond the fixed-power/cooldown-gated tracer launch, launch-time trajectory, one-frame tracer expiry, looped audio, weapon-cycle unselect, pre-shot cancellation, lethal-hit stop handling, and first-pass AI tactical hold paths, and keep tuning MIRV/Missile details beyond the current launch-time shell/MIRV parabola, intra-frame apex/five-fragment split with protected split-frame fragment stepping, unclamped fuel-limited steering, steering clamp/conflicting-input recentering, and Python-order missile free-fall integration.
-6. Continue tuning AI personality after the new risk/reward weapon scoring pass; the AI now avoids self-damaging Nukes and ranks specials by expected value, while between-round shop behavior has been restored to the Pygame no-purchase pass-through. Final classic aggression/personality tuning still needs playtest calibration.
+6. Extend seeded classic AI differential coverage through longer multi-round matches. The default now uses Python AIPlayer command timing, target/impact memory and no-purchase shop commands; strategic special-weapon/difficulty helpers are retained only for the opt-in development path.
 7. Replace the first score/shop scaffold with faithful end-of-round, score, economy, winner, and shop screens; classic defeat/leader/survival/stipend awards, previous-round leader flags, score-screen leader reassignment, self-defeat penalty, score-screen translucent column boxes, white total-score text, player tank icons, defeated-tank icons and leader flags, classic weapon bundle sizes, persistent weapon stock copied into per-round available ammo at round start, classic shop ordering/copy with `Done!`, classic shop input delays, separate `$cost` shop column, non-duplicated `Buy` actions, classic `$N` shop money copy, legacy catalog behavior (Rolling Mines, Airstrike, Death's Head, Hover Coil, Corbomite mapped as disabled no-purchase classic rows with zero initial ammo and no Godot-only locked/migration copy), closer Jump Jet fuel-reserve purchasing, visible reserve economy state, a separate score overlay, roster-backed score rows and final-result winner selection, final `Final Result` heading, final top-score/tie winner marking, centered winner-only tank-card rows with white rotating-letter emphasis, human/computer activation delays, human-focused shop passes with no-purchase computer pass-through, next-round shop labels, and a first final-result overlay are now started. The current Python/Godot coverage protects Pygame score/economy constants, classic score draw headings and multi-combatant rank/tie ordering, classic post-round held-fire/Jump Jet cleanup entering score, classic winner draw copy and four-card row grouping for multi-winner ties, simultaneous roster money display, active and disabled classic shop catalog order/prices/copy, no-purchase behavior for shop positions 5-9, AI-style Gun Up wrapping from Machine Gun to `Done!` without buying, classic one-update shop finish handoff, classic stock-vs-available-ammo behavior for shop purchases and round resets, and hidden inventory pack semantics; final classic art tuning and exact simultaneous shop layout parity still need manual visual integration.
 
 ### Local Match Fidelity 2 Execution Checklist
@@ -1643,6 +2183,8 @@ Acceptance criteria for this batch:
 Avoid mixing this with the full online protocol or final release hardening in the same batch. Those should come after the local gameplay loop is stronger.
 
 ## Next Agent Handoff
+
+**Start here - 2026-09-30:** read section 10 of the [experience equivalence project](#projeto-equivalencia-2026-09-29) and run `scripts/validate_experience_parity.py`. Keep `baseline.json` and the Python edition unchanged. The current report passes 36 checks, including 99 state scenarios. All five weapons reach score, a real shop purchase and the next round; a two-round match reaches the winner without injected deaths. Extend combinations and finish the screen/audio/device/network/platform matrix. There are 98 paired captures; capture generation alone is not visual acceptance. The Windows EXE is a local test artifact, without publication or complete equivalence certification.
 
 **Active handoff (2026-09-25):** continue from the [current project](#projeto-2026-09). This delivery planned both user requests and updated documentation validation; it did not implement the F/O backlog. Recheck the environment and working tree. Start M0, then F01/F02/F03. All older continuation suggestions and validation counts below are historical evidence and must not override this order or be reported as newly run tests.
 

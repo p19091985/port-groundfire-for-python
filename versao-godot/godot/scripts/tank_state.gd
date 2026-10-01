@@ -1,5 +1,7 @@
 extends RefCounted
 
+const World := preload("res://scripts/classic_world.gd")
+
 const STATE_ALIVE := "alive"
 const STATE_DEAD := "dead"
 const GUN_ANGLE_MIN := -75.0
@@ -12,21 +14,22 @@ const GUN_POWER_MAX := 20.0
 const GUN_POWER_DEFAULT := 10.0
 const GUN_POWER_CHANGE_ACCELERATION := 20.0
 const GUN_POWER_MAX_CHANGE_SPEED := 50.0
-const GUN_POWER_PIXEL_SCALE := 5.5
+const GUN_POWER_PIXEL_SCALE := World.SCALE
 const TANK_MAX_HEALTH := 100
 const TANK_FULL_FUEL := 1.0
+const TANK_INITIAL_FUEL := 0.0
 const TANK_FUEL_PURCHASE_AMOUNT := 1.0
-const TANK_BOOST_ACCELERATION := 133.0
+const TANK_BOOST_ACCELERATION := 7.0 * World.SCALE
 const BOOST_FUEL_USAGE_RATE := 0.2
 const BOOST_TURN_RATE := 90.0
 const BOOST_TURN_LIMIT := 15.0
-const TANK_AIR_GRAVITY := 95.0
+const TANK_AIR_GRAVITY := 5.0 * World.SCALE
 const TANK_GROUND_DETACH_THRESHOLD := 2.0
-const TANK_MOVE_SPEED := 74.0
+const TANK_MOVE_SPEED := 0.2 * World.SCALE
 const TANK_SLOPE_DRAG_SCALE := 65.0
 const TANK_MIN_SLOPE_MOVE_FACTOR := 0.35
 const TANK_PASSIVE_SLIDE_THRESHOLD := 30.0
-const TANK_BODY_HALF_WIDTH := 26.0
+const TANK_BODY_HALF_WIDTH := 0.25 * World.SCALE
 const TANK_CENTER_OFFSET := TANK_BODY_HALF_WIDTH * 0.5
 const GUN_LAUNCH_OFFSET := TANK_BODY_HALF_WIDTH * 1.2
 const TANK_CLASSIC_WORLD_PIXEL_SCALE := TANK_BODY_HALF_WIDTH / 0.25
@@ -61,9 +64,9 @@ var gun_angle_change_speed := 0.0
 var gun_power := GUN_POWER_DEFAULT
 var gun_power_change_speed := 0.0
 var health: float = TANK_MAX_HEALTH
-var fuel := TANK_FULL_FUEL
+var fuel := TANK_INITIAL_FUEL
 var fuel_capacity := TANK_FULL_FUEL
-var fuel_reserve := TANK_FULL_FUEL
+var fuel_reserve := TANK_INITIAL_FUEL
 var state := STATE_ALIVE
 var on_ground := true
 var airborne_velocity := Vector2.ZERO
@@ -72,6 +75,77 @@ var hover_time := 0.0
 var corbomite_active := false
 var exhaust_time := 0.0
 var boost_detach_pending := false
+
+# Keep simulation coordinates in doubles. Vector2 is only the rendering/API view;
+# repeatedly integrating its float32 values changes track contact and landing ticks.
+var _motion_x := 0.0
+var _motion_y := 0.0
+var _motion_vx := 0.0
+var _motion_vy := 0.0
+var _motion_position_view := Vector2.INF
+var _motion_velocity_view := Vector2.INF
+
+
+func _read_motion_state() -> void:
+	if position != _motion_position_view:
+		_motion_x = (position.x - World.ORIGIN.x) / World.SCALE
+		_motion_y = (World.ORIGIN.y - position.y) / World.SCALE
+	if airborne_velocity != _motion_velocity_view:
+		_motion_vx = airborne_velocity.x / World.SCALE
+		_motion_vy = -airborne_velocity.y / World.SCALE
+
+
+func _write_motion_state() -> void:
+	position = World.from_classic(_motion_x, _motion_y)
+	airborne_velocity = Vector2(_motion_vx * World.SCALE, -_motion_vy * World.SCALE)
+	_motion_position_view = position
+	_motion_velocity_view = airborne_velocity
+
+
+func begin_classic_motion(delta: float, direction: float, boosting: bool) -> void:
+	_read_motion_state()
+	var cos_a := cos(deg_to_rad(tank_angle))
+	var sin_a := sin(deg_to_rad(tank_angle))
+	if boosting and state == STATE_ALIVE and fuel > 0.0:
+		_spend_fuel(delta * BOOST_FUEL_USAGE_RATE, true)
+		_motion_vx -= sin_a * (TANK_BOOST_ACCELERATION / World.SCALE) * delta
+		_motion_vy += cos_a * (TANK_BOOST_ACCELERATION / World.SCALE) * delta
+		_update_boost_turn(delta, direction)
+	if on_ground:
+		var moved := direction != 0.0 and state == STATE_ALIVE
+		var move_x := cos_a * direction * (TANK_MOVE_SPEED / World.SCALE) if moved else 0.0
+		var move_y := sin_a * direction * (TANK_MOVE_SPEED / World.SCALE) if moved else 0.0
+		if moved or abs(tank_angle) > TANK_PASSIVE_SLIDE_THRESHOLD:
+			var drag := -((TANK_MOVE_SPEED / World.SCALE) * (tank_angle / TANK_SLOPE_DRAG_SCALE))
+			move_x += cos_a * drag
+			move_y += sin_a * drag
+		_motion_x += move_x * delta
+		_motion_y += move_y * delta
+	else:
+		_motion_vy -= (TANK_AIR_GRAVITY / World.SCALE) * delta
+		_motion_x += _motion_vx * delta
+		_motion_y += _motion_vy * delta
+	_write_motion_state()
+
+
+func finish_classic_motion(terrain: RefCounted, boosting: bool) -> void:
+	_read_motion_state()
+	if terrain.has_method("playable_bounds"):
+		var bounds: Vector2 = terrain.playable_bounds()
+		var left_bound := (bounds.x - World.ORIGIN.x) / World.SCALE
+		var right_bound := (bounds.y - World.ORIGIN.x) / World.SCALE
+		if _motion_x < left_bound or _motion_x > right_bound:
+			_motion_x = clampf(_motion_x, left_bound, right_bound)
+			_motion_vx = 0.0
+	_write_motion_state()
+	var alignment := _classic_track_ground_alignment(terrain, boosting)
+	on_ground = not bool(alignment.airborne)
+	if on_ground:
+		_motion_y += float(alignment.classic_shift)
+		tank_angle -= clampf(float(alignment.classic_relative), -0.1, 0.1) * 75.0
+		_motion_vx = 0.0
+		_motion_vy = 0.0
+	_write_motion_state()
 
 
 func reset_round(x: float, terrain: RefCounted, label: String, color: Color) -> void:
@@ -107,6 +181,11 @@ func set_position_on_ground(x: float, terrain: RefCounted) -> void:
 	on_ground = true
 	airborne_velocity = Vector2.ZERO
 	boost_detach_pending = false
+	_read_motion_state()
+	_motion_x = (x - World.ORIGIN.x) / World.SCALE
+	if terrain.has_method("uses_classic_world") and terrain.uses_classic_world():
+		_motion_y = float(terrain.call("move_to_ground_classic", _motion_x, 100.0))
+	_write_motion_state()
 
 
 func settle_on_terrain(terrain: RefCounted, delta := 0.0) -> void:
@@ -190,24 +269,18 @@ func _apply_passive_slope_slide(delta: float, terrain: RefCounted, ground_angle:
 
 
 func _classic_track_ground_alignment(terrain: RefCounted, boosting := false) -> Dictionary:
+	_read_motion_state()
 	var radians := deg_to_rad(tank_angle)
 	var cos_a := cos(radians)
 	var sin_a := sin(radians)
-	var left_query := Vector2(
-		position.x - TANK_TRACK_HALF_WIDTH * cos_a,
-		position.y - TANK_TRACK_HALF_WIDTH * sin_a
-	)
-	var right_query := Vector2(
-		position.x + TANK_TRACK_HALF_WIDTH * cos_a,
-		position.y + TANK_TRACK_HALF_WIDTH * sin_a
-	)
-	var mid_query := position
-	var left_screen_disp: float = _ground_position_for_query(terrain, left_query.x, left_query.y).y - left_query.y
-	var right_screen_disp: float = _ground_position_for_query(terrain, right_query.x, right_query.y).y - right_query.y
-	var mid_screen_disp: float = _ground_position_for_query(terrain, mid_query.x, mid_query.y).y - mid_query.y
-	var left_disp := -left_screen_disp
-	var right_disp := -right_screen_disp
-	var mid_disp := -mid_screen_disp
+	var track_width := TANK_TRACK_HALF_WIDTH / World.SCALE
+	var left_x := _motion_x - track_width * cos_a
+	var left_y := _motion_y - track_width * sin_a
+	var right_x := _motion_x + track_width * cos_a
+	var right_y := _motion_y + track_width * sin_a
+	var left_disp := _ground_y_classic(terrain, left_x, left_y) - left_y
+	var right_disp := _ground_y_classic(terrain, right_x, right_y) - right_y
+	var mid_disp := _ground_y_classic(terrain, _motion_x, _motion_y) - _motion_y
 	var relative_disp := 0.0
 	var max_disp := 0.0
 	if mid_disp > left_disp and mid_disp > right_disp:
@@ -228,14 +301,16 @@ func _classic_track_ground_alignment(terrain: RefCounted, boosting := false) -> 
 		else:
 			relative_disp = left_disp - right_disp
 		max_disp = left_disp
-	var airborne := max_disp < -TANK_TRACK_AIRBORNE_THRESHOLD or (boosting and max_disp <= 0.0)
+	var airborne := max_disp < -TANK_TRACK_AIRBORNE_THRESHOLD / World.SCALE or (boosting and max_disp <= 0.0)
 	return {
 		"airborne": airborne,
-		"screen_shift": -max_disp,
-		"relative_displacement": relative_disp,
-		"left_displacement": left_disp,
-		"right_displacement": right_disp,
-		"mid_displacement": mid_disp,
+		"classic_shift": max_disp,
+		"classic_relative": relative_disp,
+		"screen_shift": -max_disp * World.SCALE,
+		"relative_displacement": relative_disp * World.SCALE,
+		"left_displacement": left_disp * World.SCALE,
+		"right_displacement": right_disp * World.SCALE,
+		"mid_displacement": mid_disp * World.SCALE,
 	}
 
 
@@ -250,7 +325,7 @@ func _apply_classic_track_ground_alignment(terrain: RefCounted, boosting := fals
 		-TANK_TRACK_MAX_REL_DISPLACEMENT,
 		TANK_TRACK_MAX_REL_DISPLACEMENT
 	)
-	tank_angle += rel_disp * TANK_TRACK_ANGLE_SCALE
+	tank_angle -= rel_disp * TANK_TRACK_ANGLE_SCALE
 	on_ground = true
 	airborne_velocity = Vector2.ZERO
 	return true
@@ -260,6 +335,16 @@ func _ground_position_for_query(terrain: RefCounted, x: float, query_y: float) -
 	if terrain.has_method("move_to_ground"):
 		return Vector2(x, float(terrain.call("move_to_ground", x, query_y)))
 	return terrain.tank_position(x)
+
+
+func _ground_y_classic(terrain: RefCounted, x: float, query_y: float) -> float:
+	if terrain.has_method("uses_classic_world") and terrain.uses_classic_world():
+		return float(terrain.call("move_to_ground_classic", x, query_y))
+	var sx := World.ORIGIN.x + x * World.SCALE
+	var sy := World.ORIGIN.y - query_y * World.SCALE
+	if terrain.has_method("move_to_ground"):
+		return (World.ORIGIN.y - float(terrain.call("move_to_ground", sx, sy))) / World.SCALE
+	return (World.ORIGIN.y - float(terrain.tank_position(sx).y)) / World.SCALE
 
 
 func _constrain_to_terrain_bounds(terrain: RefCounted) -> void:

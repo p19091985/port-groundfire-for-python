@@ -1,12 +1,23 @@
 extends RefCounted
 
+# Terrain clipping must not round its intermediate heights to Vector2 float32.
+class DoublePoint extends RefCounted:
+	var x: float
+	var y: float
+	func _init(px: float, py: float) -> void:
+		x = px
+		y = py
+	func distance_squared_to(other: DoublePoint) -> float:
+		return (x - other.x) * (x - other.x) + (y - other.y) * (y - other.y)
+
 const PythonRandom := preload("res://scripts/python_random.gd")
+const World := preload("res://scripts/classic_world.gd")
 
 const CLASSIC_SURFACE_TOP := Color(0.40, 0.40, 0.00)
 const CLASSIC_SURFACE_BOTTOM := Color(0.80, 0.80, 0.00)
 const CLASSIC_BASE := Color(0.80, 0.80, 0.00)
 const CLASSIC_COLOUR_EQUAL_EPSILON := 0.0001
-const MIN_CHUNK_THICKNESS := 0.5
+const MIN_CHUNK_THICKNESS := 0.0
 const CLASSIC_MIN_LAND_HEIGHT := -7.0
 const TANK_EDGE_MARGIN := 30.0
 const CLASSIC_SLICE_COUNT := 500
@@ -16,20 +27,23 @@ var _height := 768.0
 var _step := 1024.0 / CLASSIC_SLICE_COUNT
 var _seed := 1337
 var _slice_count := CLASSIC_SLICE_COUNT
-var _samples := PackedFloat32Array()
+var _samples := PackedFloat64Array()
 var _chunks: Array = []
 var _fall_pause := 0.20
-var _fall_acceleration := 240.0
-var _fall_terminal_speed := 420.0
+var _fall_acceleration := 5.0 * World.SCALE
+var _fall_terminal_speed := INF
+var _classic_half_width := World.TERRAIN_HALF_WIDTH
+var _classic_fall_acceleration := 5.0
+var _rng: RefCounted
+var _clipping_classic := false
 
 
 func configure_classic(settings: Dictionary) -> void:
 	var terrain := Dictionary(settings.get("terrain", {}))
 	_slice_count = max(1, int(terrain.get("slices", CLASSIC_SLICE_COUNT)))
 	_fall_pause = max(0.0, float(terrain.get("fall_pause", 0.20)))
-	# Keep the established world-to-screen conversion while making the Python
-	# value authoritative and preserving the classic default exactly.
-	_fall_acceleration = 240.0 * float(terrain.get("fall_acceleration", 5.0)) / 5.0
+	_classic_half_width = float(terrain.get("width", World.TERRAIN_HALF_WIDTH))
+	_classic_fall_acceleration = float(terrain.get("fall_acceleration", 5.0))
 
 
 func rebuild(width: float, height: float) -> void:
@@ -37,6 +51,7 @@ func rebuild(width: float, height: float) -> void:
 	_height = max(height, 64.0)
 	_slice_count = max(1, _slice_count)
 	_step = _width / float(_slice_count)
+	_fall_acceleration = _classic_fall_acceleration * _world_scale()
 	_generate_original_style_samples()
 
 
@@ -48,9 +63,10 @@ func rebuild_with_seed(width: float, height: float, seed: int) -> void:
 func _generate_original_style_samples() -> void:
 	_samples.clear()
 	_chunks.clear()
-	var rng := PythonRandom.new(_seed)
-	var heights := PackedFloat32Array()
-	var smoothed := PackedFloat32Array()
+	_rng = PythonRandom.new(_seed)
+	var rng := _rng
+	var heights := PackedFloat64Array()
+	var smoothed := PackedFloat64Array()
 	for _index in range(_slice_count + 1):
 		heights.append(-7.0)
 		smoothed.append(0.0)
@@ -71,15 +87,75 @@ func _generate_original_style_samples() -> void:
 	for index in range(_slice_count + 1):
 		if index >= 10 and index < _slice_count - 10:
 			var total := 0.0
+			var correction := 0.0
 			for neighbor in range(index - 10, index + 11):
-				total += heights[neighbor]
-			smoothed[index] = total / 21.0
+				var value := heights[neighbor]
+				var next_total := total + value
+				if abs(total) >= abs(value):
+					correction += (total - next_total) + value
+				else:
+					correction += (value - next_total) + total
+				total = next_total
+			# Python 3.12+ sum(float) retains the low-order part of the sum.
+			smoothed[index] = (total + correction) / 21.0
 		else:
 			smoothed[index] = heights[index]
 
 	for index in range(_slice_count + 1):
 		_samples.append(_world_height_to_screen(smoothed[index]))
 	_rebuild_chunks_from_samples()
+	# Retain the generated doubles before conversion to render coordinates. Track
+	# alignment branches on very small height differences in the Python runtime.
+	for index in range(_chunks.size()):
+		var cap: Dictionary = _chunks[index][0]
+		cap["classic_heights"] = [smoothed[index], smoothed[index + 1], smoothed[index] - 1.0, smoothed[index + 1] - 1.0]
+		cap["classic_height_view"] = [cap.top_left, cap.top_right, cap.bottom_left, cap.bottom_right]
+
+
+func _screen_height_to_world(screen_height: float) -> float:
+	return (_height - screen_height) / _world_scale() - 8.0
+
+
+func _classic_heights(chunk: Dictionary) -> Array:
+	var screen: Array = [chunk.top_left, chunk.top_right, chunk.bottom_left, chunk.bottom_right]
+	var previous: Array = chunk.get("classic_height_view", [])
+	var heights: Array = chunk.get("classic_heights", [0.0, 0.0, 0.0, 0.0])
+	for index in range(4):
+		if previous.is_empty() or screen[index] != previous[index]:
+			heights[index] = _screen_height_to_world(float(screen[index]))
+	chunk["classic_height_view"] = screen
+	chunk["classic_heights"] = heights
+	return heights
+
+
+func move_to_ground_classic(x: float, y: float) -> float:
+	if _chunks.is_empty():
+		return _screen_height_to_world(move_to_ground((x + _classic_half_width) * _world_scale(), _world_height_to_screen(y)))
+	var slice_position := x * (_slice_count / (2.0 * _classic_half_width)) + _slice_count / 2.0
+	var slice_index := int(slice_position)
+	if slice_index < 0 or slice_index >= _chunks.size():
+		return CLASSIC_MIN_LAND_HEIGHT
+	var offset := slice_position - slice_index
+	var height := 0.0
+	var old_height := -1000.0
+	for chunk in _chunks[slice_index]:
+		var heights := _classic_heights(chunk)
+		var top: float = heights[0] * (1.0 - offset) + heights[1] * offset
+		var bottom: float = heights[2] * (1.0 - offset) + heights[3] * offset
+		if y < bottom:
+			continue
+		height = top
+		if y <= top:
+			break
+		if y - height < y - old_height:
+			old_height = height
+		else:
+			height = old_height
+	return height
+
+
+func uses_classic_world() -> bool:
+	return _width == World.SIZE.x and _height == World.SIZE.y
 
 
 func _rebuild_chunks_from_samples() -> void:
@@ -89,11 +165,12 @@ func _rebuild_chunks_from_samples() -> void:
 	for index in range(_samples.size() - 1):
 		var surface_left := _samples[index]
 		var surface_right := _samples[index + 1]
-		var cap_bottom_left: float = min(surface_left + 42.0, _height)
-		var cap_bottom_right: float = min(surface_right + 42.0, _height)
+		var cap_bottom_left: float = surface_left + _world_scale()
+		var cap_bottom_right: float = surface_right + _world_scale()
 		var slice_chunks: Array[Dictionary] = []
-		slice_chunks.append(_make_chunk(surface_left, surface_right, cap_bottom_left, cap_bottom_right, true, CLASSIC_SURFACE_TOP, CLASSIC_SURFACE_BOTTOM))
-		if cap_bottom_left < _height or cap_bottom_right < _height:
+		var linked := cap_bottom_left < _world_height_to_screen(-7.5) or cap_bottom_right < _world_height_to_screen(-7.5)
+		slice_chunks.append(_make_chunk(surface_left, surface_right, cap_bottom_left, cap_bottom_right, linked, CLASSIC_SURFACE_TOP, CLASSIC_SURFACE_BOTTOM))
+		if linked:
 			slice_chunks.append(_make_chunk(cap_bottom_left, cap_bottom_right, _height, _height, false, CLASSIC_BASE, CLASSIC_BASE))
 		_chunks.append(slice_chunks)
 
@@ -130,13 +207,10 @@ func is_empty() -> bool:
 	return _samples.is_empty()
 
 
-func world_height_samples() -> PackedFloat32Array:
-	var result := PackedFloat32Array()
-	var screen_bottom := _height - 72.0
-	var screen_top := _height * 0.38
+func world_height_samples() -> PackedFloat64Array:
+	var result := PackedFloat64Array()
 	for screen_height in _samples:
-		var normalized := inverse_lerp(screen_bottom, screen_top, screen_height)
-		result.append(lerpf(-8.0, 5.0, normalized))
+		result.append((_height - screen_height) / _world_scale() - 8.0)
 	return result
 
 
@@ -283,17 +357,79 @@ func _chunk_bottom_at_offset(chunk: Dictionary, slice_offset: float) -> float:
 
 
 func tank_position(x: float) -> Vector2:
-	return Vector2(clamp(x, TANK_EDGE_MARGIN, _width - TANK_EDGE_MARGIN), height_at(x))
+	var bounds := playable_bounds()
+	return Vector2(clamp(x, bounds.x, bounds.y), height_at(x))
 
 
 func playable_bounds() -> Vector2:
-	return Vector2(TANK_EDGE_MARGIN, _width - TANK_EDGE_MARGIN)
+	return Vector2(_width * 0.5 - 10.0 * _world_scale(), _width * 0.5 + 10.0 * _world_scale())
+
+
+func projectile_bounds() -> Vector2:
+	return Vector2(0.0, _width)
 
 
 func slope_angle_at(x: float) -> float:
 	var left := height_at(x - _step)
 	var right := height_at(x + _step)
 	return clamp(rad_to_deg(atan2(right - left, _step * 2.0)), -32.0, 32.0)
+
+
+func ground_collision_classic(x1: float, y1: float, x2: float, y2: float) -> Array:
+	var conversion := _slice_count / (2.0 * _classic_half_width)
+	var sx1 := x1 * conversion + _slice_count / 2.0
+	var sx2 := x2 * conversion + _slice_count / 2.0
+	var index1 := int(sx1)
+	var index2 := int(sx2)
+	var offset1 := sx1 - floorf(sx1)
+	var offset2 := sx2 - floorf(sx2)
+	if index1 == index2:
+		return _intersect_classic_chunk(offset1, y1, offset2, y2, index1)
+	var direction := 1 if index1 < index2 else -1
+	var length_x := x2 - x1 if direction > 0 else x1 - x2
+	var length_y := y2 - y1 if direction > 0 else y1 - y2
+	var edge := 1.0 if direction > 0 else 0.0
+	var x := (index1 + edge - _slice_count / 2.0) / conversion
+	var y := y1 + ((x - x1) / length_x) * length_y if direction > 0 else y2 + ((x - x2) / length_x) * length_y
+	var collision := _intersect_classic_chunk(offset1, y1, edge, y, index1)
+	if not collision.is_empty():
+		return collision
+	for index in range(index1 + direction, index2, direction):
+		x += direction * (1.0 / conversion)
+		var previous_y := y
+		y = y1 + ((x - x1) / length_x) * length_y if direction > 0 else y2 + ((x - x2) / length_x) * length_y
+		collision = _intersect_classic_chunk(1.0 - edge, previous_y, edge, y, index)
+		if not collision.is_empty():
+			return collision
+	return _intersect_classic_chunk(1.0 - edge, y, offset2, y2, index2)
+
+
+func _intersect_classic_chunk(x1: float, y1: float, x2: float, y2: float, index: int) -> Array:
+	if index < 0 or index >= _chunks.size():
+		return []
+	var conversion := _slice_count / (2.0 * _classic_half_width)
+	for chunk in _chunks[index]:
+		var heights := _classic_heights(chunk)
+		var states: Array[int] = []
+		for point in [[x1, y1], [x2, y2]]:
+			var top: float = heights[0] * (1.0 - point[0]) + heights[1] * point[0]
+			var bottom: float = heights[2] * (1.0 - point[0]) + heights[3] * point[0]
+			states.append(1 if point[1] > top else (2 if point[1] < bottom else 0))
+		if states[0] == 0:
+			return [(x1 + index - _slice_count / 2.0) / conversion, y1]
+		if states[0] == states[1]:
+			continue
+		var side := 0 if states[0] == 1 else 2
+		var dx := x2 - x1
+		var projectile_gradient := (y2 - y1) / dx if absf(dx) > 1.0e-9 else 1.0e10
+		var slice_gradient: float = heights[side + 1] - heights[side]
+		var cx: float
+		if projectile_gradient > 1.0 or projectile_gradient < -1.0:
+			cx = (((heights[side] - y1) / projectile_gradient) + x1) / (1.0 - slice_gradient / projectile_gradient)
+		else:
+			cx = (heights[side] - y1 + projectile_gradient * x1) / (projectile_gradient - slice_gradient)
+		return [(cx + index - _slice_count / 2.0) / conversion, cx * slice_gradient + heights[side]]
+	return []
 
 
 func ground_collision(start: Vector2, end: Vector2) -> Dictionary:
@@ -321,6 +457,37 @@ func ground_collision(start: Vector2, end: Vector2) -> Dictionary:
 
 
 func apply_crater(center: Vector2, radius: float) -> void:
+	_apply_precise_crater(DoublePoint.new(center.x, center.y), radius)
+
+
+func apply_crater_classic(x: float, y: float, radius: float) -> void:
+	# Clip in the reference coordinate space. Translating to pixels and back
+	# changes last bits that decide which suspended layer supports a tank.
+	var conversion := _slice_count / (2.0 * _classic_half_width)
+	var first := maxi(0, int((x - radius) * conversion + _slice_count / 2.0))
+	var last := mini(_slice_count - 1, int((x + radius) * conversion + _slice_count / 2.0) + 1)
+	_clipping_classic = true
+	for index in range(first, last + 1):
+		for chunk in _chunks[index]:
+			var h := _classic_heights(chunk)
+			chunk.top_left = -float(h[0])
+			chunk.top_right = -float(h[1])
+			chunk.bottom_left = -float(h[2])
+			chunk.bottom_right = -float(h[3])
+		_clip_slice(index, DoublePoint.new(x, -y), radius)
+		for chunk in _chunks[index]:
+			var h := [-float(chunk.top_left), -float(chunk.top_right), -float(chunk.bottom_left), -float(chunk.bottom_right)]
+			chunk.top_left = _world_height_to_screen(h[0])
+			chunk.top_right = _world_height_to_screen(h[1])
+			chunk.bottom_left = _world_height_to_screen(h[2])
+			chunk.bottom_right = _world_height_to_screen(h[3])
+			chunk.classic_heights = h
+			chunk.classic_height_view = [chunk.top_left, chunk.top_right, chunk.bottom_left, chunk.bottom_right]
+	_clipping_classic = false
+	_update_samples_from_chunks()
+
+
+func _apply_precise_crater(center: DoublePoint, radius: float) -> void:
 	if _samples.is_empty():
 		rebuild(_width, _height)
 	var safe_radius: float = max(radius, 6.0)
@@ -345,11 +512,25 @@ func drop_terrain(amount: float) -> void:
 		var slice_chunks: Array = _chunks[slice_index]
 		for chunk_index in range(slice_chunks.size()):
 			var chunk: Dictionary = slice_chunks[chunk_index]
+			if uses_classic_world():
+				var heights := _classic_heights(chunk)
+				var classic_amount := amount / _world_scale()
+				heights[0] = maxf(CLASSIC_MIN_LAND_HEIGHT, heights[0] - classic_amount)
+				heights[1] = maxf(CLASSIC_MIN_LAND_HEIGHT, heights[1] - classic_amount)
+				if heights[0] > CLASSIC_MIN_LAND_HEIGHT:
+					heights[2] -= classic_amount
+					heights[3] -= classic_amount
+				for side in range(4):
+					chunk[["top_left", "top_right", "bottom_left", "bottom_right"][side]] = _world_height_to_screen(heights[side])
+				chunk["classic_heights"] = heights
+				chunk["classic_height_view"] = [chunk.top_left, chunk.top_right, chunk.bottom_left, chunk.bottom_right]
+				slice_chunks[chunk_index] = chunk
+				continue
 			chunk["top_left"] = min(floor_y, float(chunk["top_left"]) + amount)
 			chunk["top_right"] = min(floor_y, float(chunk["top_right"]) + amount)
 			if float(chunk["top_left"]) < floor_y:
-				chunk["bottom_left"] = min(_height, float(chunk["bottom_left"]) + amount)
-				chunk["bottom_right"] = min(_height, float(chunk["bottom_right"]) + amount)
+				chunk["bottom_left"] = float(chunk["bottom_left"]) + amount
+				chunk["bottom_right"] = float(chunk["bottom_right"]) + amount
 			slice_chunks[chunk_index] = chunk
 		_chunks[slice_index] = slice_chunks
 	_update_samples_from_chunks()
@@ -398,7 +579,7 @@ func update(delta: float) -> void:
 					if left_at_rest and right_at_rest:
 						superblock_end = _settle_landed_superblock(slice_chunks, chunk_index, superblock_end)
 					else:
-						_set_superblock_motion(slice_chunks, chunk_index, superblock_end, true, next_speed, 0.0)
+						_set_superblock_motion(slice_chunks, chunk_index, superblock_end, true, next_speed, float(leader.get("wait", 0.0)))
 			chunk_index = superblock_end + 1
 		_sort_slice(slice_chunks)
 		_merge_resting_superblocks(slice_chunks)
@@ -411,7 +592,7 @@ func chunk_polygons() -> Array[Dictionary]:
 		var x1 := float(slice_index) * _step
 		var x2 := float(slice_index + 1) * _step
 		for chunk in _chunks[slice_index]:
-			if float(chunk["bottom_left"]) <= float(chunk["top_left"]) + 0.5 and float(chunk["bottom_right"]) <= float(chunk["top_right"]) + 0.5:
+			if float(chunk["bottom_left"]) <= float(chunk["top_left"]) and float(chunk["bottom_right"]) <= float(chunk["top_right"]):
 				continue
 			polygons.append({
 				"points": PackedVector2Array([
@@ -439,9 +620,15 @@ func polygon_points() -> PackedVector2Array:
 	return points
 
 
-func _clip_slice(slice_index: int, center: Vector2, radius: float) -> void:
+func _clip_slice(slice_index: int, center: Variant, radius: float) -> void:
+	if center is Vector2:
+		center = DoublePoint.new(center.x, center.y)
 	var x1 := float(slice_index) * _step
 	var x2 := float(slice_index + 1) * _step
+	if _clipping_classic:
+		var conversion := _slice_count / (2.0 * _classic_half_width)
+		x1 = (slice_index - _slice_count / 2.0) / conversion
+		x2 = (slice_index + 1 - _slice_count / 2.0) / conversion
 	var left_interval := _blast_interval_at_x(center, radius, x1)
 	var right_interval := _blast_interval_at_x(center, radius, x2)
 	if left_interval.x == INF and right_interval.x == INF:
@@ -464,14 +651,14 @@ func _clip_slice(slice_index: int, center: Vector2, radius: float) -> void:
 		var chunk_right_interval := _clamped_blast_interval_for_chunk_side(chunk, false, right_interval)
 		var left_parts := _subtract_interval(float(chunk["top_left"]), float(chunk["bottom_left"]), chunk_left_interval)
 		var right_parts := _subtract_interval(float(chunk["top_right"]), float(chunk["bottom_right"]), chunk_right_interval)
-		var state1 := _blast_state_at_point(center, radius, Vector2(x1, float(chunk["top_left"])))
-		var state2 := _blast_state_at_point(center, radius, Vector2(x2, float(chunk["top_right"])))
+		var state1 := _blast_state_at_point(center, radius, DoublePoint.new(x1, float(chunk["top_left"])))
+		var state2 := _blast_state_at_point(center, radius, DoublePoint.new(x2, float(chunk["top_right"])))
 		var state3 := _bottom_blast_state_for_chunk_side(chunk, true, center, radius, x1)
 		var state4 := _bottom_blast_state_for_chunk_side(chunk, false, center, radius, x2)
 		if right_interval.x == INF and left_parts.size() == 2 and state1 != 3 and state3 != 3:
-			left_parts = [Vector2(float(chunk["top_left"]), float(chunk["bottom_left"]))]
+			left_parts = [DoublePoint.new(float(chunk["top_left"]), float(chunk["bottom_left"]))]
 		if left_interval.x == INF and right_parts.size() == 2 and state2 != 3 and state4 != 3:
-			right_parts = [Vector2(float(chunk["top_right"]), float(chunk["bottom_right"]))]
+			right_parts = [DoublePoint.new(float(chunk["top_right"]), float(chunk["bottom_right"]))]
 		var top_code := (state2 << 2) | state1
 		if (top_code == 6 or top_code == 14) and left_parts.size() > 1:
 			left_parts = [left_parts[left_parts.size() - 1]]
@@ -493,9 +680,9 @@ func _clip_slice(slice_index: int, center: Vector2, radius: float) -> void:
 		for part_index in range(part_count):
 			if part_index >= left_parts.size() or part_index >= right_parts.size():
 				continue
-			var left_part: Vector2 = left_parts[part_index]
-			var right_part: Vector2 = right_parts[part_index]
-			if left_part.y <= left_part.x + 0.5 and right_part.y <= right_part.x + 0.5:
+			var left_part: DoublePoint = left_parts[part_index]
+			var right_part: DoublePoint = right_parts[part_index]
+			if left_part.y <= left_part.x and right_part.y <= right_part.x:
 				continue
 			var new_chunk: Dictionary = _chunk_from_clipped_parts(chunk, left_part, right_part)
 			new_chunk["linked_to_next"] = false
@@ -538,52 +725,51 @@ func _clip_slice(slice_index: int, center: Vector2, radius: float) -> void:
 		replacement.append_array(produced_parts)
 	_chunks[slice_index] = replacement
 	_sort_slice(_chunks[slice_index])
-	_merge_resting_superblocks(_chunks[slice_index])
+	if not _clipping_classic:
+		_merge_resting_superblocks(_chunks[slice_index])
 
 
-func _blast_interval_at_x(center: Vector2, radius: float, x: float) -> Vector2:
+func _blast_interval_at_x(center: DoublePoint, radius: float, x: float) -> DoublePoint:
 	var distance: float = abs(x - center.x)
 	if distance > radius:
-		return Vector2(INF, -INF)
+		return DoublePoint.new(INF, -INF)
 	var root := sqrt(max(0.0, radius * radius - distance * distance))
-	return Vector2(center.y - root, center.y + root)
+	return DoublePoint.new(center.y - root, center.y + root)
 
 
-func _clamped_blast_interval_for_chunk_side(chunk: Dictionary, left_side: bool, raw_interval: Vector2) -> Vector2:
+func _clamped_blast_interval_for_chunk_side(chunk: Dictionary, left_side: bool, raw_interval: DoublePoint) -> DoublePoint:
 	if raw_interval.x == INF:
 		return raw_interval
-	var bottom_key := "bottom_left" if left_side else "bottom_right"
-	var bottom := float(chunk[bottom_key])
-	var min_land_screen_y := _world_height_to_screen(CLASSIC_MIN_LAND_HEIGHT)
-	if bottom < min_land_screen_y - 0.001:
-		return raw_interval
+	var min_land_screen_y := -CLASSIC_MIN_LAND_HEIGHT if _clipping_classic else _world_height_to_screen(CLASSIC_MIN_LAND_HEIGHT)
+	# Python clip_height clamps the lower intersection even when clipping an
+	# upper layer. Its removal can propagate this edge into the layer below.
 	var clamped_bottom: float = min(raw_interval.y, min_land_screen_y)
 	if clamped_bottom <= raw_interval.x:
-		return Vector2(INF, -INF)
-	return Vector2(raw_interval.x, clamped_bottom)
+		return DoublePoint.new(INF, -INF)
+	return DoublePoint.new(raw_interval.x, clamped_bottom)
 
 
-func _should_skip_linked_superblock_clip(chunk: Dictionary, center: Vector2, radius: float, x1: float, x2: float) -> bool:
+func _should_skip_linked_superblock_clip(chunk: Dictionary, center: DoublePoint, radius: float, x1: float, x2: float) -> bool:
 	if not bool(chunk.get("linked_to_next", false)):
 		return false
-	var state1 := _blast_state_at_point(center, radius, Vector2(x1, float(chunk["top_left"])))
-	var state2 := _blast_state_at_point(center, radius, Vector2(x2, float(chunk["top_right"])))
+	var state1 := _blast_state_at_point(center, radius, DoublePoint.new(x1, float(chunk["top_left"])))
+	var state2 := _blast_state_at_point(center, radius, DoublePoint.new(x2, float(chunk["top_right"])))
 	var state3 := _bottom_blast_state_for_chunk_side(chunk, true, center, radius, x1)
 	var state4 := _bottom_blast_state_for_chunk_side(chunk, false, center, radius, x2)
 	return (state1 == 0 and state2 != 3 and state4 == 3) \
 			or (state2 == 0 and state1 != 3 and state3 == 3)
 
 
-func _bottom_blast_state_for_chunk_side(chunk: Dictionary, left_side: bool, center: Vector2, radius: float, edge_x: float) -> int:
+func _bottom_blast_state_for_chunk_side(chunk: Dictionary, left_side: bool, center: DoublePoint, radius: float, edge_x: float) -> int:
 	var bottom_key := "bottom_left" if left_side else "bottom_right"
 	var bottom := float(chunk[bottom_key])
-	var min_land_screen_y := _world_height_to_screen(CLASSIC_MIN_LAND_HEIGHT)
+	var min_land_screen_y := -CLASSIC_MIN_LAND_HEIGHT if _clipping_classic else _world_height_to_screen(CLASSIC_MIN_LAND_HEIGHT)
 	if bottom >= min_land_screen_y - 0.001:
 		return 1
-	return _blast_state_at_point(center, radius, Vector2(edge_x, bottom))
+	return _blast_state_at_point(center, radius, DoublePoint.new(edge_x, bottom))
 
 
-func _blast_state_at_point(center: Vector2, radius: float, point: Vector2) -> int:
+func _blast_state_at_point(center: DoublePoint, radius: float, point: DoublePoint) -> int:
 	if point.x > center.x + radius or point.x < center.x - radius:
 		return 0
 	if point.distance_squared_to(center) < radius * radius:
@@ -656,22 +842,22 @@ func _cross(a: Vector2, b: Vector2) -> float:
 	return a.x * b.y - a.y * b.x
 
 
-func _subtract_interval(top: float, bottom: float, cut: Vector2) -> Array[Vector2]:
+func _subtract_interval(top: float, bottom: float, cut: DoublePoint) -> Array[DoublePoint]:
 	if bottom <= top + MIN_CHUNK_THICKNESS:
 		return []
 	if cut.x == INF or cut.y <= top or cut.x >= bottom:
-		return [Vector2(top, bottom)]
-	var parts: Array[Vector2] = []
+		return [DoublePoint.new(top, bottom)]
+	var parts: Array[DoublePoint] = []
 	var cut_top: float = clamp(cut.x, top, bottom)
 	var cut_bottom: float = clamp(cut.y, top, bottom)
 	if cut_top > top + MIN_CHUNK_THICKNESS:
-		parts.append(Vector2(top, cut_top))
+		parts.append(DoublePoint.new(top, cut_top))
 	if bottom > cut_bottom + MIN_CHUNK_THICKNESS:
-		parts.append(Vector2(cut_bottom, bottom))
+		parts.append(DoublePoint.new(cut_bottom, bottom))
 	return parts
 
 
-func _align_clipped_side_parts(chunk: Dictionary, left_parts: Array[Vector2], right_parts: Array[Vector2]) -> Dictionary:
+func _align_clipped_side_parts(chunk: Dictionary, left_parts: Array[DoublePoint], right_parts: Array[DoublePoint]) -> Dictionary:
 	# A one-sided crater can split one edge while leaving the opposite edge intact.
 	# Preserve both remainders by mirroring the split ratios onto the intact edge.
 	if left_parts.size() == 2 and right_parts.size() == 1:
@@ -699,13 +885,13 @@ func _align_clipped_side_parts(chunk: Dictionary, left_parts: Array[Vector2], ri
 
 
 func _split_single_part_to_match(
-	part: Vector2,
+	part: DoublePoint,
 	target_top: float,
 	target_bottom: float,
-	source_parts: Array[Vector2],
+	source_parts: Array[DoublePoint],
 	source_top: float,
 	source_bottom: float
-) -> Array[Vector2]:
+) -> Array[DoublePoint]:
 	if source_parts.size() != 2:
 		return [part]
 	var source_span := source_bottom - source_top
@@ -716,13 +902,13 @@ func _split_single_part_to_match(
 	var target_top_split: float = clamp(lerpf(target_top, target_bottom, top_split_ratio), part.x, part.y)
 	var target_bottom_split: float = clamp(lerpf(target_top, target_bottom, bottom_split_ratio), part.x, part.y)
 	return [
-		Vector2(part.x, target_top_split),
-		Vector2(target_bottom_split, part.y),
+		DoublePoint.new(part.x, target_top_split),
+		DoublePoint.new(target_bottom_split, part.y),
 	]
 
 
-func _chunk_from_clipped_parts(chunk: Dictionary, left_part: Vector2, right_part: Vector2) -> Dictionary:
-	var new_chunk: Dictionary = chunk.duplicate()
+func _chunk_from_clipped_parts(chunk: Dictionary, left_part: DoublePoint, right_part: DoublePoint) -> Dictionary:
+	var new_chunk: Dictionary = chunk.duplicate(true)
 	new_chunk["top_left"] = left_part.x
 	new_chunk["bottom_left"] = left_part.y
 	new_chunk["top_right"] = right_part.x
@@ -735,7 +921,7 @@ func _chunk_from_clipped_parts(chunk: Dictionary, left_part: Vector2, right_part
 	return new_chunk
 
 
-func _parts_preserve_chunk_bottom(left_parts: Array[Vector2], right_parts: Array[Vector2], chunk: Dictionary) -> bool:
+func _parts_preserve_chunk_bottom(left_parts: Array[DoublePoint], right_parts: Array[DoublePoint], chunk: Dictionary) -> bool:
 	if left_parts.is_empty() or right_parts.is_empty():
 		return false
 	var left_bottom: float = left_parts[left_parts.size() - 1].y
@@ -772,8 +958,8 @@ func _propagate_removed_linked_top(next_chunk: Dictionary, removed_chunk: Dictio
 func _propagate_removed_linked_cut_top(
 	next_chunk: Dictionary,
 	removed_chunk: Dictionary,
-	left_cut: Vector2,
-	right_cut: Vector2
+	left_cut: DoublePoint,
+	right_cut: DoublePoint
 ) -> void:
 	next_chunk["top_left"] = float(removed_chunk["top_left"]) if left_cut.x == INF else float(left_cut.y)
 	next_chunk["top_right"] = float(removed_chunk["top_right"]) if right_cut.x == INF else float(right_cut.y)
@@ -942,7 +1128,7 @@ func _superblock_landing_gap(slice_chunks: Array, start_index: int, end_index: i
 	return min(gaps.x, gaps.y)
 
 
-func _superblock_landing_gaps(slice_chunks: Array, _start_index: int, end_index: int) -> Vector2:
+func _superblock_landing_gaps(slice_chunks: Array, _start_index: int, end_index: int) -> DoublePoint:
 	var bottom_chunk: Dictionary = slice_chunks[end_index]
 	var left_gap := INF
 	var right_gap := INF
@@ -961,7 +1147,7 @@ func _superblock_landing_gaps(slice_chunks: Array, _start_index: int, end_index:
 		right_gap = -1.0
 	else:
 		right_gap = max(0.0, right_gap)
-	return Vector2(left_gap, right_gap)
+	return DoublePoint.new(left_gap, right_gap)
 
 
 func _landing_gap(slice_chunks: Array, chunk_index: int) -> float:
@@ -1065,5 +1251,8 @@ func _base_height_at(x: float) -> float:
 
 
 func _world_height_to_screen(world_height: float) -> float:
-	var normalized := inverse_lerp(-8.0, 5.0, world_height)
-	return lerpf(_height - 72.0, _height * 0.38, normalized)
+	return _height - (world_height + 8.0) * _world_scale()
+
+
+func _world_scale() -> float:
+	return _width / (2.0 * _classic_half_width)

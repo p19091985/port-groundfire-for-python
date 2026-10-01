@@ -49,7 +49,7 @@ func _run() -> void:
 	online.set("_join_sent", true)
 	online.call("_on_websocket_message_received", {"type": "error", "protocol": 2, "message": "server_full"})
 	assert(not bool(online.get("_join_sent")))
-	assert(abs(float(online.get("_capacity_retry_timer")) - 3.0) < 0.01)
+	assert(abs(float(online.get("_capacity_retry_timer")) - 1.0) < 0.01)
 	assert(str(online.get("_status")).contains("slot opens"))
 
 	online.set("_endpoint", "ws://127.0.0.1:9")

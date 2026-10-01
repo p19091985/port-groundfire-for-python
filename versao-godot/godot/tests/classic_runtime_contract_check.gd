@@ -31,8 +31,12 @@ func _check_fixed_step_contract() -> void:
 func _check_controller_routing_contract() -> void:
 	assert(PlayerInputRouter.action_name_for_controller(0, "fire") == "gf_fire")
 	assert(PlayerInputRouter.action_name_for_controller(1, "fire") == "gf_p2_fire")
-	assert(PlayerInputRouter.gamepad_device_for_controller(2) == 0)
-	assert(PlayerInputRouter.gamepad_device_for_controller(9) == 7)
+	# Godot device IDs can be sparse after hotplug. Controller slots index the
+	# connected device list, and a disconnected slot must never read device 0.
+	var devices := Input.get_connected_joypads()
+	for slot in range(8):
+		var expected := int(devices[slot]) if slot < devices.size() else -1
+		assert(PlayerInputRouter.gamepad_device_for_controller(slot + 2) == expected)
 	var empty := PlayerInputRouter.empty_command()
 	assert(not empty["fire"])
 	assert(not empty["fire_pressed"])

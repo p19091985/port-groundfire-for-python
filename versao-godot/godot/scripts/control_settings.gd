@@ -352,6 +352,13 @@ static func _apply_key_binding(action_name: String, keycode: int) -> void:
 	var event := InputEventKey.new()
 	event.keycode = keycode
 	InputMap.action_add_event(action_name, event)
+	# The local keyboard participant must never consume the network/global
+	# action's gamepad events. Keep a keyboard-only mirror when rebinding.
+	var local_name := "keyboard_" + action_name
+	if not InputMap.has_action(local_name):
+		InputMap.add_action(local_name)
+	InputMap.action_erase_events(local_name)
+	InputMap.action_add_event(local_name, event.duplicate())
 
 
 static func _apply_action_binding(action_name: String, keycode: int, config: ConfigFile) -> void:

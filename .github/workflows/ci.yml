@@ -117,6 +117,24 @@ jobs:
           fi
           scripts/validate_godot_release.sh "${flags[@]}"
 
+      - name: Install display for rendered experience checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth libgl1-mesa-dri
+
+      - name: Validate experience parity evidence
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a python scripts/validate_experience_parity.py --godot-bin "$GODOT_BIN" --output .tmp/experience-parity/ci --capture
+
+      - name: Upload experience parity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: experience-parity-evidence
+          path: .tmp/experience-parity/ci
+          if-no-files-found: warn
+
       - name: Validate GPG signing secrets
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign-release == 'true' }}
         env:

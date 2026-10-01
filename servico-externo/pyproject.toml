@@ -25,6 +25,9 @@ gf-service = "gf_service.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+gf_service = ["ui/*.html", "ui/*.css", "ui/*.js"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

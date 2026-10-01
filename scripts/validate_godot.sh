@@ -38,6 +38,8 @@ fi
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/main.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --check-only --script res://scripts/server_browser.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/browser_store_check.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/experience_menu_check.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/experience_audio_check.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/classic_runtime_contract_check.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/ai_memory_contract_check.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/simultaneous_local_contract_check.gd
@@ -47,7 +49,7 @@ fi
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/local_match_fidelity_check.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/test_weapon_inventory_ammo.gd
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/online_reliability_check.gd
-"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/runtime_smoke_check.gd
+"$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --script res://tests/runtime_smoke_check.gd -- --development-tools
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --scene res://scenes/main.tscn --quit-after 3
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --scene res://scenes/local_match.tscn --quit-after 3
 "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --scene res://scenes/online_match.tscn --quit-after 3

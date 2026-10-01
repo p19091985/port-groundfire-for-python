@@ -1,5 +1,7 @@
 extends Control
 
+signal back_requested
+
 const GroundfireTheme := preload("res://scripts/groundfire_theme.gd")
 const NetworkAdapter := preload("res://scripts/network_adapter.gd")
 const WebSocketClient := preload("res://scripts/websocket_client.gd")
@@ -12,6 +14,7 @@ const RECONNECT_BASE_DELAY := 0.75
 const RECONNECT_MAX_DELAY := 6.0
 const RECONNECT_MAX_ATTEMPTS := 5
 const HELLO_TIMEOUT := 5.0
+const CONNECT_TIMEOUT := 5.0
 const SNAPSHOT_STALE_TIMEOUT := 10.0
 const PENDING_COMMAND_TIMEOUT_MSEC := 5000
 const PREDICTION_MOVE_STEP := 0.08
@@ -58,6 +61,7 @@ var _local_player_number := -1
 var _seen_effect_ids: Dictionary = {}
 var _snapshot_age := 0.0
 var _handshake_age := 0.0
+var _connection_pending := false
 var _server_protocol_ready := false
 var _server_protocol_status := "Protocol handshake pending."
 var _join_sent := false
@@ -112,16 +116,33 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	_stop_session("online_match_exit")
+
+
+func _stop_session(reason: String) -> void:
+	_manual_disconnect = true
+	_connection_pending = false
 	set_process(false)
+	_reconnect_timer = 0.0
+	_capacity_retry_timer = 0.0
+	_session_token_pending = false
+	_join_sent = false
+	_pending_commands.clear()
 	if _session_token_request != null:
 		_session_token_request.cancel_request()
 	if _websocket_client != null:
-		_websocket_client.disconnect_from_endpoint("online_match_exit")
+		_websocket_client.disconnect_from_endpoint(reason)
 
 
 func _process(delta: float) -> void:
+	if _manual_disconnect:
+		return
 	_update_reconnect(delta)
 	if not _websocket_client.is_websocket_connected():
+		if _connection_pending:
+			_handshake_age += delta
+			if _handshake_age >= CONNECT_TIMEOUT:
+				_force_reconnect("connect_timeout")
 		_update_interpolation(delta)
 		_update_effects(delta)
 		queue_redraw()
@@ -191,7 +212,7 @@ func _send_input_snapshot() -> void:
 		return
 	if not _websocket_client.is_websocket_connected():
 		return
-	if _spectating:
+	if _spectating or bool(_entry.get("is_computer", false)):
 		return
 	var typing_chat := _chat_input != null and _chat_input.has_focus()
 	var phase := str(_match_snapshot.get("game_phase", ""))
@@ -225,10 +246,13 @@ func _send_input_snapshot() -> void:
 
 
 func _on_websocket_status_changed(status: String) -> void:
+	if _manual_disconnect:
+		return
 	if (_protocol_failure or _fatal_server_failure) and (status == "websocket_closed" or status == "websocket_disconnected"):
 		return
 	if status == "websocket_connected":
 		_reconnect_timer = 0.0
+		_connection_pending = false
 		_snapshot_age = 0.0
 		_handshake_age = 0.0
 		_server_protocol_ready = false
@@ -240,14 +264,18 @@ func _on_websocket_status_changed(status: String) -> void:
 	elif status == "websocket_connecting":
 		_status = "Opening WebSocket."
 	elif status == "websocket_closed" or status == "websocket_connect_failed":
+		_connection_pending = false
 		_schedule_reconnect(status)
 	elif status == "websocket_disconnected":
+		_connection_pending = false
 		_status = "Disconnected."
 	else:
 		_status = status.capitalize().replace("_", " ")
 
 
 func _on_websocket_message_received(message: Dictionary) -> void:
+	if _manual_disconnect or is_queued_for_deletion():
+		return
 	var message_type := str(message.get("type", "unknown"))
 	if message_type == NetworkAdapter.MESSAGE_HELLO:
 		_handle_protocol_hello(message)
@@ -289,8 +317,8 @@ func _on_websocket_message_received(message: Dictionary) -> void:
 			return
 		if error_name == "server_full" and _auto_retry_when_full:
 			_join_sent = false
-			_capacity_retry_timer = 3.0
-			_status = "Server full. Joining automatically when a slot opens (retry in 3s)."
+			_capacity_retry_timer = 1.0
+			_status = "Server full. Joining automatically when a slot opens (retry in 1s)."
 			return
 		if NetworkAdapter.is_fatal_server_error(error_name):
 			_fail_server_error(NetworkAdapter.server_error_status_message(message), error_name)
@@ -350,6 +378,7 @@ func _fail_protocol_handshake(status_text: String, reason: String) -> void:
 	_protocol_failure = true
 	_manual_disconnect = true
 	_status = status_text
+	queue_redraw()
 	if _websocket_client != null:
 		_websocket_client.disconnect_from_endpoint(reason)
 
@@ -359,6 +388,7 @@ func _fail_server_error(status_text: String, reason: String) -> void:
 	_manual_disconnect = true
 	_reconnect_timer = 0.0
 	_status = status_text
+	queue_redraw()
 	if _websocket_client != null:
 		_websocket_client.disconnect_from_endpoint(reason)
 
@@ -393,7 +423,7 @@ func _send_join_after_hello() -> void:
 	_snapshot_age = 0.0
 	_input_tick = 0.0
 	_ping_tick = 0.0
-	_websocket_client.join(_player_name, _password, _auth_token, _spectating)
+	_websocket_client.join(_player_name, _password, _auth_token, _spectating, bool(_entry.get("is_computer", false)))
 	_websocket_client.ping()
 	_status = "%s Join sent." % _server_protocol_status
 
@@ -427,7 +457,7 @@ func _request_session_token() -> void:
 		return
 	_session_token_pending = true
 	_session_token_requested = true
-	var request_url := _session_token_request_url(NetworkAdapter.PLAYER_NAME_DEFAULT)
+	var request_url := _session_token_request_url(_player_name)
 	var headers := PackedStringArray(["Cache-Control: no-store"])
 	var error := _session_token_request.request(request_url, headers, HTTPClient.METHOD_GET)
 	if error != OK:
@@ -496,6 +526,7 @@ func _header_value(headers: PackedStringArray, header_name: String) -> String:
 
 func _connect_now(message: String) -> void:
 	_manual_disconnect = false
+	_connection_pending = true
 	_protocol_failure = false
 	_fatal_server_failure = false
 	_server_protocol_ready = false
@@ -550,6 +581,8 @@ func _mark_session_healthy() -> void:
 
 
 func _update_reconnect(delta: float) -> void:
+	if _manual_disconnect:
+		return
 	if _reconnect_timer <= 0.0:
 		return
 	_reconnect_timer = max(0.0, _reconnect_timer - delta)
@@ -560,6 +593,7 @@ func _update_reconnect(delta: float) -> void:
 func _force_reconnect(reason: String) -> void:
 	if _manual_disconnect or _endpoint.is_empty():
 		return
+	_connection_pending = false
 	if _websocket_client.has_method("abort_connection"):
 		_websocket_client.abort_connection()
 	else:
@@ -681,10 +715,8 @@ func _manual_reconnect() -> void:
 
 
 func _return_to_main_menu() -> void:
-	_manual_disconnect = true
-	if _websocket_client != null:
-		_websocket_client.disconnect_from_endpoint("back_to_main_menu")
-	get_parent().get_parent()._show_main_menu()
+	_stop_session("back_to_main_menu")
+	back_requested.emit()
 
 
 func _draw_header() -> void:

@@ -69,7 +69,7 @@ banned_gateway_log="$tmp_dir/banned-gateway.log"
 user_data_dir="$tmp_dir/chromium-user"
 actual_dir="$ROOT_DIR/.tmp/godot_browser_actual"
 golden_dir="$ROOT_DIR/docs/references/godot_browser_visual"
-qa_fixture_dir="$BUILD_DIR/godot-web/qa"
+qa_fixture_dir="$tmp_dir/qa"
 mkdir -p "$actual_dir" "$golden_dir"
 mkdir -p "$qa_fixture_dir"
 
@@ -196,11 +196,15 @@ cleanup() {
             wait "$pid" >/dev/null 2>&1 || true
         fi
     done
-    rm -rf "$tmp_dir"
+    if [[ "${GODOT_QA_KEEP_TEMP:-0}" == "1" ]]; then
+        printf 'QA logs preserved at: %s\n' "$tmp_dir"
+    else
+        rm -rf "$tmp_dir"
+    fi
 }
 trap cleanup EXIT
 
-"$PYTHON_BIN" - "$port" "$BUILD_DIR/godot-web" "$ROOT_DIR" "$PYTHON_VERSION_DIR" >"$server_log" 2>&1 <<'PY' &
+"$PYTHON_BIN" - "$port" "$GODOT_WEB_DIR" "$ROOT_DIR" "$PYTHON_VERSION_DIR" "$qa_fixture_dir/server_directory.json" >"$server_log" 2>&1 <<'PY' &
 import functools
 import http.server
 import json
@@ -211,6 +215,7 @@ port = int(sys.argv[1])
 directory = sys.argv[2]
 root_dir = sys.argv[3]
 python_version_dir = sys.argv[4]
+directory_fixture = sys.argv[5]
 sys.path.insert(0, python_version_dir)
 sys.path.insert(0, root_dir)
 
@@ -221,6 +226,11 @@ SESSION_SECRET = "qa-session-secret"
 
 
 class GroundfireQAHandler(http.server.SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        if urllib.parse.urlsplit(path).path == "/qa/server_directory.json":
+            return directory_fixture
+        return super().translate_path(path)
+
     def do_GET(self):
         path = self.path.split("?", 1)[0]
         if path == "/qa/session_token.json":
@@ -651,24 +661,25 @@ PY
     [[ -s "$output" ]]
 }
 
-capture main_menu ""
-capture options "?screen=options"
-capture server_browser "?screen=servers"
-capture local_match_setup "?screen=local_match_setup"
-capture local_match "?screen=local"
+capture main_menu "?qa=visual"
+capture options "?qa=visual&screen=options"
+capture server_browser "?qa=visual&screen=servers"
+capture local_match_setup "?qa=visual&screen=local_match_setup"
+capture local_match "?qa=visual&screen=local"
 
 browser_runtime_qa() {
     local phase="$1"
-    "$PYTHON_BIN" - "$BROWSER_BIN" "$user_data_dir-runtime" "http://127.0.0.1:$port/index.html?qa=browser_runtime&store_phase=$phase&directory_url=http://127.0.0.1:$port/qa/server_directory.json%3Fphase%3D$phase&gateway_endpoint=ws://127.0.0.1:$gateway_port/qa-gateway&auth_gateway_endpoint=ws://127.0.0.1:$auth_gateway_port/qa-auth-gateway&full_gateway_endpoint=ws://127.0.0.1:$full_gateway_port/qa-full-gateway&closed_gateway_endpoint=ws://127.0.0.1:$closed_gateway_port/qa-closed-gateway&banned_gateway_endpoint=ws://127.0.0.1:$banned_gateway_port/qa-banned-gateway&session_gateway_endpoint=ws://127.0.0.1:$session_gateway_port/qa-session-gateway&session_token_url=http://127.0.0.1:$port/qa/session_token.json%3Fphase%3D$phase" <<'PY'
+    "$PYTHON_BIN" - "$BROWSER_BIN" "$user_data_dir-runtime" "http://127.0.0.1:$port/index.html?qa=browser_runtime&store_phase=$phase&directory_url=http://127.0.0.1:$port/qa/server_directory.json%3Fphase%3D$phase&gateway_endpoint=ws://127.0.0.1:$gateway_port/qa-gateway&auth_gateway_endpoint=ws://127.0.0.1:$auth_gateway_port/qa-auth-gateway&full_gateway_endpoint=ws://127.0.0.1:$full_gateway_port/qa-full-gateway&closed_gateway_endpoint=ws://127.0.0.1:$closed_gateway_port/qa-closed-gateway&banned_gateway_endpoint=ws://127.0.0.1:$banned_gateway_port/qa-banned-gateway&session_gateway_endpoint=ws://127.0.0.1:$session_gateway_port/qa-session-gateway&session_token_url=http://127.0.0.1:$port/qa/session_token.json%3Fphase%3D$phase" "$actual_dir/runtime-$phase.json" <<'PY'
 import json
 import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 import websocket
 
-browser, user_data_dir, url = sys.argv[1:4]
+browser, user_data_dir, url, report_path = sys.argv[1:5]
 
 import socket
 
@@ -699,7 +710,7 @@ try:
     while True:
         try:
             with urllib.request.urlopen(version_url, timeout=0.2) as response:
-                json.load(response)
+                browser_version = json.load(response).get("Browser", "unknown")
             break
         except Exception:
             if time.monotonic() > deadline:
@@ -768,6 +779,9 @@ try:
             raise SystemExit("Timed out waiting for browser runtime QA result.")
         time.sleep(0.25)
 
+    qa_result["browser_version"] = browser_version
+    qa_result["browser_executable"] = browser
+    Path(report_path).write_text(json.dumps(qa_result, indent=2) + "\n", encoding="utf-8")
     if not qa_result.get("ok"):
         raise SystemExit(
             f"Browser runtime QA failed: {qa_result.get('errors')}; details={qa_result.get('details')}"
@@ -796,6 +810,8 @@ browser_runtime_qa seed
 browser_runtime_qa verify
 
 GODOT_BROWSER_GOLDEN_UPDATE="$UPDATE_GOLDENS" "$PYTHON_BIN" - "$actual_dir" "$golden_dir" <<'PY'
+import hashlib
+import json
 import os
 import shutil
 import sys
@@ -810,6 +826,8 @@ cases = ("main_menu", "options", "server_browser", "local_match_setup", "local_m
 average_tolerance = 1.0
 changed_ratio_tolerance = 0.02
 missing_cases = []
+failures = []
+results = []
 
 for case in cases:
     actual_path = actual_dir / f"{case}.png"
@@ -831,10 +849,25 @@ for case in cases:
     changed = sum(count for value, count in enumerate(histogram) if value > 12)
     average = total / max(1, pixels)
     changed_ratio = changed / max(1, pixels)
-    if average > average_tolerance or changed_ratio > changed_ratio_tolerance:
-        raise SystemExit(
-            f"{case}: visual diff too large: average={average:.3f}, changed_ratio={changed_ratio:.4f}"
-        )
+    passed = average <= average_tolerance and changed_ratio <= changed_ratio_tolerance
+    results.append({
+        "case": case, "status": "passed" if passed else "failed",
+        "average_difference": average, "changed_ratio": changed_ratio,
+        "actual_sha256": hashlib.sha256(actual_path.read_bytes()).hexdigest(),
+        "golden_sha256": hashlib.sha256(golden_path.read_bytes()).hexdigest(),
+    })
+    if not passed:
+        failures.append(f"{case}: visual diff too large: average={average:.3f}, changed_ratio={changed_ratio:.4f}")
+
+(actual_dir / "visual-report.json").write_text(json.dumps({
+    "schema": 1, "status": "updated-unreviewed" if update else ("failed" if failures or missing_cases else "passed"),
+    "scope": "Regression against browser goldens; not full Python equivalence",
+    "average_tolerance": average_tolerance, "changed_ratio_tolerance": changed_ratio_tolerance,
+    "cases": results, "missing_cases": missing_cases,
+}, indent=2) + "\n", encoding="utf-8")
+
+if failures:
+    raise SystemExit("\n".join(failures))
 
 if missing_cases:
     raise SystemExit(

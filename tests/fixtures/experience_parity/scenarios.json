@@ -1,0 +1,346 @@
+{
+  "schema": 1,
+  "reference": "baseline.json",
+  "primary_viewport": [
+    1024,
+    768
+  ],
+  "viewports": [
+    [
+      640,
+      480
+    ],
+    [
+      800,
+      600
+    ],
+    [
+      1024,
+      768
+    ],
+    [
+      1280,
+      960
+    ],
+    [
+      1280,
+      1024
+    ],
+    [
+      1600,
+      1200
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "journeys": [
+    {
+      "id": "UX-01",
+      "mode": "offline",
+      "python_reference": [
+        "mainmenu.py",
+        "quitmenu.py"
+      ],
+      "states": [
+        "initial",
+        "confirm",
+        "cancel"
+      ],
+      "automated_checks": [
+        "experience_menu_check"
+      ],
+      "paired_captures": [
+        "main_menu",
+        "quit"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-02",
+      "mode": "local",
+      "python_reference": [
+        "playermenu.py",
+        "player.py"
+      ],
+      "states": [
+        "empty",
+        "joined",
+        "disabled",
+        "ready"
+      ],
+      "automated_checks": [
+        "experience_menu_check",
+        "simultaneous_local_contract_check",
+        "package-journey-source"
+      ],
+      "paired_captures": [
+        "local_match_setup"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-03",
+      "mode": "offline",
+      "python_reference": [
+        "optionmenu.py",
+        "controllermenu.py",
+        "setcontrolsmenu.py"
+      ],
+      "states": [
+        "initial",
+        "draft",
+        "apply",
+        "back",
+        "capture",
+        "reset",
+        "reload"
+      ],
+      "automated_checks": [
+        "experience_menu_check"
+      ],
+      "paired_captures": [
+        "options",
+        "controllers",
+        "keyboard_layout"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-04",
+      "mode": "local",
+      "python_reference": [
+        "gamesimulation.py",
+        "tank.py",
+        "humanplayer.py",
+        "aiplayer.py"
+      ],
+      "states": [
+        "round_start",
+        "combat",
+        "elimination"
+      ],
+      "automated_checks": [
+        "classic_runtime_contract_check",
+        "simultaneous_local_contract_check",
+        "projectile-differential",
+        "state-differential",
+        "rendered-effects",
+        "effect-geometry",
+        "package-journey-source",
+        "experience_audio_check",
+        "audio-assets"
+      ],
+      "paired_captures": [
+        "local_match",
+        "round_starting"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-05",
+      "mode": "local",
+      "python_reference": [
+        "scoremenu.py",
+        "shopmenu.py"
+      ],
+      "states": [
+        "score",
+        "shop",
+        "buy",
+        "done",
+        "next_round"
+      ],
+      "automated_checks": [
+        "local_match_fidelity_check",
+        "test_weapon_inventory_ammo",
+        "state-differential",
+        "package-journey-source",
+        "experience_audio_check",
+        "audio-assets"
+      ],
+      "paired_captures": [
+        "score",
+        "shop",
+        "shop_selected"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-06",
+      "mode": "local",
+      "python_reference": [
+        "winnermenu.py",
+        "game.py"
+      ],
+      "states": [
+        "winner",
+        "tie",
+        "return"
+      ],
+      "automated_checks": [
+        "local_match_fidelity_check",
+        "state-differential",
+        "experience_audio_check",
+        "audio-assets"
+      ],
+      "paired_captures": [
+        "winner",
+        "winner_eight"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-07",
+      "mode": "local",
+      "python_reference": [
+        "game.py"
+      ],
+      "states": [
+        "pause",
+        "options",
+        "resume",
+        "quit"
+      ],
+      "automated_checks": [
+        "local_match_fidelity_check",
+        "package-journey-source"
+      ],
+      "paired_captures": [],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-08",
+      "mode": "connected",
+      "python_reference": [
+        "serverbrowsermenu.py",
+        "groundfire/ui/menus.py"
+      ],
+      "states": [
+        "empty",
+        "populated",
+        "filter",
+        "sort",
+        "favorite",
+        "history",
+        "direct",
+        "return"
+      ],
+      "automated_checks": [
+        "server_directory_check",
+        "browser_store_check",
+        "experience_menu_check",
+        "mixed-udp",
+        "mixed-websocket"
+      ],
+      "paired_captures": [
+        "server_browser",
+        "server_filters",
+        "server_add",
+        "server_join",
+        "server_password",
+        "server_unavailable",
+        "server_invalid_address"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-09",
+      "mode": "connected",
+      "python_reference": [
+        "groundfire/app",
+        "groundfire/gameplay/match_controller.py"
+      ],
+      "states": [
+        "lobby",
+        "ready",
+        "combat",
+        "shop",
+        "result",
+        "rematch"
+      ],
+      "automated_checks": [
+        "network_adapter_protocol_check",
+        "mixed-udp"
+      ],
+      "paired_captures": [],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-10",
+      "mode": "connected",
+      "python_reference": [
+        "groundfire/app",
+        "groundfire_net/browser.py"
+      ],
+      "states": [
+        "full",
+        "wrong_password",
+        "timeout",
+        "cancel",
+        "retry",
+        "resume"
+      ],
+      "automated_checks": [
+        "online_reliability_check",
+        "mixed-udp",
+        "mixed-websocket"
+      ],
+      "paired_captures": [
+        "server_unavailable",
+        "server_invalid_address"
+      ],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-11",
+      "mode": "connected",
+      "python_reference": [
+        "groundfire/ui/menus.py"
+      ],
+      "states": [
+        "spectator",
+        "chat",
+        "focus"
+      ],
+      "automated_checks": [
+        "online_reliability_check"
+      ],
+      "paired_captures": [],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    },
+    {
+      "id": "UX-12",
+      "mode": "desktop",
+      "python_reference": [
+        "launchers",
+        "groundfire/input/controlsfile.py"
+      ],
+      "states": [
+        "restart",
+        "isolated_copy"
+      ],
+      "automated_checks": [
+        "experience_menu_check",
+        "browser_store_check",
+        "package-journey-source",
+        "isolated-package"
+      ],
+      "paired_captures": [],
+      "acceptance": "pending",
+      "limitation": "Checks provide regression evidence; full journey acceptance, visual/audio review and physical/platform checks are still required."
+    }
+  ]
+}

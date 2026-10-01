@@ -11,7 +11,6 @@ import sys
 import time
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 GODOT_PROJECT = ROOT / "versao-godot" / "godot"
 
@@ -31,6 +30,64 @@ def _default_godot_bin() -> Path:
         if candidate.exists():
             return candidate
     raise FileNotFoundError("Godot 4.6.2 executable not found; pass --godot-bin or set GODOT_BIN")
+
+
+def _validate_join_errors(godot_bin: Path, base_env: dict[str, str]) -> int:
+    env = base_env.copy()
+    port = _free_udp_port()
+    env["GROUNDFIRE_TEST_UDP_ENDPOINT"] = f"127.0.0.1:{port}"
+    server = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "src.groundfire.server",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--no-discovery",
+            "--headless",
+            "--max-players",
+            "1",
+            "--password",
+            "fixture-only",
+            "--ticks",
+            "1800",
+        ],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        time.sleep(0.6)
+        result = subprocess.run(
+            [
+                str(godot_bin),
+                "--headless",
+                "--path",
+                str(GODOT_PROJECT),
+                "--script",
+                "res://tests/online_join_errors_check.gd",
+            ],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=18,
+            check=False,
+        )
+        print(result.stdout, end="")
+        return result.returncode or int("ERROR:" in result.stdout)
+    finally:
+        if server.poll() is None:
+            server.terminate()
+            try:
+                server.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=3)
 
 
 def main() -> int:
@@ -73,8 +130,10 @@ def main() -> int:
     try:
         time.sleep(0.6)
         for script in (
+            "res://tests/browser_probe_check.gd",
             "res://tests/udp_python_integration_check.gd",
             "res://tests/udp_spectator_integration_check.gd",
+            "res://tests/udp_ai_integration_check.gd",
         ):
             result = subprocess.run(
                 [
@@ -99,7 +158,10 @@ def main() -> int:
             if "SCRIPT ERROR:" in result.stdout or "ERROR:" in result.stdout:
                 print(f"Godot reported a script/runtime error during {script}.", file=sys.stderr)
                 return 1
-        print("Godot/Python native UDP player, resume, discovery, spectator and chat integration passed.")
+        errors_result = _validate_join_errors(godot_bin, env)
+        if errors_result:
+            return errors_result
+        print("Godot/Python UDP probe, player, resume, discovery, spectator, AI, chat and join errors passed.")
         return 0
     finally:
         if server.poll() is None:

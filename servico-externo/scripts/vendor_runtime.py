@@ -50,7 +50,9 @@ GROUNDIFRE_NET_FILES = (
 
 def _copy(source: Path, destination: Path) -> str:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    data = source.read_bytes()
+    # Vendored inputs are Python/INI text. Keep byte hashes portable across Git
+    # checkouts with core.autocrlf; the service's .gitattributes preserves LF.
+    data = source.read_bytes().replace(b"\r\n", b"\n")
     if source.name == "websocket_gateway.py":
         data = data.replace(b"from src.groundfire", b"from groundfire")
     destination.write_bytes(data)

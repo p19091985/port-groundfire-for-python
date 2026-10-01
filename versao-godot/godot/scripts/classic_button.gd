@@ -7,6 +7,13 @@ var _classic_font_color := GroundfireTheme.COLOR_TEXT
 var _classic_font_hover_color := GroundfireTheme.COLOR_WARN
 var _classic_font_disabled_color := GroundfireTheme.BUTTON_FONT_DISABLED
 var _classic_spacing_ratio := ClassicFont.DEFAULT_SPACING_RATIO
+var _draw_font_size := 0.0
+
+func set_classic_draw_size(value: float) -> void:
+	_draw_font_size = value
+	clip_text = true
+	add_theme_font_size_override("font_size", 1)
+	queue_redraw()
 
 
 func _ready() -> void:
@@ -51,17 +58,18 @@ func _draw() -> void:
 		self,
 		text,
 		Rect2(Vector2.ZERO, size),
-		float(get_theme_font_size("font_size")),
+		_draw_font_size if _draw_font_size > 0 else float(get_theme_font_size("font_size")),
 		text_color,
 		HORIZONTAL_ALIGNMENT_CENTER,
-		VERTICAL_ALIGNMENT_CENTER,
+		VERTICAL_ALIGNMENT_BOTTOM if _draw_font_size > 0 else VERTICAL_ALIGNMENT_CENTER,
 		_classic_spacing_ratio,
 		not disabled,
-		GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR,
+		Color8(0, 0, 0, 100) if _draw_font_size > 0 else GroundfireTheme.CLASSIC_TEXT_SHADOW_COLOR,
 		Vector2(
 			float(GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_X),
 			float(GroundfireTheme.CLASSIC_TEXT_SHADOW_OFFSET_Y)
-		)
+		) if _draw_font_size <= 0 else Vector2(-_draw_font_size / 8, size.y / 8),
+		_draw_font_size > 0
 	)
 
 

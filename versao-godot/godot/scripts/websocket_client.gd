@@ -54,8 +54,8 @@ func _exit_tree() -> void:
 	_closed_reported = true
 
 
-func join(player_name: String, password := "", auth_token := "", spectator := false) -> void:
-	send_message(NetworkAdapter.join_message(player_name, password, auth_token, spectator))
+func join(player_name: String, password := "", auth_token := "", spectator := false, is_computer := false) -> void:
+	send_message(NetworkAdapter.join_message(player_name, password, auth_token, spectator, is_computer))
 
 
 func resume_session(session_id: String, player_number: int, resume_token: String, player_name := NetworkAdapter.PLAYER_NAME_DEFAULT) -> void:

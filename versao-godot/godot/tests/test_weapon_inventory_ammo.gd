@@ -5,7 +5,7 @@ const WeaponInventory := preload("res://scripts/weapon_inventory.gd")
 
 func _init() -> void:
 	var inventory := WeaponInventory.new()
-	assert(abs(inventory.current_cooldown() - (WeaponInventory.SHELL_COOLDOWN - WeaponInventory.ROUND_STARTING_COOLDOWN_ADVANCE)) < 0.01)
+	assert(abs(inventory.current_cooldown() - WeaponInventory.SHELL_COOLDOWN) < 0.01)
 	assert(not inventory.is_current_ready())
 	inventory.update_current_cooldown(WeaponInventory.SHELL_COOLDOWN)
 	assert(inventory.is_current_ready())

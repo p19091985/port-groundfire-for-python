@@ -14,12 +14,27 @@ class ReplayDifference(AssertionError):
     pass
 
 
-def compare(expected: Any, actual: Any, *, tolerance: float = 1e-5, path: str = "$") -> None:
+def compare(
+    expected: Any,
+    actual: Any,
+    *,
+    tolerance: float = 1e-5,
+    path: str = "$",
+    field_tolerances: dict[str, float] | None = None,
+) -> None:
+    if not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("Replay tolerance must be finite and nonnegative")
     if isinstance(expected, bool) or isinstance(actual, bool):
         if expected is not actual:
             raise ReplayDifference(f"{path}: expected {expected!r}, got {actual!r}")
         return
     if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
+        # JSON readers (including Godot) may decode integers as floats. Their
+        # representation can differ, but discrete reference values must be exact.
+        if isinstance(expected, int):
+            if expected != actual:
+                raise ReplayDifference(f"{path}: expected discrete value {expected!r}, got {actual!r}")
+            return
         if not math.isclose(float(expected), float(actual), rel_tol=0.0, abs_tol=tolerance):
             raise ReplayDifference(f"{path}: expected {expected!r}, got {actual!r}; tolerance={tolerance}")
         return
@@ -31,13 +46,20 @@ def compare(expected: Any, actual: Any, *, tolerance: float = 1e-5, path: str = 
             extra = sorted(actual.keys() - expected.keys())
             raise ReplayDifference(f"{path}: key mismatch; missing={missing}, extra={extra}")
         for key in expected:
-            compare(expected[key], actual[key], tolerance=tolerance, path=f"{path}.{key}")
+            field_tolerance = (field_tolerances or {}).get(key, tolerance)
+            compare(
+                expected[key],
+                actual[key],
+                tolerance=field_tolerance,
+                path=f"{path}.{key}",
+                field_tolerances=field_tolerances,
+            )
         return
     if isinstance(expected, list):
         if len(expected) != len(actual):
             raise ReplayDifference(f"{path}: expected {len(expected)} items, got {len(actual)}")
         for index, (left, right) in enumerate(zip(expected, actual, strict=True)):
-            compare(left, right, tolerance=tolerance, path=f"{path}[{index}]")
+            compare(left, right, tolerance=tolerance, path=f"{path}[{index}]", field_tolerances=field_tolerances)
         return
     if expected != actual:
         raise ReplayDifference(f"{path}: expected {expected!r}, got {actual!r}")

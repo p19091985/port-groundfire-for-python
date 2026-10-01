@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "date": "2026-09-30",
+  "reviewer": "Codex, side-by-side image inspection",
+  "browser": "Chrome/154.0.8037.59",
+  "rendering": "headless SwiftShader",
+  "fixture": "?qa=visual (frozen menu and initial local match)",
+  "limitations": [
+    "No audio, physical input, animation or interactive acceptance",
+    "Other resolutions and browsers require their own evidence",
+    "Python reference hashes in tests/fixtures/experience_parity/baseline.json remain frozen"
+  ],
+  "cases": [
+    {
+      "case": "main_menu",
+      "status": "reviewed-with-differences",
+      "scope": "static 1024x768 browser regression baseline; not full Python equivalence",
+      "notes": "Layout, logo, labels and actions match the Python composition. Minor text rasterization/shadow differences remain (EQ-D22).",
+      "golden_sha256": "2c607abf3bbdd908159f5a414b2e296cb8c0be9359f441fde29e1fe9e4a292f4",
+      "previous_golden_sha256": "7094f78ee91b1f7bca98f47186ef8bb1281b87f0b8c738b1613afcb476c778fd",
+      "python_reference": ".tmp/experience-parity/ct02/captures/1024x768/python/main_menu.png",
+      "python_reference_sha256": "1d9819d7eb22302277d100af54ddec6da1ae8ab3d49b9eea5365cc78cd6887c4"
+    },
+    {
+      "case": "options",
+      "status": "reviewed-with-differences",
+      "scope": "static 1024x768 browser regression baseline; not full Python equivalence",
+      "notes": "Composition matches. Web deliberately disables fixed resolutions and displays Browser size. Glyph/edge rasterization differs (EQ-D22).",
+      "golden_sha256": "445c6208edbdfe46cb175a972b2107a464fd898e9a1c35061c92ed7bade3cd1b",
+      "previous_golden_sha256": "945ef1af65123c2c111a410c0d7f4242c9adfe74fa004191e62be6c2599a4ebb",
+      "python_reference": ".tmp/experience-parity/ct02/captures/1024x768/python/options.png",
+      "python_reference_sha256": "bb901328b240434c9b9a57affd3009319782047899a36e6b93b527a80e509384"
+    },
+    {
+      "case": "local_match_setup",
+      "status": "reviewed-with-differences",
+      "scope": "static 1024x768 browser regression baseline; not full Python equivalence",
+      "notes": "Empty eight-player setup, inactive controls and rounds selector match. Small polygon/button edge and glyph differences remain (EQ-D22).",
+      "golden_sha256": "29ee8e33eb456325080a3cd0cd28afaf700c2c7a49c741ec977adc0e0169a938",
+      "previous_golden_sha256": "1b54462dda8cb94cd01e17e981af8c79db158ac50ad0f59234a20383bbbda53c",
+      "python_reference": ".tmp/experience-parity/ct02/captures/1024x768/python/local_match_setup.png",
+      "python_reference_sha256": "28d7d28bc3409e2d410f36ce5e59be56045dfb8342a2d280d9aa4d00d8d5f0ef"
+    },
+    {
+      "case": "local_match",
+      "status": "reviewed-with-differences",
+      "scope": "static 1024x768 browser regression baseline; not full Python equivalence",
+      "notes": "Frozen initial seed 1401, two humans, arena and HUD match in composition. Terrain/tank edges differ by approximately one pixel (EQ-D22); no animation acceptance.",
+      "golden_sha256": "df2d20a6a0ec505854d41bf276e28c2738645ac5931747cf2d8079a1a60ed999",
+      "previous_golden_sha256": "573bcb428e76e3516e8358e20d7c1714571bf3472cc06d3c144ceb0a805131cf",
+      "python_reference": ".tmp/experience-parity/ct02/captures/1024x768/python/local_match.png",
+      "python_reference_sha256": "4fce7ecff7355140392cf735bd048c14837f675518e20e22671ff301ce23e13c"
+    },
+    {
+      "case": "server_browser",
+      "status": "reviewed-with-differences",
+      "scope": "static 1024x768 browser regression baseline; not full Python equivalence",
+      "notes": "Classic table, actions and tabs match in composition. Web omits unsupported UDP LAN tab. Small glyph/edge differences remain (EQ-D22); no interaction acceptance from screenshot.",
+      "golden_sha256": "ce93de06f6f3983a8c5fc93c396ffca75752dce2308b9a3044b6f71be2c2693e",
+      "previous_golden_sha256": "fb4759f44d1c825cd17db35ff81af6cc6b4518c226d1051c0a949e63bdc40bfb",
+      "python_reference": ".tmp/experience-parity/ct02/captures/1024x768/python/server_browser.png",
+      "python_reference_sha256": "4a2b2b39d4b4a992643a208f37422bcc08d90b58c32c1d20b00f48717b76e84a"
+    }
+  ]
+}

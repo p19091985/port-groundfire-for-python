@@ -9,6 +9,8 @@ const OnlineMatchScene := preload("res://scenes/online_match.tscn")
 const ServerBrowserScene := preload("res://scenes/server_browser.tscn")
 const OnlineHubScene := preload("res://scenes/online_hub.tscn")
 const ControlSettings := preload("res://scripts/control_settings.gd")
+const ClassicOptions := preload("res://scripts/classic_options.gd")
+const PackageVerification := preload("res://scripts/package_verification.gd")
 const ServerDirectory := preload("res://scripts/server_directory.gd")
 const BrowserStore := preload("res://scripts/browser_store.gd")
 const NetworkAdapter := preload("res://scripts/network_adapter.gd")
@@ -74,12 +76,12 @@ const LOCAL_MATCH_CONTROLLER_LABELS := [
 ]
 const LOCAL_MATCH_PLAYER_COLORS := [
 	Color("#ff00ff"),
-	Color("#ff8000"),
+	Color("#ff7f00"),
 	Color("#ffff00"),
 	Color("#00ff00"),
 	Color("#00ffff"),
 	Color("#0000ff"),
-	Color("#ff8080"),
+	Color("#ff7f7f"),
 	Color("#ffffff"),
 ]
 const GROUNDFIRE_LOCAL_GATEWAY_NOTE := "ST04: companion local em runtime, sem venv externo"
@@ -129,10 +131,14 @@ var _local_match_setup_start_button: Button
 var _local_match_setup_back_button: Button
 var _local_match_setup_rounds: OptionButton
 var _classic_fullscreen_layout := false
+var _development_tools := false
+var _options_back := Callable()
+var _menu_scroll := 0.0
 
 
 func _ready() -> void:
 	_capabilities = get_node("/root/PlatformCapabilities")
+	_development_tools = OS.get_cmdline_user_args().has("--development-tools")
 	ControlSettings.apply_saved_bindings()
 	_load_options()
 	_apply_options()
@@ -153,7 +159,12 @@ func _apply_desktop_launch_args() -> void:
 	var index := 0
 	while index < launch_args.size():
 		var option := launch_args[index]
-		if option == "--spectator":
+		if option == "--verify-package" and index + 1 < launch_args.size():
+			await PackageVerification.new().run(self, str(launch_args[index + 1]))
+			return
+		elif option == "--development-tools":
+			pass
+		elif option == "--spectator":
 			entry["spectator"] = true
 		elif option == "--connect" or option == "--player-name" or option == "--password":
 			if index + 1 >= launch_args.size() or str(launch_args[index + 1]).is_empty():
@@ -179,8 +190,11 @@ func _notification(what: int) -> void:
 		_apply_menu_layout_metrics()
 
 
-func _process(_delta: float) -> void:
-	if _show_fps:
+func _process(delta: float) -> void:
+	if not _development_tools and _screen is ClassicOptions:
+		_menu_scroll = fposmod(_menu_scroll + delta * 0.1, 1.0)
+		queue_redraw()
+	elif _show_fps:
 		queue_redraw()
 
 
@@ -213,7 +227,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _in_options and event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
-		_show_main_menu()
+		if _screen is ClassicOptions and _screen.screen != "options":
+			if _screen.screen == "layout":
+				_screen.show_controllers()
+			else:
+				_screen.back_from_controllers()
+		elif _options_back.is_valid():
+			_options_back.call()
+		else:
+			_show_main_menu()
 
 
 func _build_layout() -> void:
@@ -236,9 +258,15 @@ func _build_layout() -> void:
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), GroundfireTheme.COLOR_BG)
 	var tile_size := MENU_TILE.get_size()
-	for x in range(0, int(size.x) + int(tile_size.x), int(tile_size.x)):
-		for y in range(0, int(size.y) + int(tile_size.y), int(tile_size.y)):
-			draw_texture(MENU_TILE, Vector2(x, y), GroundfireTheme.COLOR_MENU_TILE_TINT)
+	var offset := Vector2.ZERO
+	if not _development_tools:
+		# Canvas stretch must not resize Python's native-pixel background tiles.
+		var pixel_scale := get_viewport_transform().get_scale()
+		offset = Vector2(int(_menu_scroll * tile_size.x), int(_menu_scroll * tile_size.y)) / pixel_scale
+		tile_size /= pixel_scale
+	for x in range(int(ceil(size.x / tile_size.x)) + 1):
+		for y in range(int(ceil(size.y / tile_size.y)) + 1):
+			draw_texture_rect(MENU_TILE, Rect2(Vector2(x, y) * tile_size - offset, tile_size), false, GroundfireTheme.COLOR_MENU_TILE_TINT)
 	if _show_fps:
 		draw_string(
 			ThemeDB.fallback_font,
@@ -255,9 +283,12 @@ func _show_main_menu() -> void:
 	_in_options = false
 	_discard_paused_match_screen()
 	_set_classic_fullscreen_layout(true)
+	if not _development_tools:
+		_classic_surface().show_main([["Start Game", _show_local_match_setup], ["Find Servers", _on_find_servers], ["Options", _on_options], ["Quit", _on_quit]])
+		return
 	_stack.alignment = BoxContainer.ALIGNMENT_BEGIN
 	_clear_content()
-	var has_dedicated_tools: bool = bool(_capabilities.supports(_capabilities.FEATURE_DEDICATED_SERVER_TOOLS))
+	var has_dedicated_tools: bool = _development_tools and bool(_capabilities.supports(_capabilities.FEATURE_DEDICATED_SERVER_TOOLS))
 	var top_spacer: float = max(110.0, MENU_CLASSIC_TOP_SPACER - (28.0 if has_dedicated_tools else 0.0))
 	var copy_spacer: float = max(12.0, MENU_CLASSIC_COPY_SPACER - (42.0 if has_dedicated_tools else 0.0))
 	_add_spacer(_scaled_classic_value(top_spacer))
@@ -304,6 +335,9 @@ func _apply_web_start_screen() -> void:
 	if not Engine.has_singleton("JavaScriptBridge"):
 		return
 	var qa_mode := _web_query_param("qa").to_lower()
+	var visual_fixture := qa_mode == "visual"
+	if visual_fixture:
+		set_process(false) # Same menu animation time as the paired Python captures.
 	if qa_mode == "browser_runtime":
 		_run_browser_runtime_qa.call_deferred(
 			_web_query_param("directory_url"),
@@ -330,7 +364,17 @@ func _apply_web_start_screen() -> void:
 			_on_find_servers()
 			visual_ready_screen = "server_browser"
 		"local", "local_match":
-			_start_local_match(LOCAL_MATCH_ROUND_OPTIONS[0])
+			if visual_fixture:
+				_start_local_match(5, [
+					{"name":"Player","kind":"human","controller":0,"color":Color(1,0,1)},
+					{"name":"Enemy","kind":"human","controller":1,"color":Color8(255,128,0)}])
+				_screen.set_process(false)
+				_screen.set("_phase","aim")
+				_screen.call("_update_hud")
+				_screen.call("_update_camera",0.0)
+				_screen.queue_redraw()
+			else:
+				_start_local_match(LOCAL_MATCH_ROUND_OPTIONS[0])
 			visual_ready_screen = "local_match"
 	_publish_web_visual_ready.call_deferred(visual_ready_screen)
 
@@ -373,6 +417,11 @@ func _run_browser_runtime_qa(
 	_qa_expect(errors, not _capabilities.supports(_capabilities.FEATURE_UDP_TRANSPORT), "UDP transport hidden on web")
 	_qa_expect(errors, not _capabilities.supports(_capabilities.FEATURE_DEDICATED_SERVER_TOOLS), "dedicated tools hidden on web")
 	_qa_expect(errors, not _capabilities.visible_server_browser_tabs().has("LAN"), "LAN tab hidden on web")
+	_show_options()
+	var resolution_selector: Control = _screen.get_node("Resolution")
+	_qa_expect(errors, resolution_selector.is_disabled(), "browser controls canvas size")
+	_qa_expect(errors, resolution_selector.show_disabled_value and resolution_selector.get_item_text(0) == "Browser size", "browser resolution explanation is visible")
+	details["web_resolution"] = resolution_selector.get_item_text(0)
 	_qa_check_browser_store(errors, details, normalized_store_phase)
 	await _qa_check_http_directory(directory_url, errors, details)
 	await _qa_check_online_error_flow(
@@ -618,6 +667,7 @@ func _qa_check_gateway_session_token_join(endpoint: String, session_token_url: S
 	gateway_match.setup({
 		"endpoint": endpoint,
 		"session_token_url": session_token_url,
+		"player_name": "QA Pilot + Silva",
 	})
 	add_child(gateway_match)
 	var deadline_msec := Time.get_ticks_msec() + 10000
@@ -635,6 +685,8 @@ func _qa_check_gateway_session_token_join(endpoint: String, session_token_url: S
 			var token_received := bool(gateway_match.call("_has_session_auth_token"))
 			details[detail_key] = "joined"
 			details["gateway_session_token_auth"] = "received" if token_received else "missing"
+			details["gateway_session_player_name"] = str(snapshot.get("player_name", ""))
+			_qa_expect(errors, str(snapshot.get("player_name", "")) == "QA Pilot + Silva", "signed session-token join preserved the selected player name")
 			_qa_expect(errors, token_received, "signed session-token join fetched auth_token")
 			_qa_expect(errors, str(gateway_match.get("_session_token_url")) == session_token_url, "signed session-token URL was used")
 			gateway_match.queue_free()
@@ -828,6 +880,11 @@ func _prepare_for_shutdown() -> void:
 
 
 func _show_local_match_setup() -> void:
+	if not _development_tools:
+		_in_options = false
+		_set_classic_fullscreen_layout(true)
+		_classic_surface().show_setup(LOCAL_MATCH_PLAYER_COLORS, _start_local_match, _show_main_menu)
+		return
 	_in_options = false
 	_discard_paused_match_screen()
 	_set_classic_fullscreen_layout(false)
@@ -1143,7 +1200,10 @@ func _setup_name_or_default(text: String, fallback: String) -> String:
 
 
 func _on_find_servers() -> void:
-	_show_online_hub()
+	if _development_tools:
+		_show_online_hub()
+	else:
+		_show_server_browser()
 
 
 func _show_online_hub() -> void:
@@ -1167,7 +1227,10 @@ func _show_server_browser() -> void:
 	_stack.alignment = BoxContainer.ALIGNMENT_BEGIN
 	_clear_content()
 	_screen = ServerBrowserScene.instantiate()
+	_screen.classic_presentation = not _development_tools
 	_screen.name = "ServerBrowser"
+	_screen.match_requested.connect(_show_online_match)
+	_screen.back_requested.connect(_show_main_menu)
 	_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_stack.add_child(_screen)
@@ -1180,6 +1243,7 @@ func _show_online_match(entry: Dictionary) -> void:
 	_clear_content()
 	_screen = OnlineMatchScene.instantiate()
 	_screen.name = "OnlineMatch"
+	_screen.back_requested.connect(_show_main_menu)
 	_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_screen.setup(entry)
@@ -1203,6 +1267,10 @@ func _on_quit() -> void:
 
 func _show_quit_menu() -> void:
 	_in_options = false
+	if not _development_tools:
+		_set_classic_fullscreen_layout(true)
+		_classic_surface().show_quit(func() -> void: get_tree().quit(), _show_main_menu)
+		return
 	_discard_paused_match_screen()
 	_set_classic_fullscreen_layout(true)
 	_stack.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -1708,6 +1776,52 @@ func _discard_paused_match_screen() -> void:
 
 
 func _show_options(back_callback: Callable = Callable()) -> void:
+	_options_back = back_callback if back_callback.is_valid() else Callable(self, "_show_main_menu")
+	if not _development_tools:
+		_show_classic_options()
+		return
+	_show_development_options(back_callback)
+
+
+func _show_classic_options() -> void:
+	_in_options = true
+	_set_classic_fullscreen_layout(true)
+	_clear_content()
+	var options := ClassicOptions.new()
+	options.name = "ClassicOptions"
+	options.resolution = _resolution_index
+	if DisplayServer.get_name() != "headless":
+		options.resolution = 0
+		for index in range(RESOLUTION_PRESETS.size()):
+			if RESOLUTION_PRESETS[index].size.y == get_window().size.y:
+				options.resolution = index
+	options.fullscreen = _fullscreen
+	for preset in RESOLUTION_PRESETS:
+		options.resolutions.append(preset.label)
+	options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	options.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	options.back_requested.connect(func() -> void: _options_back.call())
+	options.options_applied.connect(func(index: int, fullscreen: bool) -> void:
+		_resolution_index = index
+		_fullscreen = fullscreen
+		_apply_options()
+		_save_options()
+	)
+	_screen = options
+	_stack.add_child(options)
+
+
+func _classic_surface() -> Control:
+	_clear_content()
+	var surface := ClassicOptions.new()
+	surface.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	surface.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_screen = surface
+	_stack.add_child(surface)
+	return surface
+
+
+func _show_development_options(back_callback: Callable = Callable()) -> void:
 	_in_options = true
 	_set_classic_fullscreen_layout(true)
 	_stack.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -2030,12 +2144,25 @@ func _load_options() -> void:
 		_mouse_aim_enabled = bool(config.get_value("gameplay", "mouse_aim", _mouse_aim_enabled))
 		_ai_difficulty = _normalized_ai_difficulty(str(config.get_value("gameplay", "ai_difficulty", _ai_difficulty)))
 		_load_dedicated_gateway_options(config)
+	if not _development_tools:
+		# Exclusive gameplay options must not silently change the classic path
+		# when upgrading an installation that previously enabled them.
+		_mouse_aim_enabled = false
+		_camera_smoothing = 1.0
+		_ai_difficulty = "normal"
+		_screen_shake_enabled = true
 	_load_server_directory_options(config, loaded)
 	_apply_server_directory_options()
 
 
 func _save_options() -> void:
 	var config := ConfigFile.new()
+	config.load(OPTIONS_PATH)
+	if not _development_tools:
+		config.set_value("video", "fullscreen", _fullscreen)
+		config.set_value("video", "resolution_index", _resolution_index)
+		config.save(OPTIONS_PATH)
+		return
 	config.set_value("video", "show_fps", _show_fps)
 	config.set_value("video", "fullscreen", _fullscreen)
 	config.set_value("video", "resolution_index", _resolution_index)

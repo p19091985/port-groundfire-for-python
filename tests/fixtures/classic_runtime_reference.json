@@ -177,7 +177,7 @@
         "sample_rate": 22050,
         "sample_width_bytes": 1
       },
-      "godot_sha256": "454cc3cb8707a0386d37b184bf7aec0d093ce62a99bfacc31e25b6873fa58269",
+      "godot_sha256": "63e6f14e4bbf8cb6c3ceb425887f43de55b7ca001364ad16441af4508ff3ba8c",
       "id": 2,
       "key": "quake",
       "kind": "sound",
@@ -189,7 +189,7 @@
         "sample_width_bytes": 1
       },
       "python_sha256": "454cc3cb8707a0386d37b184bf7aec0d093ce62a99bfacc31e25b6873fa58269",
-      "transfer": "preserved",
+      "transfer": "converted",
       "usage": "runtime"
     },
     {
@@ -201,7 +201,7 @@
         "sample_rate": 22050,
         "sample_width_bytes": 1
       },
-      "godot_sha256": "6e2634521cf855972fee13411e09e1b6d14064c59ea261aeeca8a3ce9d25c711",
+      "godot_sha256": "1b8dbc47acd958b6792c1e666f9d4406a5f81343069d88f70af01189664cc396",
       "id": 3,
       "key": "jumpjets",
       "kind": "sound",
@@ -213,7 +213,7 @@
         "sample_width_bytes": 1
       },
       "python_sha256": "6e2634521cf855972fee13411e09e1b6d14064c59ea261aeeca8a3ce9d25c711",
-      "transfer": "preserved",
+      "transfer": "converted",
       "usage": "runtime"
     },
     {
@@ -249,7 +249,7 @@
         "sample_rate": 22050,
         "sample_width_bytes": 1
       },
-      "godot_sha256": "9f53b967efd7a4d1830310446fa1b42ea6de4ef71b90268be9b5a719e0545e72",
+      "godot_sha256": "d7c632d6c66324d3bc3cf1f31285426292bcb220b800086aaf3495350eea5aae",
       "id": 5,
       "key": "launch_missile",
       "kind": "sound",
@@ -261,7 +261,7 @@
         "sample_width_bytes": 1
       },
       "python_sha256": "9f53b967efd7a4d1830310446fa1b42ea6de4ef71b90268be9b5a719e0545e72",
-      "transfer": "preserved",
+      "transfer": "converted",
       "usage": "runtime"
     },
     {
@@ -273,7 +273,7 @@
         "sample_rate": 22050,
         "sample_width_bytes": 1
       },
-      "godot_sha256": "2bdec254c50fb2798f755749a0d8146e93124fb6f47b1e5b46409d1a2ddf98c0",
+      "godot_sha256": "018f3a9dee2330148667d30854bd8a80430092fb95d0331e6b8b974f470e6a4a",
       "id": 6,
       "key": "missile_death",
       "kind": "sound",
@@ -285,7 +285,7 @@
         "sample_width_bytes": 1
       },
       "python_sha256": "2bdec254c50fb2798f755749a0d8146e93124fb6f47b1e5b46409d1a2ddf98c0",
-      "transfer": "preserved",
+      "transfer": "converted",
       "usage": "runtime"
     },
     {
@@ -345,7 +345,7 @@
         "sample_rate": 44100,
         "sample_width_bytes": 1
       },
-      "godot_sha256": "f03756c0eec79757e7bad8079cba6e3acab3af565a7143534bc78a1f381a9074",
+      "godot_sha256": "c255d87830b0c3adca725fd515b6d7854bad1584e8edb58fdf841a2fc9529ec4",
       "id": 9,
       "key": "metal",
       "kind": "sound",
@@ -357,7 +357,7 @@
         "sample_width_bytes": 1
       },
       "python_sha256": "f03756c0eec79757e7bad8079cba6e3acab3af565a7143534bc78a1f381a9074",
-      "transfer": "preserved",
+      "transfer": "converted",
       "usage": "runtime"
     }
   ],

@@ -173,8 +173,8 @@ def test_main_menu_uses_capabilities_to_hide_dedicated_server_tools():
     assert "func _begin_key_capture" in script
     assert "func _begin_gamepad_capture" in script
     assert "func _classic_control_capture_prompt" in script
-    assert '"Press Button for \'%s\'"' in script
-    assert 'Select a control to rebind.' not in script
+    assert "\"Press Button for '%s'\"" in script
+    assert "Select a control to rebind." not in script
     assert script.count('_capture_prompt.text = ""') >= 2
     assert "Press a keyboard key" not in script
     assert "Press a gamepad button" not in script
@@ -619,7 +619,7 @@ def test_server_browser_has_web_safe_empty_state():
     assert "func _on_websocket_message_received" in script
     assert "NetworkAdapter.server_error_status_message" in script
     assert "NetworkAdapter.transport_for_endpoint" in script
-    assert "_show_online_match" in script
+    assert "match_requested.emit(_pending_join_entry)" in script
     assert "func _exit_tree" in script
     assert "_http_request.cancel_request()" in script
     assert '_websocket_client.disconnect_from_endpoint("server_browser_exit")' in script
@@ -751,7 +751,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "InputEventMouseMotion" in local_match
     assert "InputEventMouseButton" in local_match
     assert "MOUSE_BUTTON_LEFT" in local_match
-    assert "move_on_terrain" in local_match
+    assert "begin_classic_motion" in local_match
+    assert "finish_classic_motion" in local_match
     assert "func _build_pause_overlay" in local_match
     assert "func _set_paused" in local_match
     assert "focus_resume := true" in local_match
@@ -771,14 +772,14 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"Restart Round"' in local_match
     assert "func _fire_weapon" in local_match
     assert "func _spawn_mirv_children" in local_match
-    assert "PROJECTILE_GRAVITY := 190.0" in local_match
+    assert "PROJECTILE_GRAVITY := World.PROJECTILE_GRAVITY" in local_match
     assert "TANK_GUN_ARROW_START_OFFSET := TankState.TANK_BODY_HALF_WIDTH * 1.5" in local_match
     assert "TANK_GUN_ARROW_BASE_LENGTH := TankState.TANK_BODY_HALF_WIDTH * 2.0" in local_match
     assert "TANK_GUN_ARROW_POWER_SCALE := TankState.TANK_BODY_HALF_WIDTH * 0.5" in local_match
     assert "TANK_GUN_ARROW_HEAD_TIP_SCALE := 1.25" in local_match
     assert "TANK_GUN_ARROW_SHAFT_HALF_WIDTH := TankState.TANK_BODY_HALF_WIDTH * 0.4" in local_match
     assert "TANK_GUN_ARROW_HEAD_HALF_WIDTH := TankState.TANK_BODY_HALF_WIDTH * 0.8" in local_match
-    assert "MIRV_MIN_SPLIT_AGE := 0.25" in local_match
+    assert "MIRV_MIN_SPLIT_AGE" not in local_match
     assert "MISSILE_ANGLE_CHANGE_LIMIT := 500.0" in local_match
     assert "MISSILE_RECENTER_MULTIPLIER := 3.0" in local_match
     assert "MISSILE_AI_STEER_ANGLE_SCALE := 18.0" in local_match
@@ -800,7 +801,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "var _configured_roster: Array[Dictionary]" in local_match
     assert "var _participants: Array[Dictionary]" in local_match
     assert 'for entry in Array(config.get("roster", []))' in local_match
-    assert '_configured_roster.append(Dictionary(entry).duplicate(true))' in local_match
+    assert "_configured_roster.append(Dictionary(entry).duplicate(true))" in local_match
     assert "func _build_participants_from_roster" in local_match
     assert "func _participant_rows_snapshot" in local_match
     assert "func _participant_owner_for_index" in local_match
@@ -822,8 +823,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _set_turn_index" in local_match
     assert "func _record_round_defeat" in local_match
     assert (
-        '_player_name = _setup_name_or_default(str(config.get("player_name", TURN_PLAYER)), TURN_PLAYER)'
-        in local_match
+        '_player_name = _setup_name_or_default(str(config.get("player_name", TURN_PLAYER)), TURN_PLAYER)' in local_match
     )
     assert '_enemy_name = _setup_name_or_default(str(config.get("enemy_name", TURN_ENEMY)), TURN_ENEMY)' in local_match
     assert "func _round_spawn_x" in local_match
@@ -846,13 +846,16 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "var _shop_finish_pending := false" in local_match
     assert "velocity.y += _projectile_gravity * step" in local_match
     assert "velocity.y += _projectile_gravity * delta" in local_match
-    assert "split_age = max(MIRV_MIN_SPLIT_AGE, -velocity.y / _projectile_gravity)" in local_match
+    assert "split_age = -velocity.y / _projectile_gravity" in local_match
     assert '"split_age": split_age' in local_match
     assert "func _mirv_split_velocity" in local_match
-    assert "var projectiles_this_step := _projectiles.duplicate()" in local_match
+    assert (
+        "var projectiles_this_step := _step_projectiles if _in_simulation_step else _projectiles.duplicate()"
+        in local_match
+    )
     assert 'var split_age: float = float(projectile.get("split_age", 0.8))' in local_match
     assert "var split_delta: float = clamp(split_age - previous_age, 0.0, delta)" in local_match
-    assert "var split_position := previous_position + Vector2(split_velocity.x * split_delta, 0.0)" in local_match
+    assert "var split_position := Vector2(launch_position.x + launch_velocity.x * split_age, 0.0)" in local_match
     assert (
         "split_position.y = _ballistic_projectile_y_at(projectile, split_age, previous_position, velocity)"
         in local_match
@@ -860,24 +863,25 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _ballistic_projectile_y_at" in local_match
     assert 'projectile["expired"] = true' in local_match
     assert (
-        "if position.x < 0.0 or position.x > _world_size.x:\n"
-        '\t\t\t_lay_projectile_trail(projectile, position)\n'
-        '\t\t\t_expire_projectile_without_explosion(projectile)\n'
+        "if _projectile_outside_classic_bounds(position):\n"
+        '\t\t\tif kind == "missile":\n'
+        '\t\t\t\tprojectile["fuel"] = fuel_before_step\n'
+        "\t\t\t_lay_projectile_trail(projectile, position)\n"
+        '\t\t\tif kind == "shell" or kind == "nuke":\n'
+        '\t\t\t\t_record_ai_shot(str(projectile.owner), position, "", projectile.get("classic_position", []))\n'
+        "\t\t\t_expire_projectile_without_explosion(projectile)\n"
         "\t\t\tcontinue\n"
-        "\t\tvar terrain_collision := _terrain_collision(previous_position, position)"
-        in local_match
+        "\t\tvar terrain_collision := _terrain_collision(previous_position, position)" in local_match
     )
     assert 'TRAIL_TEXTURE := preload("res://assets/trail.png")' in local_match
     assert "func _lay_projectile_trail" in local_match
     assert "func _update_trail_segments" in local_match
     assert (
-        "var terrain_collision := _terrain_collision(previous_position, position)\n"
         '\tif bool(terrain_collision["hit"]):\n'
         '\t\tprojectile["position"] = Vector2(terrain_collision["position"])\n'
         '\t\tprojectile["kill_next_frame"] = true\n'
         "\t\treturn\n"
-        "\tvar target_owner := _segment_tank_hit_owner"
-        in local_match
+        "\tvar target_owner := _segment_tank_hit_owner" in local_match
     )
     assert 'weapon.get("fragments", WeaponInventory.MIRV_FRAGMENTS)' in local_match
     assert 'weapon.get("spread", WeaponInventory.MIRV_SPREAD)' in local_match
@@ -923,7 +927,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "_machine_gun_active" in local_match
     assert "_machine_gun_player_owned" in local_match
     assert "_machine_gun_ai_burst_remaining" in local_match
-    assert 'inventory.call("consume_ammo", weapon_name, WeaponInventory.DEFAULT_AMMO_SPEND)' in local_match
+    assert 'inventory.call("consume_ammo", weapon_name, WeaponInventory.DEFAULT_AMMO_SPEND, false)' in local_match
     assert "func _has_projectile_kind" in local_match
     assert '"back_position": origin' in local_match
     assert '"launch_position": origin' in local_match
@@ -931,14 +935,14 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert 'weapon.get("volley", WeaponInventory.MACHINE_GUN_VOLLEY)' in local_match
     assert 'weapon.get("cooldown", WeaponInventory.MACHINE_GUN_COOLDOWN)' in local_match
     assert "_machine_gun_cooldown = _machine_gun_cooldown_time(_machine_gun_weapon)" in local_match
-    assert "while _machine_gun_cooldown < 0.0 and _machine_gun_fire_held:" in local_match
+    assert "while _machine_gun_cooldown < 0.0 and _machine_gun_fire_held and inventory.ammo_for" in local_match
     assert "var frame_delay: float = max(0.0, delta + _machine_gun_cooldown)" in local_match
     assert '_projectiles[_projectiles.size() - 1]["delay"] = frame_delay' in local_match
-    assert '_cancel_machine_gun_before_first_shot(_message)' in local_match
+    assert "_cancel_machine_gun_before_first_shot(_message)" in local_match
     assert '_cancel_machine_gun_before_first_shot("Machine Gun cancelled.")' in local_match
     assert '"delay"' in local_match
     assert "WeaponInventory.MACHINE_GUN_CLASSIC_POWER" in local_match
-    assert 'draw_line(back_position, projectile_position, Color.WHITE, 2.0)' in local_match
+    assert "draw_line(back_position, projectile_position, Color.WHITE, 2.0)" in local_match
     assert "_add_score_for_owner(owner, damage)" not in local_match
     assert "_add_credits_for_owner(owner, damage)" not in local_match
     assert "_record_round_defeat(owner, target_owner)" in local_match
@@ -1028,16 +1032,16 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _play_nuke_audio" in local_match
     assert "func _stop_nuke_audio" in local_match
     assert "func _exit_tree" in local_match
-    assert '_stop_quake_audio()' in local_match
-    assert '_stop_jump_jets_audio()' in local_match
-    assert '_stop_fire_shell_audio()' in local_match
-    assert '_stop_shell_death_audio()' in local_match
-    assert '_stop_launch_missile_audio()' in local_match
-    assert '_stop_missile_flight_audio()' in local_match
-    assert '_stop_missile_death_audio()' in local_match
-    assert '_stop_machine_gun_audio()' in local_match
-    assert '_stop_metal_hit_audio()' in local_match
-    assert '_stop_nuke_audio()' in local_match
+    assert "_stop_quake_audio()" in local_match
+    assert "_stop_jump_jets_audio()" in local_match
+    assert "_stop_fire_shell_audio()" in local_match
+    assert "_stop_shell_death_audio()" in local_match
+    assert "_stop_launch_missile_audio()" in local_match
+    assert "_stop_missile_flight_audio()" in local_match
+    assert "_stop_missile_death_audio()" in local_match
+    assert "_stop_machine_gun_audio()" in local_match
+    assert "_stop_metal_hit_audio()" in local_match
+    assert "_stop_nuke_audio()" in local_match
     assert "_quake_active" in local_match
     assert "_quake_countdown" in local_match
     assert "_jump_jets_active" in local_match
@@ -1050,19 +1054,19 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "var _machine_gun_audio: AudioStreamPlayer" in local_match
     assert "var _metal_hit_audio: AudioStreamPlayer" in local_match
     assert "var _nuke_audio: AudioStreamPlayer" in local_match
-    assert 'FireShellAudio' in local_match
-    assert 'ShellDeathAudio' in local_match
-    assert 'JumpJetsAudio' in local_match
-    assert 'LaunchMissileAudio' in local_match
-    assert 'MissileFlightAudio' in local_match
-    assert 'MissileDeathAudio' in local_match
-    assert 'MachineGunAudio' in local_match
-    assert 'MetalHitAudio' in local_match
-    assert 'NukeAudio' in local_match
+    assert "FireShellAudio" in local_match
+    assert "ShellDeathAudio" in local_match
+    assert "JumpJetsAudio" in local_match
+    assert "LaunchMissileAudio" in local_match
+    assert "MissileFlightAudio" in local_match
+    assert "MissileDeathAudio" in local_match
+    assert "MachineGunAudio" in local_match
+    assert "MetalHitAudio" in local_match
+    assert "NukeAudio" in local_match
     assert "_play_weapon_launch_audio(kind)" in local_match
     assert "func _play_explosion_death_audio" in local_match
-    assert '_play_launch_missile_audio()' in local_match
-    assert '_play_fire_shell_audio()' in local_match
+    assert "_play_launch_missile_audio()" in local_match
+    assert "_play_fire_shell_audio()" in local_match
     assert "_play_machine_gun_audio()" in local_match
     assert "_stop_machine_gun_audio()" in local_match
     assert "_play_jump_jets_audio()" in local_match
@@ -1099,10 +1103,13 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "NUKE_WHITEOUT_FADE_RATE := 0.6" in local_match
     assert "var white_out := _weapon_white_out(weapon)" in local_match
     assert "_play_explosion_death_audio(kind, white_out)" in local_match
-    assert "_spawn_explosion(position, blast_radius, white_out)" in local_match
+    assert "_spawn_explosion(position, blast_radius, white_out, classic_position)" in local_match
     assert '"white_out_level": 1.0 if white_out else 0.0' in local_match
     assert "var living := _living_participant_indices()" in local_match
-    assert "if living.size() <= 1:" in local_match
+    assert "if _living_participant_count() <= 1:" in local_match
+    assert 'PHASE_ROUND_FINISHING := "round_finishing"' in local_match
+    assert "ROUND_FINISHING_DELAY := 5.0" in local_match
+    assert "func _update_round_finishing" in local_match
     assert "func _start_next_turn_or_round" in local_match
     assert "func _fire" in local_match
     assert "LocalMatchHud" in local_match
@@ -1144,8 +1151,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
         "\t\t_hide_score_overlay()\n"
         "\t\t_open_winner_overlay()\n"
         "\t\treturn\n"
-        "\t_update_leader_flags()"
-        in local_match
+        "\tif update_leader:\n"
+        "\t\t_update_leader_flags()" in local_match
     )
     assert "func _hide_score_overlay" in local_match
     assert "func _build_winner_overlay" in local_match
@@ -1154,20 +1161,18 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "button.focus_neighbor_right = path" in local_match
     assert (
         'if event.is_action_pressed("ui_accept") or event.is_action_pressed("gf_fire"):\n'
-        "\t\t\t_continue_from_score()"
-        in local_match
+        "\t\t\t_continue_from_score()" in local_match
     )
     assert 'if event.is_action_pressed("gf_fire"):\n\t\t\t_return_to_main_menu()' in local_match
     assert (
         'if event.is_action_pressed("ui_accept") or event.is_action_pressed("gf_fire") '
-        'or event.is_action_pressed("ui_cancel")'
-        not in local_match
+        'or event.is_action_pressed("ui_cancel")' not in local_match
     )
     assert "WinnerOverlay" in local_match
     assert "var _winner_heading_label: Label" in local_match
     assert '_winner_heading_label.text = "Final Result"' in local_match
     assert 'const MENU_TILE := preload("res://assets/menuback.png")' in local_match
-    assert 'var backdrop := Control.new()' in local_match
+    assert "var backdrop := Control.new()" in local_match
     assert '"WinnerMenuBackground"' in local_match
     assert "TextureRect.STRETCH_TILE" in local_match
     assert "GroundfireTheme.COLOR_MENU_TILE_TINT" in local_match
@@ -1181,8 +1186,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "func _refresh_winner_continue_button" in local_match
     assert "_winner_main_menu_button.disabled = _winner_continue_delay > 0.0" in local_match
     assert (
-        "if _winner_exit_pending or (not _has_human_participants() and _winner_continue_delay <= 0.0):"
-        in local_match
+        "if _winner_exit_pending or (not _has_human_participants() and _winner_continue_delay <= 0.0):" in local_match
     )
     assert "_winner_exit_pending = true" in local_match
     assert "_winner_main_menu_button.visible = false" in local_match
@@ -1316,7 +1320,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "CLASSIC_MIN_LAND_HEIGHT := -7.0" in terrain
     assert "TANK_EDGE_MARGIN := 30.0" in terrain
     assert "func playable_bounds" in terrain
-    assert "return Vector2(TANK_EDGE_MARGIN, _width - TANK_EDGE_MARGIN)" in terrain
+    assert "10.0 * _world_scale()" in terrain
     assert "var _chunks: Array" in terrain
     assert "func _clip_slice" in terrain
     assert "func _subtract_interval" in terrain
@@ -1412,14 +1416,14 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "GUN_POWER_MIN := 1.0" in tank
     assert "GUN_POWER_MAX := 20.0" in tank
     assert "GUN_POWER_DEFAULT := 10.0" in tank
-    assert "GUN_POWER_PIXEL_SCALE := 5.5" in tank
+    assert "GUN_POWER_PIXEL_SCALE := World.SCALE" in tank
     assert "GUN_POWER_CHANGE_ACCELERATION := 20.0" in tank
     assert "GUN_POWER_MAX_CHANGE_SPEED := 50.0" in tank
     assert "TANK_MAX_HEALTH := 100" in tank
     assert "TANK_FULL_FUEL := 1.0" in tank
     assert "TANK_FUEL_PURCHASE_AMOUNT := 1.0" in tank
     assert "fuel_capacity := TANK_FULL_FUEL" in tank
-    assert "fuel_reserve := TANK_FULL_FUEL" in tank
+    assert "fuel_reserve := TANK_INITIAL_FUEL" in tank
     assert "func add_fuel_capacity" in tank
     assert "func add_fuel_reserve" in tank
     assert "func _spend_fuel" in tank
@@ -1430,17 +1434,17 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"fuel_reserve": fuel_reserve' in tank
     assert "GUN_ANGLE_MIN, GUN_ANGLE_MAX" in tank
     assert "GUN_POWER_MIN, GUN_POWER_MAX" in tank
-    assert "TANK_BOOST_ACCELERATION := 133.0" in tank
+    assert "TANK_BOOST_ACCELERATION := 7.0 * World.SCALE" in tank
     assert "BOOST_FUEL_USAGE_RATE := 0.2" in tank
     assert "BOOST_TURN_RATE := 90.0" in tank
     assert "BOOST_TURN_LIMIT := 15.0" in tank
-    assert "TANK_AIR_GRAVITY := 95.0" in tank
+    assert "TANK_AIR_GRAVITY := 5.0 * World.SCALE" in tank
     assert "TANK_GROUND_DETACH_THRESHOLD := 2.0" in tank
-    assert "TANK_MOVE_SPEED := 74.0" in tank
+    assert "TANK_MOVE_SPEED := 0.2 * World.SCALE" in tank
     assert "TANK_SLOPE_DRAG_SCALE := 65.0" in tank
     assert "TANK_MIN_SLOPE_MOVE_FACTOR := 0.35" in tank
     assert "TANK_PASSIVE_SLIDE_THRESHOLD := 30.0" in tank
-    assert "TANK_BODY_HALF_WIDTH := 26.0" in tank
+    assert "TANK_BODY_HALF_WIDTH := 0.25 * World.SCALE" in tank
     assert "TANK_CENTER_OFFSET := TANK_BODY_HALF_WIDTH * 0.5" in tank
     assert "GUN_LAUNCH_OFFSET := TANK_BODY_HALF_WIDTH * 1.2" in tank
     assert "airborne_velocity.y += TANK_AIR_GRAVITY * delta" in tank
@@ -1505,7 +1509,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "const NUKE" in weapons
     assert '"kind": "mirv"' in weapons
     assert "LIMITED_WEAPON_INITIAL_STOCK := 0" in weapons
-    assert "ROUND_STARTING_COOLDOWN_ADVANCE := 2.0" in weapons
+    assert "_arm_current_cooldown()" in weapons
     assert "SHELL_COOLDOWN := 4.0" in weapons
     assert "MIRV_ROUND_AMMO := 1" in weapons
     assert "MIRV_DAMAGE := 30" in weapons
@@ -1526,7 +1530,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "MACHINE_GUN_VOLLEY := 5" in weapons
     assert "MACHINE_GUN_COOLDOWN := 0.1" in weapons
     assert "MACHINE_GUN_SHOP_PACK := 50" in weapons
-    assert "MACHINE_GUN_TRACER_GRAVITY := 190.0" in weapons
+    assert "MACHINE_GUN_TRACER_GRAVITY := World.PROJECTILE_GRAVITY" in weapons
     assert "MACHINE_GUN_CLASSIC_POWER := 25.0" in weapons
     assert "MIRV_MIN_FRAGMENT_SPREAD_SPEED := 0.0" in weapons
     assert "MIRV_SHOP_PACK := 1" in weapons
@@ -1607,8 +1611,8 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert '"Missile": "Missiles"' in shop
     assert '"Nuke": "Nukes"' in shop
     assert "func _catalog_display_name" in shop
-    assert 'label.text = _catalog_display_name(weapon_name)' in shop
-    assert 'label.text = _catalog_display_name(item_name)' in shop
+    assert "label.text = _catalog_display_name(weapon_name)" in shop
+    assert "label.text = _catalog_display_name(item_name)" in shop
     assert '"classic_shop_stock"' in shop
     assert '"classic_shop_pack"' in shop
     assert "CLASSIC_LIMITED_STOCK_INDICATORS" in shop
@@ -1703,7 +1707,7 @@ def test_local_match_and_network_adapter_scaffolds_exist():
     assert "WebSocketPeer.new()" in websocket
     assert "func connect_to_endpoint" in websocket
     assert "func send_input" in websocket
-    assert "NetworkAdapter.join_message(player_name, password, auth_token, spectator)" in websocket
+    assert "NetworkAdapter.join_message(player_name, password, auth_token, spectator, is_computer)" in websocket
     assert "func is_websocket_connected" in websocket
     assert "func last_sequence" in websocket
     assert "_closed_reported" in websocket
@@ -1728,7 +1732,8 @@ def test_online_match_scene_consumes_websocket_snapshots_and_sends_input():
     assert "func _is_protocol_error" in script
     assert "func _send_join_after_hello" in script
     assert "func _exit_tree" in script
-    assert '_websocket_client.disconnect_from_endpoint("online_match_exit")' in script
+    assert '_stop_session("online_match_exit")' in script
+    assert "_websocket_client.disconnect_from_endpoint(reason)" in script
     assert "_auth_token" in script
     assert 'str(_entry.get("auth_token", ""))' in script
     assert "_session_token_url" in script
@@ -1819,7 +1824,7 @@ def test_control_settings_persist_input_bindings():
     assert '"gf_shield"' in script
     assert '"gf_pause": KEY_ESCAPE' in script
     assert '"gf_pause": JOY_BUTTON_START' in script
-    assert 'for action_name in ACTION_ORDER:' in script
+    assert "for action_name in ACTION_ORDER:" in script
     assert "static func save_key_binding" in script
     assert "static func save_gamepad_button_binding" in script
     assert "static func save_gamepad_axis_binding" in script
@@ -1932,8 +1937,8 @@ def test_control_settings_persist_input_bindings():
     assert '"gf_move_right": {"axis": JOY_AXIS_RIGHT_X' not in script
     assert "Weapon Next" not in script
     assert "Weapon Prev" not in script
-    assert 'KEY_TAB' not in script
-    assert 'KEY_SHIFT' not in script
+    assert "KEY_TAB" not in script
+    assert "KEY_SHIFT" not in script
 
 
 def test_migration_strategy_documents_web_feature_rule():
@@ -2013,9 +2018,7 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     visual_script = (PROJECT_ROOT / "scripts" / "validate_godot_visuals.sh").read_text(encoding="utf-8")
     fidelity_script = (PROJECT_ROOT / "scripts" / "validate_godot_fidelity.sh").read_text(encoding="utf-8")
     qa_script = (PROJECT_ROOT / "scripts" / "qa_godot_web.sh").read_text(encoding="utf-8")
-    hosted_verify_script = (PROJECT_ROOT / "scripts" / "verify_godot_hosted_deployment.py").read_text(
-        encoding="utf-8"
-    )
+    hosted_verify_script = (PROJECT_ROOT / "scripts" / "verify_godot_hosted_deployment.py").read_text(encoding="utf-8")
     pygame_reference_script = (PROJECT_ROOT / "scripts" / "capture_pygame_references.py").read_text(encoding="utf-8")
     validate_script = (PROJECT_ROOT / "scripts" / "validate_godot.sh").read_text(encoding="utf-8")
     visual_check = (GODOT_ROOT / "tests" / "visual_golden_check.gd").read_text(encoding="utf-8")
@@ -2124,7 +2127,7 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "groundfire-qa-directory-v1" in qa_script
     assert "/qa/session_token.json" in qa_script
     assert "generate_join_token(SESSION_SECRET, player_name" in qa_script
-    assert 'capture local_match_setup "?screen=local_match_setup"' in qa_script
+    assert 'capture local_match_setup "?qa=visual&screen=local_match_setup"' in qa_script
 
     assert '"local_match_setup"' in qa_script
     assert "missing_cases" in qa_script
@@ -2216,7 +2219,7 @@ def test_ci_has_godot_release_gate():
     assert "inputs.package-godot == 'true' || inputs.sign-release == 'true'" in workflow
     assert 'if [[ "$PACKAGE_GODOT" == "true" || "$SIGN_RELEASE" == "true" ]]; then' in workflow
     assert "Validate GPG signing secrets" in workflow
-    assert "test -n \"$RELEASE_GPG_PRIVATE_KEY\"" in workflow
-    assert "test -n \"$RELEASE_SIGN_KEY\"" in workflow
+    assert 'test -n "$RELEASE_GPG_PRIVATE_KEY"' in workflow
+    assert 'test -n "$RELEASE_SIGN_KEY"' in workflow
     assert "secrets.RELEASE_GPG_PRIVATE_KEY != '' || secrets.RELEASE_SIGN_KEY != ''" in release_workflow
     assert "Validate GPG signing secrets" in release_workflow

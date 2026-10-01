@@ -44,12 +44,12 @@ if [[ "$TARGET" == "all" || "$TARGET" == "web" ]]; then
 fi
 
 "$ROOT_DIR/scripts/validate_godot.sh"
-mkdir -p "$BUILD_DIR/godot" "$BUILD_DIR/godot-web"
+mkdir -p "$GODOT_LINUX_DIR" "$GODOT_WEB_DIR"
 
 if [[ "$TARGET" == "all" || "$TARGET" == "linux" ]]; then
-    "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --export-release "Linux Desktop"
+    "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --export-release "Linux Desktop" "$GODOT_LINUX_DIR/Groundfire.x86_64"
 fi
 
 if [[ "$TARGET" == "all" || "$TARGET" == "web" ]]; then
-    "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --export-release "Web"
+    "$GODOT_BIN" --headless --path "$GODOT_PROJECT_DIR" --export-release "Web" "$GODOT_WEB_DIR/index.html"
 fi

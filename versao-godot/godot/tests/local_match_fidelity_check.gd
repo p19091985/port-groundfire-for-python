@@ -8,6 +8,7 @@ const ControlSettings = preload("res://scripts/control_settings.gd")
 const TankState = preload("res://scripts/tank_state.gd")
 const TerrainModel = preload("res://scripts/terrain_model.gd")
 const WeaponInventory = preload("res://scripts/weapon_inventory.gd")
+const World = preload("res://scripts/classic_world.gd")
 const SHUTDOWN_DRAIN_FRAMES = 8
 
 
@@ -275,7 +276,7 @@ func _run() -> void:
 	var initial_round_start_delay := float(local_match.get("_round_start_delay"))
 	var initial_shell_cooldown := float(starting_inventory.call("current_cooldown"))
 	assert(initial_round_start_delay > 0.0 and initial_round_start_delay <= 2.0)
-	assert(abs(initial_shell_cooldown - initial_round_start_delay) < 0.1)
+	assert(abs(initial_shell_cooldown - initial_round_start_delay - 2.0) < 0.1)
 	assert(not bool(local_match.call("_tank_weapon_ready", starting_inventory)))
 	local_match.call("_fire_player")
 	assert(Array(local_match.get("_projectiles")).is_empty())
@@ -288,6 +289,8 @@ func _run() -> void:
 	local_match.call("_update_weapon_cooldowns", half_round_start_delay + 0.1)
 	local_match.call("_update_round_starting", half_round_start_delay + 0.1)
 	assert(str(local_match.get("_phase")) == "aim")
+	assert(not bool(starting_inventory.call("is_current_ready")))
+	local_match.call("_update_weapon_cooldowns", 2.0)
 	assert(bool(starting_inventory.call("is_current_ready")))
 	assert(bool(local_match.call("_tank_weapon_ready", starting_inventory)))
 	player_tank.position = Vector2(120.0, 120.0)
@@ -368,7 +371,8 @@ func _run() -> void:
 		{"weapon": {"name": "Shell", "kind": "shell", "damage": 40, "blast": 50.0}, "player_owned": true},
 		""
 	)
-	assert(abs(float(enemy_tank.health) - (float(TankState.TANK_MAX_HEALTH) - 37.296)) < 0.01)
+	# Python includes the tank's 0.75 * size hit range in splash falloff.
+	assert(abs(float(enemy_tank.health) - 61.3995134837731) < 0.01)
 	local_match.call("_set_paused", true)
 	assert(shell_death_audio.stream_paused)
 	local_match.call("_set_paused", false)
@@ -520,7 +524,7 @@ func _run() -> void:
 	assert(inventory.ammo_for(WeaponInventory.CORBOMITE) == 0)
 	assert(not inventory.select_by_name(WeaponInventory.CORBOMITE))
 	assert(abs(float(inventory.weapon_by_name(WeaponInventory.MACHINE_GUN).get("tracer_gravity", -1.0)) - WeaponInventory.MACHINE_GUN_TRACER_GRAVITY) < 0.01)
-	assert(abs(WeaponInventory.MACHINE_GUN_TRACER_GRAVITY - 190.0) < 0.01)
+	assert(abs(WeaponInventory.MACHINE_GUN_TRACER_GRAVITY - World.PROJECTILE_GRAVITY) < 0.01)
 	assert(abs(float(inventory.weapon_by_name(WeaponInventory.MIRV).get("min_fragment_spread_speed", -1.0)) - WeaponInventory.MIRV_MIN_FRAGMENT_SPREAD_SPEED) < 0.01)
 	assert(int(inventory.weapon_by_name(WeaponInventory.MIRV).get("damage", 0)) == WeaponInventory.MIRV_DAMAGE)
 	assert(WeaponInventory.MIRV_DAMAGE == 30)
@@ -617,7 +621,7 @@ func _run() -> void:
 		true,
 		{"name": "MIRV", "kind": "mirv", "damage": WeaponInventory.MIRV_DAMAGE, "blast": 34.0, "fragments": WeaponInventory.MIRV_FRAGMENTS, "spread": WeaponInventory.MIRV_SPREAD},
 		Vector2.ZERO,
-		Vector2(100.0, 0.0)
+		Vector2(100.0, -World.PROJECTILE_GRAVITY * 0.25)
 	)
 	local_match.call("_update_projectiles", 0.25)
 	mirv_children = local_match.get("_projectiles")
@@ -626,13 +630,13 @@ func _run() -> void:
 	assert(str(mirv_at_exact_apex.get("kind", "")) == "mirv")
 	assert(abs(float(mirv_at_exact_apex.get("age", 0.0)) - 0.25) < 0.01)
 	assert(not bool(mirv_at_exact_apex.get("split", false)))
-	assert(Vector2(mirv_at_exact_apex.get("position", Vector2.ZERO)).distance_to(Vector2(325.0, 65.9375)) < 0.01)
+	assert(Vector2(mirv_at_exact_apex.get("position", Vector2.ZERO)).distance_to(Vector2(325.0, (60.0 - 0.5 * World.PROJECTILE_GRAVITY * 0.25 * 0.25))) < 0.01)
 	local_match.call("_update_projectiles", 0.01)
 	mirv_children = local_match.get("_projectiles")
 	assert(mirv_children.size() == WeaponInventory.MIRV_FRAGMENTS)
 	var split_mirv_position: Vector2 = Dictionary(mirv_children[0]).get("position", Vector2.ZERO)
 	assert(abs(split_mirv_position.x - 325.0) < 0.01)
-	assert(abs(split_mirv_position.y - 65.9375) < 0.01)
+	assert(abs(split_mirv_position.y - (60.0 - 0.5 * World.PROJECTILE_GRAVITY * 0.25 * 0.25)) < 0.01)
 	for mirv_projectile in mirv_children:
 		assert(str(mirv_projectile.get("kind", "")) == "shell")
 		assert(str(Dictionary(mirv_projectile.get("weapon", {})).get("name", "")) == "MIRV Fragment")
@@ -670,7 +674,7 @@ func _run() -> void:
 	var missile_flight_stream = missile_flight_audio.stream as AudioStreamWAV
 	assert(missile_flight_stream != null)
 	assert(missile_flight_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
-	assert(missile_flight_audio.playing)
+	assert(_loop_playing(local_match, "missile"))
 	Input.action_press("gf_aim_left")
 	local_match.call("_update_projectiles", 0.1)
 	Input.action_release("gf_aim_left")
@@ -681,14 +685,14 @@ func _run() -> void:
 	assert(float(missile_projectile.get("angle", 0.0)) > 0.0)
 	assert(float(missile_projectile.get("fuel", 3.0)) < 3.0)
 	local_match.call("_set_paused", true)
-	assert(missile_flight_audio.stream_paused)
+	assert(_loop_paused(local_match, "missile"))
 	local_match.call("_set_paused", false)
-	assert(not missile_flight_audio.stream_paused)
+	assert(not _loop_paused(local_match, "missile"))
 	missile_projectile["fuel"] = 0.05
 	missile_projectiles[0] = missile_projectile
 	local_match.set("_projectiles", missile_projectiles)
 	local_match.call("_update_projectiles", 0.1)
-	assert(not missile_flight_audio.playing)
+	assert(not _loop_playing(local_match, "missile"))
 	_clear_projectiles(local_match)
 	var clamped_missile = {
 		"fuel": 1.0,
@@ -701,7 +705,7 @@ func _run() -> void:
 	var clamped_missile_velocity: Vector2 = local_match.call("_update_missile_projectile", clamped_missile, Vector2(120.0, 0.0), Vector2.ZERO, 1.0)
 	Input.action_release("gf_aim_left")
 	assert(abs(float(clamped_missile.get("angle_change", 0.0)) - 500.0) < 0.01)
-	var clamped_expected_speed = (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(deg_to_rad(float(clamped_missile.get("angle", 0.0))))) * TankState.GUN_POWER_PIXEL_SCALE
+	var clamped_expected_speed = (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(deg_to_rad(float(clamped_missile.get("angle", 0.0))))) * World.SCALE
 	assert(abs(clamped_missile_velocity.length() - clamped_expected_speed) < 0.01)
 	var recentered_missile = {
 		"fuel": 1.0,
@@ -737,7 +741,7 @@ func _run() -> void:
 		"owner": "Player",
 	}
 	var low_speed_velocity: Vector2 = local_match.call("_update_missile_projectile", low_speed_missile, Vector2.ZERO, Vector2.ZERO, 0.1)
-	var low_speed_factor = (0.25 - cos(0.0)) * TankState.GUN_POWER_PIXEL_SCALE
+	var low_speed_factor = (0.25 - cos(0.0)) * World.SCALE
 	assert(low_speed_factor < 0.0)
 	assert(low_speed_velocity.distance_to(Vector2(0.0, -low_speed_factor)) < 0.01)
 
@@ -748,7 +752,7 @@ func _run() -> void:
 		"angle_change": 0.0,
 		"owner": "Player",
 	}
-	var missile_classic_pixel_speed = (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(0.0)) * TankState.GUN_POWER_PIXEL_SCALE
+	var missile_classic_pixel_speed = (WeaponInventory.MISSILE_CLASSIC_SPEED - cos(0.0)) * World.SCALE
 	var exhausted_frame_velocity: Vector2 = local_match.call("_update_missile_projectile", exhausting_missile, Vector2.ZERO, Vector2.ZERO, 0.1)
 	assert(float(exhausting_missile.get("fuel", 0.0)) < 0.0)
 	assert(bool(exhausting_missile.get("fuel_exhausted_this_frame", false)))
@@ -783,7 +787,7 @@ func _run() -> void:
 	assert(freefall_missile_projectiles.size() == 1)
 	var freefall_missile: Dictionary = freefall_missile_projectiles[0]
 	assert(Vector2(freefall_missile.get("position", Vector2.ZERO)).distance_to(Vector2(642.0, 23.0)) < 0.01)
-	assert(Vector2(freefall_missile.get("velocity", Vector2.ZERO)).distance_to(Vector2(20.0, 49.0)) < 0.01)
+	assert(Vector2(freefall_missile.get("velocity", Vector2.ZERO)).distance_to(Vector2(20.0, 30.0 + World.PROJECTILE_GRAVITY * 0.1)) < 0.01)
 	_clear_projectiles(local_match)
 	local_match.set("_terrain", missile_freefall_original_terrain)
 
@@ -800,7 +804,7 @@ func _run() -> void:
 	assert(airborne_projectiles.size() == 1)
 	var airborne_projectile: Dictionary = airborne_projectiles[0]
 	assert(abs(Vector2(airborne_projectile.get("velocity", Vector2.ZERO)).x - 12.0) < 0.01)
-	assert(abs(Vector2(airborne_projectile.get("velocity", Vector2.ZERO)).y + 239.0) < 0.01)
+	assert(abs(Vector2(airborne_projectile.get("velocity", Vector2.ZERO)).y + (8.0 + 10.0 * TankState.GUN_POWER_PIXEL_SCALE * 4.2)) < 0.01)
 	_clear_projectiles(local_match)
 
 	local_match.call(
@@ -835,8 +839,8 @@ func _run() -> void:
 	var gravity_projectiles: Array = local_match.get("_projectiles")
 	assert(gravity_projectiles.size() == 1)
 	var gravity_projectile: Dictionary = gravity_projectiles[0]
-	assert(abs(Vector2(gravity_projectile.get("velocity", Vector2.ZERO)).y - 19.0) < 0.01)
-	assert(Vector2(gravity_projectile.get("position", Vector2.ZERO)).distance_to(Vector2(300.0, 30.95)) < 0.01)
+	assert(abs(Vector2(gravity_projectile.get("velocity", Vector2.ZERO)).y - World.PROJECTILE_GRAVITY * 0.1) < 0.01)
+	assert(Vector2(gravity_projectile.get("position", Vector2.ZERO)).distance_to(Vector2(300.0, 30.0 + 0.5 * World.PROJECTILE_GRAVITY * 0.1 * 0.1)) < 0.01)
 	_clear_projectiles(local_match)
 
 	local_match.get("_trail_segments").clear()
@@ -861,6 +865,7 @@ func _run() -> void:
 	var trail_uvs: PackedVector2Array = local_match.call("_trail_segment_draw_uvs")
 	assert(trail_uvs.size() == 4)
 	assert(trail_uvs[0] == Vector2.ZERO)
+	assert(trail_uvs[2] == Vector2.ONE)
 	local_match.call("_update_trail_segments", 4.0)
 	trail_segments = local_match.get("_trail_segments")
 	assert(trail_segments.size() == 3)
@@ -905,7 +910,7 @@ func _run() -> void:
 	var mouse_cursor_uvs: PackedVector2Array = local_match.call("_mouse_cursor_draw_uvs")
 	assert(mouse_cursor_uvs.size() == 4)
 	assert(mouse_cursor_uvs[0] == Vector2.ZERO)
-	assert(mouse_cursor_uvs[2] == Vector2(32.0, 32.0))
+	assert(mouse_cursor_uvs[2] == Vector2.ONE)
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	local_match.set("_mouse_aim_enabled", true)
 	local_match.set("_phase", "aim")
@@ -927,7 +932,7 @@ func _run() -> void:
 	local_match.set("_credits", 0)
 	local_match.call(
 		"_fire_from",
-		Vector2(1275.0, 30.0),
+		Vector2(World.SIZE.x - 5.0, 30.0),
 		0.0,
 		0.0,
 		true,
@@ -994,6 +999,10 @@ func _run() -> void:
 	var metal_hit_stream = metal_hit_audio.stream as AudioStreamWAV
 	assert(metal_hit_stream != null)
 	assert(metal_hit_stream.loop_mode == AudioStreamWAV.LOOP_DISABLED)
+	# Earlier collision cases can leave expired polyphonic voices until the next
+	# process frame. Godot's stream_paused getter reads the first voice, so isolate
+	# this pause assertion from those completed effects (overlap is tested separately).
+	metal_hit_audio.stop()
 	var enemy_health_before = int(enemy_tank.health)
 	var score_before = int(local_match.get("_score"))
 	local_match.call("_apply_machine_gun_damage", first_machine_gun_projectile, "Enemy")
@@ -1013,7 +1022,6 @@ func _run() -> void:
 	local_match.set("_machine_gun_fire_held", true)
 	local_match.set("_machine_gun_ai_burst_remaining", 4)
 	local_match.call("_play_machine_gun_audio")
-	var lethal_machine_gun_audio: AudioStreamPlayer = local_match.get_node("MachineGunAudio")
 	var lethal_machine_gun_projectile = {
 		"kind": "machine_gun",
 		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
@@ -1032,7 +1040,7 @@ func _run() -> void:
 	# concurrent Machine Gun round in the world.
 	assert(bool(local_match.get("_machine_gun_fire_held")))
 	assert(int(local_match.get("_machine_gun_ai_burst_remaining")) == 4)
-	assert(lethal_machine_gun_audio.playing)
+	assert(_loop_playing(local_match, "machine_gun"))
 	var expired_machine_gun_projectiles: Array = local_match.get("_projectiles")
 	assert(not bool(Dictionary(expired_machine_gun_projectiles[0]).get("expired", false)))
 	assert(not bool(Dictionary(expired_machine_gun_projectiles[1]).get("expired", false)))
@@ -1085,13 +1093,13 @@ func _run() -> void:
 
 	var exiting_machine_gun_projectile = {
 		"weapon": {"name": "Machine Gun", "kind": "machine_gun", "damage": 2},
-		"position": Vector2(1275.0, 30.0),
+		"position": Vector2(World.SIZE.x - 5.0, 30.0),
 		"owner": "Player",
 		"age": 0.1,
-		"launch_position": Vector2(1275.0, 30.0),
+		"launch_position": Vector2(World.SIZE.x - 5.0, 30.0),
 		"launch_velocity": Vector2(200.0, 0.0),
 	}
-	local_match.call("_update_machine_gun_projectile", exiting_machine_gun_projectile, Vector2(1275.0, 30.0), Vector2(200.0, 0.0), 0.1)
+	local_match.call("_update_machine_gun_projectile", exiting_machine_gun_projectile, Vector2(World.SIZE.x - 5.0, 30.0), Vector2(200.0, 0.0), 0.1)
 	assert(bool(exiting_machine_gun_projectile.get("kill_next_frame", false)))
 	assert(not bool(exiting_machine_gun_projectile.get("expired", false)))
 	assert(float(Vector2(exiting_machine_gun_projectile.get("position", Vector2.ZERO)).x) > float(local_match.get("_world_size").x))
@@ -1189,6 +1197,7 @@ func _run() -> void:
 	var held_machine_gun_ammo_before = int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN))
 	local_match.set("_phase", "aim")
 	local_match.call("_set_turn_index", 0)
+	local_match.call("_update_weapon_switch_delay", 1.0)
 	Input.action_press("gf_fire")
 	local_match.call("_fire_player")
 	assert(bool(local_match.get("_machine_gun_active")))
@@ -1197,14 +1206,14 @@ func _run() -> void:
 	var machine_gun_stream = machine_gun_audio.stream as AudioStreamWAV
 	assert(machine_gun_stream != null)
 	assert(machine_gun_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
-	assert(machine_gun_audio.playing)
+	assert(_loop_playing(local_match, "machine_gun"))
 	machine_gun_projectiles = local_match.get("_projectiles")
 	assert(machine_gun_projectiles.is_empty())
 	assert(int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == held_machine_gun_ammo_before)
 	local_match.call("_unselect_machine_gun_and_cycle", 1)
 	assert(not bool(local_match.get("_machine_gun_active")))
 	assert(not bool(local_match.get("_machine_gun_fire_held")))
-	assert(not machine_gun_audio.playing)
+	assert(not _loop_playing(local_match, "machine_gun"))
 	assert(str(local_match.get("_phase")) == "aim")
 	assert(str(local_match.get("_turn_owner")) == "Player")
 	assert(player_inventory.current_name() != WeaponInventory.MACHINE_GUN)
@@ -1218,7 +1227,7 @@ func _run() -> void:
 	Input.action_press("gf_fire")
 	local_match.call("_fire_player")
 	assert(bool(local_match.get("_machine_gun_active")))
-	assert(machine_gun_audio.playing)
+	assert(_loop_playing(local_match, "machine_gun"))
 	assert(Array(local_match.get("_projectiles")).is_empty())
 	local_match.call("_update_machine_gun_fire", WeaponInventory.MACHINE_GUN_COOLDOWN)
 	assert(Array(local_match.get("_projectiles")).is_empty())
@@ -1228,7 +1237,7 @@ func _run() -> void:
 	assert(int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == held_machine_gun_ammo_before - 1)
 	local_match.call("_unselect_machine_gun_and_cycle", 1)
 	assert(not bool(local_match.get("_machine_gun_fire_held")))
-	assert(not machine_gun_audio.playing)
+	assert(not _loop_playing(local_match, "machine_gun"))
 	assert(bool(local_match.get("_machine_gun_active")))
 	assert(player_inventory.current_name() != WeaponInventory.MACHINE_GUN)
 	assert(str(local_match.get("_message")).contains("unselected"))
@@ -1240,7 +1249,7 @@ func _run() -> void:
 	Input.action_release("gf_fire")
 	local_match.call("_update_machine_gun_fire", WeaponInventory.MACHINE_GUN_COOLDOWN)
 	assert(not bool(local_match.get("_machine_gun_fire_held")))
-	assert(not machine_gun_audio.playing)
+	assert(not _loop_playing(local_match, "machine_gun"))
 	local_match.call("_reset_machine_gun_fire")
 	_clear_projectiles(local_match)
 
@@ -1258,11 +1267,12 @@ func _run() -> void:
 	machine_gun_projectiles = local_match.get("_projectiles")
 	assert(machine_gun_projectiles.size() == 1)
 	assert(int(player_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == 0)
-	assert(player_inventory.current_name() == WeaponInventory.SHELL)
+	# Python keeps the empty Machine Gun selected until Fire is released.
+	assert(player_inventory.current_name() == WeaponInventory.MACHINE_GUN)
 	local_match.call("_update_machine_gun_fire", WeaponInventory.MACHINE_GUN_COOLDOWN * 1.1)
 	assert(Array(local_match.get("_projectiles")).size() == 1)
 	assert(not bool(local_match.get("_machine_gun_fire_held")))
-	assert(not machine_gun_audio.playing)
+	assert(not _loop_playing(local_match, "machine_gun"))
 	Input.action_release("gf_fire")
 	_clear_projectiles(local_match)
 	local_match.call("_reset_machine_gun_fire")
@@ -1294,7 +1304,7 @@ func _run() -> void:
 	local_match.call("_begin_enemy_machine_gun_fire", enemy_inventory.weapon_by_name(WeaponInventory.MACHINE_GUN))
 	assert(bool(local_match.get("_machine_gun_active")))
 	assert(not bool(local_match.get("_machine_gun_player_owned")))
-	assert(machine_gun_audio.playing)
+	assert(_loop_playing(local_match, "machine_gun"))
 	assert(int(local_match.get("_machine_gun_ai_burst_remaining")) == WeaponInventory.MACHINE_GUN_VOLLEY)
 	assert(Array(local_match.get("_projectiles")).is_empty())
 	assert(int(enemy_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == enemy_machine_gun_ammo_before)
@@ -1307,7 +1317,7 @@ func _run() -> void:
 	assert(int(enemy_inventory.ammo_for(WeaponInventory.MACHINE_GUN)) == enemy_machine_gun_ammo_before - 2)
 	assert(int(local_match.get("_machine_gun_ai_burst_remaining")) == WeaponInventory.MACHINE_GUN_VOLLEY - 2)
 	local_match.call("_reset_machine_gun_fire")
-	assert(not machine_gun_audio.playing)
+	assert(not _loop_playing(local_match, "machine_gun"))
 	_clear_projectiles(local_match)
 
 	enemy_inventory.add_ammo(WeaponInventory.NUKE)
@@ -1373,7 +1383,7 @@ func _run() -> void:
 	var blast_draw_uvs: PackedVector2Array = local_match.call("_blast_draw_uvs")
 	assert(blast_draw_uvs.size() == 4)
 	assert(blast_draw_uvs[0] == Vector2.ZERO)
-	assert(blast_draw_uvs[2] == Vector2(64.0, 64.0))
+	assert(blast_draw_uvs[2] == Vector2.ONE)
 	assert(float(local_match.call("_whiteout_alpha")) > 0.99)
 	var nuke_audio: AudioStreamPlayer = local_match.get_node("NukeAudio")
 	assert(nuke_audio.stream != null)
@@ -1512,17 +1522,18 @@ func _run() -> void:
 	assert(jump_jets_stream != null)
 	assert(jump_jets_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
 	assert(not bool(local_match.get("_jump_jets_active")))
+	local_match.get("_boosting_owners")[0] = true
 	local_match.call("_play_jump_jets_audio")
 	assert(bool(local_match.get("_jump_jets_active")))
-	assert(jump_jets_audio.playing)
+	assert(_loop_playing(local_match, "jets"))
 	local_match.call("_set_paused", true)
-	assert(jump_jets_audio.stream_paused)
+	assert(_loop_paused(local_match, "jets"))
 	local_match.call("_set_paused", false)
-	assert(not jump_jets_audio.stream_paused)
-	assert(jump_jets_audio.playing)
+	assert(not _loop_paused(local_match, "jets"))
+	assert(_loop_playing(local_match, "jets"))
 	local_match.call("_stop_jump_jets_audio")
 	assert(not bool(local_match.get("_jump_jets_active")))
-	assert(not jump_jets_audio.playing)
+	assert(not _loop_playing(local_match, "jets"))
 	var jump_jets_tank = TankState.new()
 	jump_jets_tank.fuel = 0.001
 	jump_jets_tank.state = TankState.STATE_ALIVE
@@ -1669,21 +1680,22 @@ func _run() -> void:
 	local_match.set("_participants", leader_participants)
 	enemy_tank.state = TankState.STATE_DEAD
 	local_match.call("_record_round_defeat", "Player", "Enemy")
+	local_match.get("_boosting_owners")[0] = true
 	local_match.call("_play_jump_jets_audio")
 	assert(bool(local_match.get("_jump_jets_active")))
-	assert((local_match.get_node("JumpJetsAudio") as AudioStreamPlayer).playing)
+	assert(_loop_playing(local_match, "jets"))
 	local_match.set("_machine_gun_active", true)
 	local_match.set("_machine_gun_fire_held", true)
 	local_match.set("_machine_gun_ai_burst_remaining", 3)
 	local_match.call("_play_machine_gun_audio")
-	assert((local_match.get_node("MachineGunAudio") as AudioStreamPlayer).playing)
+	assert(_loop_playing(local_match, "machine_gun"))
 	local_match.call("_open_round_score", "Round Won", 100, "Player")
 	assert(not bool(local_match.get("_jump_jets_active")))
-	assert(not (local_match.get_node("JumpJetsAudio") as AudioStreamPlayer).playing)
+	assert(not _loop_playing(local_match, "jets"))
 	assert(not bool(local_match.get("_machine_gun_active")))
 	assert(not bool(local_match.get("_machine_gun_fire_held")))
 	assert(int(local_match.get("_machine_gun_ai_burst_remaining")) == 0)
-	assert(not (local_match.get_node("MachineGunAudio") as AudioStreamPlayer).playing)
+	assert(not _loop_playing(local_match, "machine_gun"))
 	assert(str(local_match.get("_phase")) == "score")
 	assert(abs(float(local_match.get("_score_continue_delay")) - 2.0) < 0.01)
 	assert(int(local_match.get("_score")) == 340)
@@ -1772,6 +1784,11 @@ func _run() -> void:
 	assert(not bool(local_match.get("_shop_finish_pending")))
 	local_match.call("_update_modal_activation", 0.01)
 	assert(float(local_match.get("_shop_input_delay")) < 0.0)
+	# The Python bot selects Done after the same 0.4 s / 0.2 s delays.
+	local_match.call("_update_shop_participants", 0.41)
+	local_match.call("_update_shop_participants", 0.01)
+	local_match.call("_update_shop_participants", 0.21)
+	local_match.call("_update_shop_participants", 0.01)
 	local_match.call("_continue_from_shop")
 	assert(str(local_match.get("_phase")) == "shop")
 	assert(bool(local_match.get("_shop_finish_pending")))
@@ -2357,6 +2374,11 @@ func _run() -> void:
 	assert(int(cursor_shop_state.get("selected_position", -1)) == 10)
 	local_match.set("_shop_input_delay", -0.01)
 	local_match.call("_handle_classic_shop_command", "fire")
+	assert(not bool(local_match.get("_shop_finish_pending")))
+	local_match.call("_update_shop_participants", 0.41)
+	local_match.call("_update_shop_participants", 0.01)
+	local_match.call("_update_shop_participants", 0.21)
+	local_match.call("_update_shop_participants", 0.01)
 	assert(bool(local_match.get("_shop_finish_pending")))
 	local_match.set("_shop_finish_pending", false)
 	local_match.call("_prepare_shop_pass")
@@ -2411,11 +2433,14 @@ func _run() -> void:
 	assert(abs(tank.gun_angle - TankState.GUN_ANGLE_DEFAULT) < 0.01)
 	assert(abs(tank.gun_power - TankState.GUN_POWER_DEFAULT) < 0.01)
 	assert(tank.health == TankState.TANK_MAX_HEALTH)
-	assert(abs(tank.fuel - TankState.TANK_FULL_FUEL) < 0.01)
+	assert(abs(tank.fuel - TankState.TANK_INITIAL_FUEL) < 0.01)
 	assert(abs(tank.fuel_capacity - TankState.TANK_FULL_FUEL) < 0.01)
-	assert(abs(tank.fuel_reserve - TankState.TANK_FULL_FUEL) < 0.01)
-	assert(abs(tank.add_fuel_reserve() - (TankState.TANK_FULL_FUEL + TankState.TANK_FUEL_PURCHASE_AMOUNT)) < 0.01)
-	assert(abs(tank.fuel - TankState.TANK_FULL_FUEL) < 0.01)
+	assert(abs(tank.fuel_reserve - TankState.TANK_INITIAL_FUEL) < 0.01)
+	assert(abs(tank.add_fuel_reserve() - TankState.TANK_FUEL_PURCHASE_AMOUNT) < 0.01)
+	assert(abs(tank.fuel - TankState.TANK_INITIAL_FUEL) < 0.01)
+	# Purchases become usable fuel when the next round initializes the tank.
+	tank.add_fuel_reserve()
+	tank.reset_round(360.0, match_terrain, "Player", Color.WHITE)
 	tank.boost(0.5)
 	assert(abs(tank.fuel - 0.9) < 0.01)
 	assert(abs(tank.fuel_reserve - 1.9) < 0.01)
@@ -2453,7 +2478,7 @@ func _run() -> void:
 	assert(abs(float(ground_smoke.get("growth_rate", 0.0)) - TankState.GROUND_SMOKE_GROWTH_RATE) < 0.01)
 	assert(abs(float(ground_smoke.get("fade_rate", 0.0)) - TankState.GROUND_SMOKE_FADE_RATE) < 0.01)
 	var ground_smoke_uvs: PackedVector2Array = local_match.call("_smoke_particle_draw_uvs", ground_smoke)
-	assert(ground_smoke_uvs[2] == Vector2(64.0, 64.0))
+	assert(ground_smoke_uvs[2] == Vector2.ONE)
 	assert(abs(float(tank.exhaust_time) - 0.5) < 0.01)
 	local_match.call("_emit_tank_burn_smoke", tank, 0.1)
 	assert(abs(float(tank.exhaust_time) - 0.4) < 0.01)
@@ -2493,7 +2518,7 @@ func _run() -> void:
 	assert(abs(float(boost_smoke.get("growth_rate", -1.0)) - TankState.BOOST_SMOKE_GROWTH_RATE) < 0.01)
 	assert(abs(float(boost_smoke.get("fade_rate", 0.0)) - TankState.BOOST_SMOKE_FADE_RATE) < 0.01)
 	var boost_smoke_uvs: PackedVector2Array = local_match.call("_smoke_particle_draw_uvs", boost_smoke)
-	assert(boost_smoke_uvs[2] == Vector2(128.0, 128.0))
+	assert(boost_smoke_uvs[2] == Vector2.ONE)
 	assert(abs(float(boost_smoke_tank.exhaust_time) + 0.05) < 0.01)
 	boost_smoke_tank.exhaust_time = 0.03
 	local_match.call("_emit_jump_jet_smoke", boost_smoke_tank, 0.1)
@@ -2504,14 +2529,14 @@ func _run() -> void:
 		"size": 0.25,
 		"rotation": 0.0,
 	})
-	var smoke_half_size = TankState.TANK_BODY_HALF_WIDTH * 0.25
+	var smoke_half_size = TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE * 0.25
 	assert(smoke_draw_points.size() == 4)
 	assert(smoke_draw_points[0].distance_to(Vector2(10.0 - smoke_half_size, 20.0 - smoke_half_size)) < 0.01)
 	assert(smoke_draw_points[2].distance_to(Vector2(10.0 + smoke_half_size, 20.0 + smoke_half_size)) < 0.01)
 	var smoke_draw_uvs: PackedVector2Array = local_match.call("_smoke_particle_draw_uvs")
 	assert(smoke_draw_uvs.size() == 4)
 	assert(smoke_draw_uvs[0] == Vector2.ZERO)
-	assert(smoke_draw_uvs[2] == Vector2(64.0, 64.0))
+	assert(smoke_draw_uvs[2] == Vector2.ONE)
 	local_match.get("_smoke_particles").clear()
 	local_match.get("_smoke_particles").append({
 		"position": Vector2(1.0, 2.0),
@@ -2610,8 +2635,8 @@ func _run() -> void:
 	tank.state = TankState.STATE_ALIVE
 	tank.boost(0.5)
 	assert(not tank.on_ground)
-	assert(abs(tank.airborne_velocity.x + 33.25) < 0.01)
-	assert(abs(tank.airborne_velocity.y + 57.5907) < 0.01)
+	assert(abs(tank.airborne_velocity.x + sin(deg_to_rad(30.0)) * TankState.TANK_BOOST_ACCELERATION * 0.5) < 0.01)
+	assert(abs(tank.airborne_velocity.y + cos(deg_to_rad(30.0)) * TankState.TANK_BOOST_ACCELERATION * 0.5) < 0.01)
 	assert(abs(tank.fuel - 0.9) < 0.01)
 	assert(abs(tank.tank_angle) < 0.01)
 	var first_boost_frame_terrain = FlatTerrain.new()
@@ -2708,7 +2733,7 @@ func _run() -> void:
 	tank.airborne_velocity = Vector2(12.0, -8.0)
 	var tank_launch_velocity = tank.launch_velocity(10.0, 4.2)
 	assert(abs(tank_launch_velocity.x - 12.0) < 0.01)
-	assert(abs(tank_launch_velocity.y + 239.0) < 0.01)
+	assert(abs(tank_launch_velocity.y + (8.0 + 10.0 * TankState.GUN_POWER_PIXEL_SCALE * 4.2)) < 0.01)
 	tank.position = Vector2(120.0, 80.0)
 	tank.airborne_velocity = Vector2(12.0, -8.0)
 	tank.fuel = 0.5
@@ -2815,7 +2840,7 @@ func _run() -> void:
 	track_alignment_tank.settle_on_terrain(track_step_terrain, 0.0)
 	assert(track_alignment_tank.on_ground)
 	assert(abs(track_alignment_tank.position.y - 100.0) < 0.01)
-	assert(abs(track_alignment_tank.tank_angle - 4.5) < 0.01)
+	assert(abs(track_alignment_tank.tank_angle + 4.5) < 0.01)
 	var track_drop = 0.06 * TankState.TANK_CLASSIC_WORLD_PIXEL_SCALE
 	track_step_terrain.left_ground_y = 100.0 + track_drop
 	track_step_terrain.mid_ground_y = 100.0 + track_drop
@@ -2834,9 +2859,9 @@ func _run() -> void:
 	tank.airborne_velocity = Vector2(4.0, -10.0)
 	tank.on_ground = false
 	tank.settle_on_terrain(terrain, 0.1)
-	assert(abs(tank.airborne_velocity.y + 0.5) < 0.01)
+	assert(abs(tank.airborne_velocity.y - (-10.0 + TankState.TANK_AIR_GRAVITY * 0.1)) < 0.01)
 	assert(abs(tank.position.x - 160.4) < 0.01)
-	assert(abs(tank.position.y - 19.95) < 0.01)
+	assert(abs(tank.position.y - (20.0 + (-10.0 + TankState.TANK_AIR_GRAVITY * 0.1) * 0.1)) < 0.01)
 	assert(abs(tank.tank_angle - 12.0) < 0.01)
 	assert(not tank.on_ground)
 	var flat_terrain = FlatTerrain.new()
@@ -2979,12 +3004,13 @@ func _run() -> void:
 		Color.BLACK
 	)
 	var min_land_screen_y = float(min_land_clip_terrain.call("_world_height_to_screen", TerrainModel.CLASSIC_MIN_LAND_HEIGHT))
-	assert(int(min_land_clip_terrain.call("_bottom_blast_state_for_chunk_side", deep_base_chunk, true, Vector2(5.0, 60.0), 80.0, 0.0)) == 1)
+	assert(int(min_land_clip_terrain.call("_bottom_blast_state_for_chunk_side", deep_base_chunk, true, TerrainModel.DoublePoint.new(5.0, 60.0), 80.0, 0.0)) == 1)
 	min_land_clip_terrain.set("_chunks", [[deep_base_chunk]])
 	min_land_clip_terrain.call("_clip_slice", 0, Vector2(5.0, 40.0), 30.0)
 	var min_land_clip_chunks: Array = min_land_clip_terrain.get("_chunks")
-	assert(Array(min_land_clip_chunks[0]).size() == 1)
-	var min_land_preserved_chunk: Dictionary = Array(min_land_clip_chunks[0])[0]
+	assert(Array(min_land_clip_chunks[0]).size() == 2)
+	# Python retains the thin cap above this nearly tangent crater.
+	var min_land_preserved_chunk: Dictionary = Array(min_land_clip_chunks[0])[1]
 	assert(abs(float(min_land_preserved_chunk.get("top_left", 0.0)) - min_land_screen_y) < 0.01)
 	assert(abs(float(min_land_preserved_chunk.get("top_right", 0.0)) - min_land_screen_y) < 0.01)
 	assert(abs(float(min_land_preserved_chunk.get("bottom_left", 0.0)) - 90.0) < 0.01)
@@ -4664,7 +4690,7 @@ func _run() -> void:
 		Color.BLACK
 	)
 	falling_terrain.set("_chunks", [[falling_chunk, landing_chunk]])
-	var landing_gaps: Vector2 = falling_terrain.call("_superblock_landing_gaps", [falling_chunk, landing_chunk], 0, 0)
+	var landing_gaps: TerrainModel.DoublePoint = falling_terrain.call("_superblock_landing_gaps", [falling_chunk, landing_chunk], 0, 0)
 	assert(abs(landing_gaps.x - 10.0) < 0.01)
 	assert(abs(landing_gaps.y - 50.0) < 0.01)
 	falling_terrain.update(0.2)
@@ -5522,16 +5548,10 @@ func _run() -> void:
 		Vector2(100.0, 100.0), Vector2(200.0, 100.0), 40, 48.0))
 	assert(beyond_range_damage == 0, "Splash beyond radius must return 0 damage")
 
-	# --- Fidelity assertions: Player spawn positions ---
-	# Fidelity target: local_match.gd _round_spawn_x()
-	# The horizontal spawn fraction of screen width must equal (index + 0.5) / count.
-	local_match.set("_world_size", Vector2(1000.0, 1000.0))
-	assert(abs(float(local_match.call("_round_spawn_x", 0, 2)) - 250.0) < 0.01, "2 players P1 spawn must be at 25%")
-	assert(abs(float(local_match.call("_round_spawn_x", 1, 2)) - 750.0) < 0.01, "2 players P2 spawn must be at 75%")
-	assert(abs(float(local_match.call("_round_spawn_x", 1, 3)) - 500.0) < 0.01, "3 players P2 spawn must be at 50%")
-	assert(abs(float(local_match.call("_round_spawn_x", 0, 4)) - 125.0) < 0.01, "4 players P1 spawn must be at 12.5%")
-	assert(abs(float(local_match.call("_round_spawn_x", 3, 4)) - 875.0) < 0.01, "4 players P4 spawn must be at 87.5%")
-	assert(abs(float(local_match.call("_round_spawn_x", 7, 8)) - 937.5) < 0.01, "8 players P8 spawn must be at 93.75%")
+	# Python GameSession.start_round uses [-10,10], inside terrain [-11,11].
+	for spawn in [[0, 2, -5.0], [1, 2, 5.0], [1, 3, 0.0], [0, 4, -7.5], [3, 4, 7.5], [7, 8, 8.75]]:
+		var expected_x := World.ORIGIN.x + float(spawn[2]) * World.SCALE
+		assert(abs(float(local_match.call("_round_spawn_x", int(spawn[0]), int(spawn[1]))) - expected_x) < 0.01)
 
 	await _free_node(local_match)
 	await _drain_frames(SHUTDOWN_DRAIN_FRAMES)
@@ -5569,3 +5589,17 @@ func _clear_explosions(local_match: Node) -> void:
 func _stock_for_round(inventory: RefCounted, weapon_name: String, amount := -1) -> void:
 	inventory.call("add_ammo", weapon_name, amount)
 	inventory.call("reset_round_ammo")
+
+
+func _loop_playing(game: Control, kind: String) -> bool:
+	for voice in game.get("_loop_voices").get(kind, {}).values():
+		if is_instance_valid(voice) and voice.playing:
+			return true
+	return false
+
+
+func _loop_paused(game: Control, kind: String) -> bool:
+	for voice in game.get("_loop_voices").get(kind, {}).values():
+		if is_instance_valid(voice) and voice.stream_paused:
+			return true
+	return false

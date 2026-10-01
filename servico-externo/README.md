@@ -31,11 +31,31 @@ sh servico-externo/servico-externo.sh
 
 `servico-externo.sh` fica **dentro de `servico-externo/`**. Ele cria `.venv` e instala as dependências na primeira execução; a instalação inicial requer acesso ao índice de pacotes ou dependências já disponíveis. O comando `check` verifica hashes do runtime e inicializa o banco; `test` instala as dependências de teste e executa a suíte da pasta. `start` verifica o runtime, inicia a API e encerra os workers criados por esta instância ao terminar.
 
-No Windows, use Git Bash ou WSL para executar o comando `sh`; PowerShell sem um ambiente POSIX não fornece esse executável.
+No Windows, use o launcher nativo, sem Git Bash ou WSL:
+
+```powershell
+cd servico-externo
+.\servico-externo.bat
+# Ou, para verificar o pacote sem iniciar a API:
+.\servico-externo.bat check
+```
+
+O `.bat` chama `servico-externo.ps1` da mesma pasta. Ele usa Python 3.11–3.14 (o serviço importa `tomllib`), cria `.venv` local e instala as dependências na primeira execução. Se necessário, defina `GF_SERVICE_PYTHON` com o caminho do executável Python, sem argumentos. As execuções seguintes reutilizam o ambiente. Uma `.venv` de Linux/WSL não é reutilizável pelo Windows; o launcher informa o problema sem apagar a pasta. A política de execução do PowerShell é ajustada apenas para o processo iniciado pelo `.bat`.
+
+Todos os comandos da tabela também funcionam substituindo `sh servico-externo.sh` por `.\servico-externo.bat`: `start`, `check`, `status`, `stop`, `backup`, `restore --file "CAMINHO"` e `test`. Para iniciar a partir da raiz do repositório: `.\servico-externo\servico-externo.bat`. Sem argumentos, inicia a API local; use outro terminal para `status` ou `stop`.
+
+## Console gráfico local
+
+No Windows, execute `servico-externo.bat gui` dentro desta pasta. Em Linux/macOS, execute `sh servico-externo.sh gui`. O comando inicia o serviço, se necessário, e abre o console no navegador. Se o serviço já estiver ativo, abre a instância existente. Mantenha o terminal aberto enquanto o serviço estiver em execução.
+
+O painel mostra jogadores online, fila, salas, partidas, workers e eventos recentes. Em **Operações**, é possível criar um backup verificado do SQLite ou parar a instância. As telas se atualizam a cada cinco segundos e também têm atualização manual. O console está disponível somente quando `[service].bind` aponta para a máquina local; ele exige a chave temporária do processo, entregue pelo comando `gui` no fragmento da URL e removida da barra de endereços após a abertura. Não compartilhe a URL de abertura. Nenhum recurso externo de fonte, script ou imagem é necessário.
+
+**Validação do launcher Windows em 30/09/2026:** criação da `.venv` e instalação em cópia isolada com espaço/acento, `check`, início da API, `/readyz`, `status`, parada autenticada com limpeza do PID e cinco testes de jornada da API via `test` aprovados. O manifesto desatualizado foi recalculado para os arquivos vendorizados existentes; `.gitattributes` e o gerador preservam LF para manter os hashes entre sistemas. A verificação SHA-256 continua obrigatória. Esse ensaio não certifica implantação pública ou todas as jornadas do serviço.
 
 | Comando | Uso |
 |---|---|
 | `sh servico-externo.sh` ou `sh servico-externo.sh start` | Inicia API local em `127.0.0.1:27880` por padrão. |
+| `sh servico-externo.sh gui` | Inicia ou abre o serviço com o console gráfico no navegador local. |
 | `sh servico-externo.sh check` / `status` | Verifica pacote/banco ou consulta `/readyz` do processo ativo. |
 | `sh servico-externo.sh stop` | Solicita parada autenticada da instância registrada. |
 | `sh servico-externo.sh backup` | Cria backup SQLite com manifesto SHA-256 em `backups/`. |

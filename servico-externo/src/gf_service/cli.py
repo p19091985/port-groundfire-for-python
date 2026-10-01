@@ -8,9 +8,12 @@ import secrets
 import shutil
 import sqlite3
 import sys
+import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+import webbrowser
 from pathlib import Path
 
 from .config import load_settings
@@ -78,7 +81,42 @@ def stop() -> int:
     return 0
 
 
-def start() -> int:
+def _open_console(host: str, port: int, nonce: str) -> None:
+    address = "[::1]" if host == "::1" else host
+    url = f"http://{address}:{port}/console#key={urllib.parse.quote(nonce)}"
+    ready = f"http://{address}:{port}/readyz"
+    for _ in range(100):
+        try:
+            with urllib.request.urlopen(ready, timeout=0.3) as response:
+                if response.status == 200:
+                    webbrowser.open(url)
+                    return
+        except (OSError, urllib.error.URLError):
+            time.sleep(0.1)
+    print("O navegador não pôde ser aberto antes do servidor ficar pronto.", file=sys.stderr)
+
+
+def gui() -> int:
+    settings = load_settings(_root())
+    if settings.bind not in {"127.0.0.1", "localhost", "::1"}:
+        print("O console gráfico exige que service.bind seja local.", file=sys.stderr)
+        return 4
+    path = _runtime_file()
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            address = "[::1]" if settings.bind == "::1" else settings.bind
+            with urllib.request.urlopen(f"http://{address}:{settings.port}/readyz", timeout=2) as response:
+                if response.status == 200:
+                    _open_console(settings.bind, settings.port, str(data["nonce"]))
+                    print("Abrindo o console da instância em execução...")
+                    return 0
+        except (OSError, urllib.error.URLError, ValueError, KeyError, json.JSONDecodeError):
+            pass
+    return start(open_console=True)
+
+
+def start(*, open_console: bool = False) -> int:
     import uvicorn
 
     settings = load_settings(_root())
@@ -111,6 +149,8 @@ def start() -> int:
     finally:
         os.close(handle)
     try:
+        if open_console:
+            threading.Thread(target=_open_console, args=(settings.bind, settings.port, nonce), daemon=True).start()
         uvicorn.run("gf_service.app:create_app", factory=True, host=settings.bind, port=settings.port, log_level="info")
     finally:
         path.unlink(missing_ok=True)
@@ -200,7 +240,7 @@ def restore(file_name: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="gf-service")
     parser.add_argument(
-        "command", nargs="?", default="start", choices=("start", "check", "status", "stop", "backup", "restore")
+        "command", nargs="?", default="start", choices=("start", "gui", "check", "status", "stop", "backup", "restore")
     )
     parser.add_argument("--file", default="", help="Arquivo usado por restore.")
     args = parser.parse_args(argv)
@@ -208,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.file:
             parser.error("restore requires --file")
         return restore(args.file)
-    return {"start": start, "check": check, "status": status, "stop": stop, "backup": backup}[args.command]()
+    return {"start": start, "gui": gui, "check": check, "status": status, "stop": stop, "backup": backup}[args.command]()
 
 
 if __name__ == "__main__":

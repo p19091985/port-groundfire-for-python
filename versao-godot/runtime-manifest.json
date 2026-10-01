@@ -308,7 +308,7 @@
     "runtime/headless/groundfire_net/observability.py": "583a92e076cbd1818977341c5085d77ce8403ed0fb08d3a893a13171939caef0",
     "runtime/headless/groundfire_net/server.py": "81abed77358aad05023e7dc177e55bbee39cc69d018db4b85ed13cc6b5293c0e",
     "runtime/headless/groundfire_net/transport.py": "63e96d077e353e23c309aba280bd442912d8eea6666f777cdf792d361d4731b1",
-    "runtime/headless/groundfire_net/websocket_gateway.py": "47e1de2e205c941fa6d745bc23b2eb7ef9e83eba14a1993208aae2f9ed5c94b7",
+    "runtime/headless/groundfire_net/websocket_gateway.py": "24030153f2f4d0c392c2901c666bd56d7068c525571a85fa4f985699b102faa2",
     "runtime/headless/src/groundfire/__init__.py": "568eaa3e0ca4dc482e34e97f9331c1bc6b8926feb1466d4f8ffc428248bba798",
     "runtime/headless/src/groundfire/app/__init__.py": "083fdc8012fba55d616766fbf383134c65ba02ec75b47bc7e77385f53ce25562",
     "runtime/headless/src/groundfire/app/client.py": "0fdda0172b8f43e181263bd985f7cfb73242554f742a19a723745522e3fb3218",

@@ -58,6 +58,8 @@ func _run() -> void:
 	var spectator_join := NetworkAdapter.join_message("Caster", "", "", true)
 	assert(bool(spectator_join.get("spectator", false)))
 	assert(spectator_join.get("type", "") == NetworkAdapter.MESSAGE_JOIN)
+	assert(NetworkAdapter.join_message("Bot", "", "", false, true).is_computer)
+	assert(not NetworkAdapter.join_message("Caster", "", "", true, true).is_computer)
 	assert(NetworkAdapter.server_error_category("invalid_password") == NetworkAdapter.SERVER_ERROR_CATEGORY_CREDENTIALS)
 	assert(NetworkAdapter.server_error_category("authentication_failed") == NetworkAdapter.SERVER_ERROR_CATEGORY_CREDENTIALS)
 	assert(NetworkAdapter.server_error_category("server_full") == NetworkAdapter.SERVER_ERROR_CATEGORY_CAPACITY)
