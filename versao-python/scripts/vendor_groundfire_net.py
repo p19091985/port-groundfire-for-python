@@ -1,6 +1,6 @@
-"""Vendor groundfire_net into versao-python/ (ST01).
+"""Vendor the canonical groundfire_net into versao-python/ (ST01).
 
-Fonte compartilhada (desenvolvimento): <repo>/groundfire_net/
+Fonte compartilhada (desenvolvimento): <repo>/groundfire-online-service/src/groundfire_net/
 Destino versionado (standalone): <repo>/versao-python/groundfire_net/
 
 Uso (a partir da raiz do repo em desenvolvimento):
@@ -22,7 +22,7 @@ from pathlib import Path
 
 EDITION_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = EDITION_DIR.parent
-SOURCE_DIR = REPO_ROOT / "groundfire_net"
+SOURCE_DIR = REPO_ROOT / "groundfire-online-service" / "src" / "groundfire_net"
 TARGET_DIR = EDITION_DIR / "groundfire_net"
 
 FILES = (

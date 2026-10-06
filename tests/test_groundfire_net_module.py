@@ -2,7 +2,9 @@ import asyncio
 import base64
 import hashlib
 import json
+import subprocess
 import struct
+import sys
 import threading
 import unittest
 from dataclasses import dataclass
@@ -38,6 +40,7 @@ from groundfire_net import (
     ServerListEntry,
     build_http_server,
 )
+from groundfire_net import browser as groundfire_net_browser
 from groundfire_net.directory_service import (
     build_parser as build_directory_parser,
 )
@@ -79,6 +82,30 @@ class ExampleMessage:
 
 
 class GroundfireNetModuleTests(unittest.TestCase):
+    def test_python_edition_uses_its_vendored_network_package(self):
+        expected = PROJECT_ROOT / "versao-python" / "groundfire_net" / "browser.py"
+        self.assertEqual(Path(groundfire_net_browser.__file__).resolve(), expected.resolve())
+
+    def test_vendored_network_package_matches_the_canonical_source(self):
+        canonical = PROJECT_ROOT / "groundfire-online-service" / "src" / "groundfire_net" / "browser.py"
+        vendored = PROJECT_ROOT / "versao-python" / "groundfire_net" / "browser.py"
+        self.assertEqual(vendored.read_bytes(), canonical.read_bytes())
+
+    def test_repository_root_import_redirects_to_the_vendored_package(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from pathlib import Path; import groundfire_net.browser as module; print(Path(module.__file__).resolve())",
+            ],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        expected = PROJECT_ROOT / "versao-python" / "groundfire_net" / "browser.py"
+        self.assertEqual(Path(result.stdout.strip()), expected.resolve())
+
     def test_json_codec_uses_standard_library_envelopes(self):
         codec = JsonDataclassCodec(lambda message_type, payload: ExampleMessage(**payload))
         message = ExampleMessage(name="hello", value=7)

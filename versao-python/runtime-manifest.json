@@ -668,13 +668,13 @@
     "groundfire_net/__init__.py": "c328e6f6b311644414611d8a59cec28987da8ba3b030915340f72d2c53b1f557",
     "groundfire_net/browser.py": "817455c88e47606c151fa3132355a30d876b28b856ba7e90990c8ab1284ad540",
     "groundfire_net/codec.py": "1ebd914e4fce4e7d81e0aafe3e34e54e8298384359b6ffa74a2f5147cabf554f",
-    "groundfire_net/directory_service.py": "7471b72ceaea41777e520e59bfac4cbbc3a15000a8ffe7ae9144174403565d0b",
+    "groundfire_net/directory_service.py": "fa7f95d011f86f2627cc664fe76bdb80130ece85a4a070f6a604385a50ea53bd",
     "groundfire_net/discovery.py": "931d1497bdb8d1e3f0a8c1d78c5bba3acf3d83cf1303336708f1db2a174392da",
     "groundfire_net/master.py": "16f13394ad0db163cd39891cfae5ca09ecf977868cc69fe046cbd854a1625e67",
     "groundfire_net/observability.py": "583a92e076cbd1818977341c5085d77ce8403ed0fb08d3a893a13171939caef0",
     "groundfire_net/server.py": "81abed77358aad05023e7dc177e55bbee39cc69d018db4b85ed13cc6b5293c0e",
     "groundfire_net/transport.py": "63e96d077e353e23c309aba280bd442912d8eea6666f777cdf792d361d4731b1",
-    "groundfire_net/websocket_gateway.py": "47e1de2e205c941fa6d745bc23b2eb7ef9e83eba14a1993208aae2f9ed5c94b7"
+    "groundfire_net/websocket_gateway.py": "f20b8cc69b7cc5c96d40306bcd3cf43fa50acaaac09ea1eae4085eb56c35b713"
   },
   "notes": [
     "ST00-ST06: manifesto de integridade da edicao Python standalone.",

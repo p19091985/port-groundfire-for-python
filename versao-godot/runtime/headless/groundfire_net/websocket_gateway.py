@@ -256,7 +256,10 @@ class WebSocketGatewaySession:
     def disconnect_notice(self, reason: str):
         if not self._joined or not self.server_session_token:
             return None
-        from src.groundfire.network.messages import DisconnectNotice
+        try:
+            from groundfire.network.messages import DisconnectNotice
+        except ModuleNotFoundError:
+            from src.groundfire.network.messages import DisconnectNotice
 
         return DisconnectNotice(
             session_id=self.server_session_id or "web",
@@ -322,7 +325,10 @@ class WebSocketGateway:
 
         class UdpProxyProtocol(asyncio.DatagramProtocol):
             def datagram_received(self, data: bytes, addr) -> None:
-                from src.groundfire.network.codec import decode_message
+                try:
+                    from groundfire.network.codec import decode_message
+                except ModuleNotFoundError:
+                    from src.groundfire.network.codec import decode_message
 
                 try:
                     msg = decode_message(data)
@@ -336,16 +342,28 @@ class WebSocketGateway:
         )
 
         async def udp_to_ws_loop() -> None:
-            from src.groundfire.network.messages import (
-                CommandResult,
-                HelloAccept,
-                JoinAccept,
-                JoinReject,
-                ResumeAccept,
-                ResumeReject,
-                ServerEventEnvelope,
-                ServerSnapshotEnvelope,
-            )
+            try:
+                from groundfire.network.messages import (
+                    CommandResult,
+                    HelloAccept,
+                    JoinAccept,
+                    JoinReject,
+                    ResumeAccept,
+                    ResumeReject,
+                    ServerEventEnvelope,
+                    ServerSnapshotEnvelope,
+                )
+            except ModuleNotFoundError:
+                from src.groundfire.network.messages import (
+                    CommandResult,
+                    HelloAccept,
+                    JoinAccept,
+                    JoinReject,
+                    ResumeAccept,
+                    ResumeReject,
+                    ServerEventEnvelope,
+                    ServerSnapshotEnvelope,
+                )
 
             while True:
                 msg = await ws_queue.get()
@@ -441,16 +459,28 @@ class WebSocketGateway:
         try:
             await _accept_handshake(reader, writer)
 
-            from src.groundfire.network.codec import encode_message
-            from src.groundfire.network.messages import (
-                ChatSendRequest,
-                ClientCommandEnvelope,
-                HelloRequest,
-                JoinRequest,
-                LobbySetReadyRequest,
-                MatchRematchRequest,
-                ResumeRequest,
-            )
+            try:
+                from groundfire.network.codec import encode_message
+                from groundfire.network.messages import (
+                    ChatSendRequest,
+                    ClientCommandEnvelope,
+                    HelloRequest,
+                    JoinRequest,
+                    LobbySetReadyRequest,
+                    MatchRematchRequest,
+                    ResumeRequest,
+                )
+            except ModuleNotFoundError:
+                from src.groundfire.network.codec import encode_message
+                from src.groundfire.network.messages import (
+                    ChatSendRequest,
+                    ClientCommandEnvelope,
+                    HelloRequest,
+                    JoinRequest,
+                    LobbySetReadyRequest,
+                    MatchRematchRequest,
+                    ResumeRequest,
+                )
 
             while not reader.at_eof():
                 payload = await _read_frame(reader)
@@ -652,7 +682,10 @@ class WebSocketGateway:
                         json.dumps(_error("unknown_type", received_type=message_type), separators=(",", ":")),
                     )
         finally:
-            from src.groundfire.network.codec import encode_message
+            try:
+                from groundfire.network.codec import encode_message
+            except ModuleNotFoundError:
+                from src.groundfire.network.codec import encode_message
 
             disconnect_notice = session.disconnect_notice("client_disconnect") if graceful_disconnect else None
             if disconnect_notice is not None:

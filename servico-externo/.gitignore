@@ -1,9 +1,0 @@
-.venv/
-data/
-logs/
-backups/
-config.toml
-*.pyc
-__pycache__/
-.pytest_cache/
-

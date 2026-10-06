@@ -5,7 +5,7 @@ The repository now keeps both implementations side by side: the Godot client liv
 
 This is the single Markdown source of truth for the Godot migration. Keep strategy, current status, validation, build/runtime notes, release walkthroughs, WebSocket protocol details, and server-directory schema updates here instead of creating new migration Markdown files under `docs/`. The image folders under `docs/references/` are fidelity assets used by tests and review, not separate narrative migration documents.
 
-**Mapa de leitura:** o [projeto completo de equivalência da experiência](#projeto-equivalencia-2026-09-29) é o plano vigente para tornar Godot equivalente ao Python; o [projeto de fidelidade e experiência on-line](#projeto-2026-09) preserva os requisitos F/O anteriores; o [plano P00–P08](#projeto-encerramento-pendencias) registra as entregas anteriores; o [registro de implementação](#registro-implementacao-2026-09-26) contém evidências históricas, sem certificar mudanças posteriores; o [projeto de autonomia das edições](#projeto-edicoes-standalone) especifica como copiar e executar cada pasta sem o restante do repositório. Para instalar e operar o serviço, use o [README próprio](../servico-externo/README.md).
+**Mapa de leitura:** o [projeto completo de equivalência da experiência](#projeto-equivalencia-2026-09-29) é o plano vigente para tornar Godot equivalente ao Python; o [projeto de fidelidade e experiência on-line](#projeto-2026-09) preserva os requisitos F/O anteriores; o [plano P00–P08](#projeto-encerramento-pendencias) registra as entregas anteriores; o [registro de implementação](#registro-implementacao-2026-09-26) contém evidências históricas, sem certificar mudanças posteriores; o [projeto de autonomia das edições](#projeto-edicoes-standalone) especifica como copiar e executar cada pasta sem o restante do repositório. Para instalar e operar o serviço, use o [README próprio](../groundfire-online-service/README.md).
 
 **Para o próximo agente:** começar pelo [plano operacional das pendências e passagem de trabalho](#continuidade-equivalencia-2026-09-30). Ele registra o estado após a correção do rastro, a primeira tarefa, os arquivos e os critérios de conclusão.
 
@@ -886,13 +886,13 @@ Gates de implementação, em ambiente provisionado com Python suportado, depend�
 
 **Data e versão:** 2026-09-26, versão 1.1. **Estado desta entrega:** implementação em andamento. P00/P01 têm referência Python e comparador iniciais; P03–P06 têm backend executável, adapters e jornada de partida real; P07 permanece parcial; P02/P08 ainda exigem a matriz completa de evidências e homologação nas plataformas indicadas. Os estados detalhados e as provas executadas estão no registro após P08.
 
-Este plano transforma as pendências F/O em trabalho verificável, sem substituir seus requisitos. Centraliza aqui o encerramento da migração; o sistema independente tem sua especificação em [servico-externo/PROJETO.md](../servico-externo/PROJETO.md), suas interfaces em [CONTRATOS.md](../servico-externo/CONTRATOS.md) e seus lotes E01–E09 em [IMPLEMENTACAO-E-TESTES.md](../servico-externo/IMPLEMENTACAO-E-TESTES.md). Não criar um segundo backend de salas dentro dos jogos.
+Este plano transforma as pendências F/O em trabalho verificável, sem substituir seus requisitos. Centraliza aqui o encerramento da migração; o sistema independente tem sua especificação em [groundfire-online-service/PROJETO.md](../groundfire-online-service/PROJETO.md), suas interfaces em [CONTRATOS.md](../groundfire-online-service/CONTRATOS.md) e seus lotes E01–E09 em [IMPLEMENTACAO-E-TESTES.md](../groundfire-online-service/IMPLEMENTACAO-E-TESTES.md). Não criar um segundo backend de salas dentro dos jogos.
 
 #### 1. Resultado esperado e limites
 
 Ao concluir o plano, a modalidade local Godot deverá passar na comparação com a referência local Python. A modalidade conectada deverá representar corretamente o estado do servidor Python. As duas interfaces deverão permitir encontrar/criar sala, convidar, formar grupo, buscar/cancelar, jogar, observar, retomar e pedir revanche com o mesmo resultado funcional. Cores, assets e regras Groundfire serão preservados.
 
-O serviço será distribuído inteiramente em `servico-externo/` e iniciado, dentro dessa pasta, por **`sh servico-externo.sh`**, sem importar código de pastas irmãs. O host LAN existente continuará utilizável sem esse serviço. Godot web consumirá HTTPS/WSS e recursos hospedados; não receberá botões que dependam de descoberta UDP ou criação de processos locais.
+O serviço será distribuído inteiramente em `groundfire-online-service/` e iniciado, dentro dessa pasta, por **`sh groundfire-online-service.sh`**, sem importar código de pastas irmãs. O host LAN existente continuará utilizável sem esse serviço. Godot web consumirá HTTPS/WSS e recursos hospedados; não receberá botões que dependam de descoberta UDP ou criação de processos locais.
 
 Contas e amizades persistentes pertencem à extensão social já especificada no serviço; não serão fingidas pela reutilização de apelidos. Não incluir Steam, voz, ranking, regras FPS ou alteração de balanceamento como consequência deste plano.
 
@@ -991,7 +991,7 @@ Fronteiras de implementação:
 
 | Componente | Destino e comportamento |
 |---|---|
-| Backend | `servico-externo/src/gf_service/` e testes/migrations/contracts locais, conforme E01–E09. |
+| Backend | `groundfire-online-service/src/gf_service/` e testes/migrations/contracts locais, conforme E01–E09. |
 | Python | Adapter de serviço sob `versao-python/src/groundfire/`, HTTP fora do loop gráfico, WS social próprio, transporte WSS de jogo gerenciado e entrega de eventos à UI por fila. |
 | Godot | Adapter sob `versao-godot/godot/scripts/online/`, `HTTPRequest` e socket social separados do socket da partida; configuração de URL base e negociação de capabilities. |
 | Protocolos existentes | Preservar UDP 1 e WS 1/2 para LAN/legado; funções atuais de pronto/chat/retomada/revanche continuam compatíveis. |
@@ -1070,7 +1070,7 @@ Reaproveitar `scripts/validate_godot_fidelity.sh`, `validate_godot_release.sh`, 
 | Python Windows/Linux | Pacote instalado com Python suportado pelo projeto, assets/configurações próprios; local/LAN e serviço gerenciado; persistência após restart. |
 | Godot Windows/Linux | Executável exportado em diretório limpo; local, LAN/UDP e WSS; controles, áudio, resize e gravação de preferências. |
 | Godot web | Export servido por HTTP no ensaio local e HTTPS/WSS no público; navegador real, MIME/cache/ETag, origins, tickets, reconnect e ausência de opções desktop inviáveis. |
-| Serviço Linux/WSL | Copiar somente `servico-externo/`, instalação offline conforme distribuição, executar `sh servico-externo.sh`, readiness, partida, backup/restore e encerramento. |
+| Serviço Linux/WSL | Copiar somente `groundfire-online-service/`, instalação offline conforme distribuição, executar `sh groundfire-online-service.sh`, readiness, partida, backup/restore e encerramento. |
 | Serviço Windows/Git Bash | Mesmo comando com Python Windows, caminho com espaços/acentos, sinais/processos/lock/portas testados nativamente; WSL não substitui esse ensaio. |
 
 Python 3.14 usado em validação histórica não substitui o teste na faixa declarada `>=3.10,<3.14`; usar Python 3.13 como ambiente comum de homologação inicial, com dependências travadas. Godot/export templates precisam corresponder à versão registrada no manifesto. Prerequisito ausente significa cenário não certificado, não aprovação com skip silencioso.
@@ -1107,9 +1107,9 @@ Implantação pública é aceite separado: exige endereço real, DNS/certificado
 | P05 | Em implementação | Presença, amizade/bloqueio, grupos, convites, eventos retomáveis e chat persistente/idempotente de grupo/sala com autorização. | Fluxo social completo nas duas UIs, recusa/revogação, mute e ensaios de consumidor lento/gap. |
 | P06 | Validado no backend | Busca cancelável e reserva indivisível em transação SQLite; concorrência pelas últimas vagas e expiração têm testes; aceite do último membro aloca worker real. | Consentimento e estados completos nas duas UIs, perfis 1/2/3/8 e falhas de commit/worker em sockets reais. |
 | P07 | Em implementação | Hub Godot, cancelamento por geração no adapter, ingresso autenticado no `online_match.gd`; adapter Python é assíncrono e expõe salas/busca/admissão/chat. | UI gerenciada Python, social Godot completo, retorno/revanche e matriz de teclado/mouse/controle. |
-| P08 | Em validação | Cópia isolada do serviço em caminho Windows com espaço e acento inicia, aloca partida real e encerra; `check`, `status`, `stop`, backup/restore e `sh servico-externo.sh` foram ensaiados. Teste de partida envia pronto/input e recebe snapshots/pong. | Linux/WSL, exports Windows/Linux/web, carga de 30 min, rede degradada e implantação HTTPS/WSS pública. |
+| P08 | Em validação | Cópia isolada do serviço em caminho Windows com espaço e acento inicia, aloca partida real e encerra; `check`, `status`, `stop`, backup/restore e `sh groundfire-online-service.sh` foram ensaiados. Teste de partida envia pronto/input e recebe snapshots/pong. | Linux/WSL, exports Windows/Linux/web, carga de 30 min, rede degradada e implantação HTTPS/WSS pública. |
 
-O runtime autoritativo usado pelo serviço está versionado dentro de `servico-externo/src/groundfire*`; `runtime-manifest.json` fixa SHA-256 de cada arquivo. `scripts/vendor_runtime.py` é uma operação explícita de desenvolvimento e nunca é executado pelo launcher. Assim, a cópia instalada não importa `../versao-python`, não precisa de Pygame/Godot e falha no `check` se o núcleo empacotado estiver ausente ou adulterado.
+O runtime autoritativo usado pelo serviço está versionado dentro de `groundfire-online-service/src/groundfire*`; `runtime-manifest.json` fixa SHA-256 de cada arquivo. `scripts/vendor_runtime.py` é uma operação explícita de desenvolvimento e nunca é executado pelo launcher. Assim, a cópia instalada não importa `../versao-python`, não precisa de Pygame/Godot e falha no `check` se o núcleo empacotado estiver ausente ou adulterado.
 
 Validações executadas neste ambiente Windows/Python 3.14.6/Godot 4.6.2: 11 testes do serviço aprovados; 6 testes focados de replay/contrato/simulação aprovados; gate de fidelidade aprovado com 285 testes; scripts Godot novos e `main.gd` aprovados em `--check-only`; `git diff --check` aprovado. O importador Godot registrou avisos de tamanho/seek em um stream WAV durante a primeira varredura, sem falha do gate; isso não substitui a revisão auditiva P02.
 
@@ -1180,7 +1180,7 @@ This section folds in the former `docs/plano_coexistencia_godot_python.md` plan.
 ├── build/
 ├── dist/
 ├── media/
-├── groundfire_net/
+├── groundfire-online-service/       # canonical online service and groundfire_net source
 ├── versao-godot/
 │   └── godot/
 │       ├── project.godot
@@ -1217,7 +1217,7 @@ Root launchers are compatibility wrappers. Their implementation lives under `ver
 
 ### Shared Root Policy
 
-`groundfire_net/` stays at the repository root even though it is Python code because it is a shared network service layer, not just part of the classic Pygame client. It provides the WebSocket gateway, directory service, protocol contracts, and QA fixtures consumed by both the Python server runtime and the Godot browser/online client.
+`groundfire-online-service/src/groundfire_net/` is the canonical shared network source. It provides the WebSocket gateway, directory service, master UDP, protocol contracts, and QA fixtures consumed by the service and vendored into both standalone editions. Development and packaged commands resolve `groundfire_net` from those versioned copies. The root `groundfire_net.py` compatibility loader redirects historical direct imports without duplicating package sources or recreating the old directory.
 
 `scripts/` also stays at the repository root because it coordinates both versions: Python quality checks, Godot validation, export, packaging, browser QA, release signing, reference capture, and hosted deployment verification. Manual one-off analysis or scratch utilities belong in `scripts/dev/` so the root remains reserved for shared files, launchers, and project configuration.
 
@@ -1236,7 +1236,7 @@ PYTHON_CONF_DIR=$ROOT_DIR/versao-python/conf
 PYTHON_DATA_DIR=$ROOT_DIR/versao-python/data
 BUILD_DIR=$ROOT_DIR/build
 DIST_DIR=$ROOT_DIR/dist
-GROUNDFIRE_NET_DIR=$ROOT_DIR/groundfire_net
+GROUNDFIRE_NET_DIR=$ROOT_DIR/groundfire-online-service/src/groundfire_net
 ```
 
 Python commands that import the classic code should include both the Python version directory and the shared root:
@@ -1259,6 +1259,13 @@ Applied in the local tree on 2026-07-17:
 - Manual root-level analysis/scratch scripts moved under `scripts/dev/`.
 - README, Docker, CI/release scripts, Godot export/package/QA scripts, and migration docs updated for the split.
 - No production deployment was performed as part of the coexistence restructure.
+
+Consolidated on 2026-10-04:
+
+- `groundfire-online-service/` became the canonical home of `groundfire_net`, `gf_service`, and the vendored headless runtime.
+- The old service path and root `groundfire_net` package were removed after their contents and compatibility entry points were consolidated.
+- Python and Godot vendoring scripts now copy networking code from the canonical service source.
+- The unified process serves the legacy HTTP directory on port 27880 and supervises the optional protocol-1 UDP master on port 27017.
 
 The original execution plan was:
 
@@ -1293,7 +1300,7 @@ GROUNDFIRE_LAUNCHER_PYTHON=.tmp/codex-py314-venv/bin/python bats tests/shell/tes
 
 - Do not remove the Python/Pygame version.
 - Do not change gameplay, protocol, goldens, or production deployment behavior as a side effect of repository layout work.
-- Do not move `groundfire_net/` into `versao-python/` unless the shared Godot/Python gateway responsibility is replaced by another shared-service location.
+- Keep `groundfire-online-service/src/groundfire_net/` as the single editable source; standalone copies are generated artifacts and no duplicate package should be recreated at the repository root.
 - Do not remove root launcher wrappers without an explicit compatibility decision.
 - Do not refresh visual goldens merely because paths changed.
 - Keep generated build and release outputs at the shared root unless a release-policy change says otherwise.
@@ -3249,14 +3256,14 @@ As **duas pastas finais e separadas** serão `versao-python/` e `versao-godot/`,
 
 Há dois níveis de aceite, ambos obrigatórios: **fonte isolada**, na qual todo código e dado do jogo está dentro da própria pasta (o desenvolvedor ainda pode usar seu Python/editor Godot para construir); e **pacote portátil**, na qual o usuário final inicia sem Python, editor Godot, `pip`, export templates, Git Bash ou ferramentas do repositório. Um checkout de fontes sem os binários gerados não será anunciado como pacote portátil.
 
-“Sozinha” inclui partida local, criação e ingresso em LAN e configuração offline. A experiência de **Internet gerenciada** continua consumindo o [`servico-externo`](../servico-externo/README.md) como serviço remoto independente: ele não será copiado para as duas edições nem iniciado automaticamente por elas. Falta de conexão ao serviço não pode bloquear menu, partida local ou LAN. Godot web é um alvo separado: o conjunto de arquivos exportados deve ser autossuficiente como cliente estático, mas depende de navegador e hospedagem HTTP(S); não pode hospedar UDP/LAN ou processos locais.
+“Sozinha” inclui partida local, criação e ingresso em LAN e configuração offline. A experiência de **Internet gerenciada** continua consumindo o [`groundfire-online-service`](../groundfire-online-service/README.md) como serviço remoto independente: ele não será copiado para as duas edições nem iniciado automaticamente por elas. Falta de conexão ao serviço não pode bloquear menu, partida local ou LAN. Godot web é um alvo separado: o conjunto de arquivos exportados deve ser autossuficiente como cliente estático, mas depende de navegador e hospedagem HTTP(S); não pode hospedar UDP/LAN ou processos locais.
 
 ### Bloqueios confirmados na árvore atual
 
 | Edição | Evidência no código | Trabalho necessário |
 |---|---|---|
 | Python | [`pyproject.toml`](../pyproject.toml) fica na raiz e procura pacotes em `versao-python` **e** `.`; [`run_game.sh`](../versao-python/run_game.sh), `.bat` e `.ps1` instalam a partir da raiz. `versao-python/` não contém seu próprio manifesto de instalação. | Criar metadados, lock, licenças, bootstrap e comandos locais. O launcher não pode usar `pip -e ..` no pacote portátil. |
-| Python | `versao-python/src/groundfire/{client,server,master,network,app}/` importa [`groundfire_net/`](../groundfire_net/) da raiz. Os `iniciar-*.sh` definem `PYTHONPATH` incluindo a pasta pai. | Incluir uma cópia versionada de `groundfire_net` na edição, resolver imports dentro dela e verificar hash/versão contra a fonte compartilhada. |
+| Python | Antes da consolidação, `versao-python/src/groundfire/{client,server,master,network,app}/` importava `groundfire_net/` da raiz e os `iniciar-*.sh` incluíam a pasta pai no `PYTHONPATH`. | A edição agora inclui uma cópia versionada de `groundfire_net`, resolve os imports internamente e verifica hash/versão contra a fonte canônica do serviço. |
 | Python | `app/dedicated_server_menu.py` ainda tenta `project_dir/versao-python/data`; caminhos de assets, INI, livro de servidores e executáveis dependem do layout de desenvolvimento. | Centralizar resolução de recursos e dados mutáveis na raiz da edição, com testes após mover a pasta e com nomes contendo espaço/acento. |
 | Godot | `versao-godot/scripts/launcher_common.sh` e `run_game.ps1/.bat` procuram Godot em `../tools/godot`; `iniciar-server.sh`, `iniciar-clientes.sh` e `iniciar-all.sh` usam Python e módulos da pasta irmã. | Priorizar binários incluídos em `versao-godot/`; empacotar servidor/gateway próprios e tornar todos os launchers locais. |
 | Godot | `godot/scripts/main.gd` procura `groundfire-web-gateway` em `res://../.venv`; `godot/export_presets.cfg` grava em `../../build`. | Separar caminhos de editor e exportação; distribuir gateway junto ao cliente e gerar artefatos dentro da edição. |
@@ -3277,7 +3284,7 @@ versao-python/                         versao-godot/
   userdata/ (dados portáteis)
 ```
 
-O código compartilhado poderá ser gerado durante o **build**, mas a cópia versionada necessária deverá existir antes de testar ou distribuir cada pasta. Um gerador reproduzível, manifesto SHA-256 e gate de divergência impedirão versões incompatíveis de `groundfire_net`, mensagens, física e servidor. Reutilizar a técnica de [`servico-externo/scripts/vendor_runtime.py`](../servico-externo/scripts/vendor_runtime.py) para o runtime headless Godot, sem importar `servico-externo/` em tempo de execução. A edição Python mantém o jogo completo; a Godot inclui apenas o núcleo headless e protocolos necessários para LAN/gateway, sem exigir Pygame no companion. Não criar um segundo servidor com regras divergentes.
+O código compartilhado poderá ser gerado durante o **build**, mas a cópia versionada necessária deverá existir antes de testar ou distribuir cada pasta. Um gerador reproduzível, manifesto SHA-256 e gate de divergência impedirão versões incompatíveis de `groundfire_net`, mensagens, física e servidor. Reutilizar a técnica de [`groundfire-online-service/scripts/vendor_runtime.py`](../groundfire-online-service/scripts/vendor_runtime.py) para o runtime headless Godot, sem importar `groundfire-online-service/` em tempo de execução. A edição Python mantém o jogo completo; a Godot inclui apenas o núcleo headless e protocolos necessários para LAN/gateway, sem exigir Pygame no companion. Não criar um segundo servidor com regras divergentes.
 
 Os builds portáteis serão **conteúdo interno das duas pastas acima**, não um executável único que extrai em diretório temporário. Um ZIP de distribuição terá `versao-python/` **ou** `versao-godot/` como pasta superior; extrair e abrir `run_game.*` nessa pasta é o fluxo completo. Isso permite localizar assets, dados editáveis, processos filhos e logs por caminhos relativos ao executável. Ferramentas de build podem existir na raiz para desenvolvimento, mas os binários e manifestos usados na execução ficam sob a edição que entregam. Os launchers usam primeiro `runtime/<plataforma>/` da própria pasta; o editor Godot/Python do sistema fica disponível somente para desenvolvimento de fonte, nunca como dependência do pacote anunciado como standalone.
 

@@ -54,7 +54,10 @@ def dist_dir() -> Path:
 
 
 def groundfire_net_dir() -> Path:
-    return _path_from_env("GROUNDFIRE_NET_DIR", PROJECT_ROOT / "groundfire_net")
+    return _path_from_env(
+        "GROUNDFIRE_NET_DIR",
+        PROJECT_ROOT / "groundfire-online-service" / "src" / "groundfire_net",
+    )
 
 
 def pythonpath_entries() -> list[Path]:

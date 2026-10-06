@@ -2160,7 +2160,9 @@ def test_godot_export_presets_exist_for_desktop_and_web():
     assert "embeds static auth_token" in hosted_verify_script
     assert "session_token_url must return Cache-Control: no-store" in hosted_verify_script
     assert "directory ETag must be quoted" in hosted_verify_script
-    directory_service = (PROJECT_ROOT / "groundfire_net" / "directory_service.py").read_text(encoding="utf-8")
+    directory_service = (
+        PROJECT_ROOT / "groundfire-online-service" / "src" / "groundfire_net" / "directory_service.py"
+    ).read_text(encoding="utf-8")
     assert "def directory_diagnostics" in directory_service
     assert "def _etag_matches" in directory_service
     assert 'candidate == "*"' in directory_service

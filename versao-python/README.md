@@ -64,5 +64,5 @@ python scripts/vendor_groundfire_net.py --check
 
 `userdata/` guarda preferências, favoritos, histórico, logs e saves.
 Mover a pasta preserva configurações; execução offline não cria dados
-fora dela. Internet gerenciada (`servico-externo/`) é serviço remoto
+fora dela. Internet gerenciada (`groundfire-online-service/`) é serviço remoto
 independente e nunca bloqueia menu, partida local ou LAN.

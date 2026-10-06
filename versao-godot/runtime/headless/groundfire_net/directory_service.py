@@ -50,6 +50,46 @@ class DirectoryServiceConfig:
     require_github_oauth: bool = False
 
 
+class SessionTokenError(ValueError):
+    def __init__(self, status: HTTPStatus, code: str):
+        super().__init__(code)
+        self.status = status
+        self.code = code
+
+
+def issue_session_token(
+    config: DirectoryServiceConfig,
+    player_name: str,
+    *,
+    authorization: str = "",
+) -> dict[str, Any]:
+    """Issue the legacy gf1 token used by protocol 1/2 gateways.
+
+    The helper is transport-neutral so the standalone HTTP server and the
+    unified FastAPI service enforce exactly the same legacy policy.
+    """
+    if not config.session_secret:
+        raise SessionTokenError(HTTPStatus.NOT_FOUND, "session_tokens_disabled")
+    selected_name = str(player_name).strip()
+    if not selected_name:
+        raise SessionTokenError(HTTPStatus.BAD_REQUEST, "missing_player_name")
+    if config.require_github_oauth:
+        if not authorization.lower().startswith("bearer "):
+            raise SessionTokenError(HTTPStatus.UNAUTHORIZED, "missing_oauth_token")
+        github_token = authorization[7:].strip()
+        if not _verify_github_token(github_token, selected_name):
+            raise SessionTokenError(HTTPStatus.FORBIDDEN, "invalid_github_token_or_username")
+    ttl = max(1, int(config.session_token_ttl))
+    return {
+        "ok": True,
+        "schema": DIRECTORY_SCHEMA_VERSION,
+        "token_type": "groundfire_join",
+        "auth_token": generate_join_token(config.session_secret, selected_name, ttl_seconds=ttl),
+        "player_name": selected_name,
+        "expires_in": ttl,
+    }
+
+
 def load_directory_payload(config: DirectoryServiceConfig) -> dict[str, Any]:
     payload = _load_payload_from_path(config.directory_path)
     servers = _servers_from_payload(
@@ -322,44 +362,18 @@ def _handler_for_config(config: DirectoryServiceConfig) -> type[BaseHTTPRequestH
                 self.wfile.write(body)
 
         def _send_session_token(self, query: str, *, send_body: bool) -> None:
-            if not config.session_secret:
-                self._send_session_error(HTTPStatus.NOT_FOUND, "session_tokens_disabled", send_body=send_body)
-                return
             params = parse_qs(query, keep_blank_values=True)
             player_name = str(params.get("player_name", [""])[0]).strip()
-            if not player_name:
-                self._send_session_error(HTTPStatus.BAD_REQUEST, "missing_player_name", send_body=send_body)
+            try:
+                payload = issue_session_token(
+                    config,
+                    player_name,
+                    authorization=self.headers.get("Authorization", ""),
+                )
+            except SessionTokenError as exc:
+                self._send_session_error(exc.status, exc.code, send_body=send_body)
                 return
-            
-            if config.require_github_oauth:
-                auth_header = self.headers.get("Authorization", "")
-                if not auth_header.lower().startswith("bearer "):
-                    self._send_session_error(HTTPStatus.UNAUTHORIZED, "missing_oauth_token", send_body=send_body)
-                    return
-                github_token = auth_header[7:].strip()
-                if not _verify_github_token(github_token, player_name):
-                    self._send_session_error(
-                        HTTPStatus.FORBIDDEN,
-                        "invalid_github_token_or_username",
-                        send_body=send_body,
-                    )
-                    return
-
-            token = generate_join_token(
-                config.session_secret,
-                player_name,
-                ttl_seconds=max(1, int(config.session_token_ttl)),
-            )
-            body = response_bytes(
-                {
-                    "ok": True,
-                    "schema": DIRECTORY_SCHEMA_VERSION,
-                    "token_type": "groundfire_join",
-                    "auth_token": token,
-                    "player_name": player_name,
-                    "expires_in": max(1, int(config.session_token_ttl)),
-                }
-            )
+            body = response_bytes(payload)
             self.send_response(HTTPStatus.OK)
             self._write_token_headers(str(len(body)))
             self.end_headers()

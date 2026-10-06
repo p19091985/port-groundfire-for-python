@@ -1,6 +1,7 @@
 """Vendor headless companion into versao-godot/runtime/headless/ (ST04).
 
-Fonte (desenvolvimento): <repo>/versao-python/{groundfire,groundfire_net,src/groundfire}.
+Fonte (desenvolvimento): runtime Python em <repo>/versao-python e rede canônica
+em <repo>/groundfire-online-service/src/groundfire_net.
 Destino versionado (standalone): <repo>/versao-godot/runtime/headless/.
 
 Uso (a partir da raiz do repo em desenvolvimento):
@@ -25,6 +26,7 @@ from pathlib import Path
 EDITION_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = EDITION_DIR.parent
 PYTHON_EDITION = REPO_ROOT / "versao-python"
+NETWORK_SOURCE = REPO_ROOT / "groundfire-online-service" / "src" / "groundfire_net"
 TARGET_DIR = EDITION_DIR / "runtime" / "headless"
 
 WRAPPERS = ("__init__.py", "server.py")
@@ -54,7 +56,7 @@ def _sha256(data: bytes) -> str:
 def _source_bytes(src: Path) -> bytes:
     """Apply audited Godot gateway fixes without changing the Python edition."""
     data = _canonical(src.read_bytes())
-    if src.relative_to(PYTHON_EDITION).as_posix() != "groundfire_net/websocket_gateway.py":
+    if src != NETWORK_SOURCE / "websocket_gateway.py":
         return data
     patches = (
         (
@@ -84,7 +86,7 @@ def _pairs() -> list[tuple[Path, Path]]:
     for name in WRAPPERS:
         pairs.append((PYTHON_EDITION / "groundfire" / name, TARGET_DIR / "groundfire" / name))
     for name in NET_FILES:
-        pairs.append((PYTHON_EDITION / "groundfire_net" / name, TARGET_DIR / "groundfire_net" / name))
+        pairs.append((NETWORK_SOURCE / name, TARGET_DIR / "groundfire_net" / name))
     src_root = PYTHON_EDITION / "src" / "groundfire"
     for path in sorted(src_root.rglob("*.py")):
         if "__pycache__" in path.parts:

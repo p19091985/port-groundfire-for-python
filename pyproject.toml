@@ -26,7 +26,7 @@ groundfire-directory = "groundfire_net.directory_service:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-where = ["versao-python", "."]
+where = ["versao-python"]
 include = ["groundfire*", "groundfire_net*", "src*"]
 exclude = ["tests*", "groundfire-0.25*"]
 

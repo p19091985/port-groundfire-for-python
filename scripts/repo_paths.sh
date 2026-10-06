@@ -22,7 +22,7 @@ repo_paths_init() {
     DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist}"
     GODOT_WEB_DIR="${GODOT_WEB_DIR:-$ROOT_DIR/versao-godot/runtime/web}"
     GODOT_LINUX_DIR="${GODOT_LINUX_DIR:-$ROOT_DIR/versao-godot/runtime/linux}"
-    GROUNDFIRE_NET_DIR="${GROUNDFIRE_NET_DIR:-$ROOT_DIR/groundfire_net}"
+    GROUNDFIRE_NET_DIR="${GROUNDFIRE_NET_DIR:-$ROOT_DIR/groundfire-online-service/src/groundfire_net}"
 }
 
 repo_pythonpath() {

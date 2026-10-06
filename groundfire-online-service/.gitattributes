@@ -1,0 +1,5 @@
+# Runtime hashes must identify the same bytes on Windows and Linux checkouts.
+*.sh text eol=lf
+src/groundfire/** text eol=lf
+src/groundfire_net/** text eol=lf
+conf/options.ini text eol=lf

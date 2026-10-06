@@ -1,7 +1,7 @@
 import re
 import sys
 
-with open("groundfire_net/websocket_gateway.py", "r") as f:
+with open("groundfire-online-service/src/groundfire_net/websocket_gateway.py", "r") as f:
     content = f.read()
 
 # 1. Remove GatewaySimulation
@@ -205,5 +205,5 @@ handle_client_replacement = """
 # Find `_handle_client` definition and replace it
 content = re.sub(r"    async def _handle_client\(self, reader: asyncio\.StreamReader, writer: asyncio\.StreamWriter\) -> None:.*?            await writer\.wait_closed\(\)\n", handle_client_replacement, content, flags=re.DOTALL)
 
-with open("groundfire_net/websocket_gateway.py", "w") as f:
+with open("groundfire-online-service/src/groundfire_net/websocket_gateway.py", "w") as f:
     f.write(content)

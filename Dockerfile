@@ -2,8 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy groundfire_net code
-COPY groundfire_net/ /app/groundfire_net/
+# Copy the canonical groundfire_net code from the unified online service.
+COPY groundfire-online-service/src/groundfire_net/ /app/groundfire_net/
 COPY versao-python/groundfire/ /app/groundfire/
 COPY versao-python/src/ /app/src/
 

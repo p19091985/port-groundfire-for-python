@@ -1,0 +1,56 @@
+[service]
+profile = "local"
+bind = "127.0.0.1"
+port = 27880
+public_base_url = "http://127.0.0.1:27880"
+allowed_origins = ["http://127.0.0.1:8060", "http://localhost:8060"]
+
+[storage]
+database = "data/service.sqlite3"
+backup_dir = "backups"
+
+[identity]
+allow_guests = true
+access_ttl_seconds = 900
+refresh_ttl_seconds = 2592000
+
+[social]
+presence_ttl_seconds = 60
+invite_ttl_seconds = 600
+party_max_members = 8
+
+[matches]
+reservation_ttl_seconds = 30
+queue_ttl_seconds = 300
+reconnect_window_seconds = 60
+max_workers = 8
+worker_bind = "127.0.0.1"
+worker_public_host = "127.0.0.1"
+worker_startup_seconds = 8
+admission_redeem_enabled = true
+
+[compatibility]
+# The unified FastAPI process serves the legacy HTTP directory on the same
+# service port, so there is no second listener competing for port 27880.
+directory_enabled = true
+directory_path = "conf/server_directory.json"
+include_lan = false
+gateway_endpoint = ""
+server_name = "Groundfire Gateway"
+cache_seconds = 5
+refresh_seconds = 30
+
+# Set the same secret on a legacy gateway to enable /session-token.json.
+# Keeping it empty returns 410 and leaves account/admission tickets in charge.
+session_secret = ""
+session_token_ttl_seconds = 3600
+session_token_url = ""
+allow_static_auth_tokens = false
+require_github_oauth = false
+
+# The protocol-1 master starts with the API and binds only to loopback by
+# default. Set master_enabled=false when legacy discovery is not required.
+master_enabled = true
+master_bind = "127.0.0.1"
+master_port = 27017
+master_ttl_seconds = 90
